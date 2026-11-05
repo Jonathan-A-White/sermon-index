@@ -174,3 +174,24 @@ func TestCountVersesMergesOverlapsAndAdjoins(t *testing.T) {
 		t.Errorf("none: %d", got)
 	}
 }
+
+func TestChapters(t *testing.T) {
+	for _, c := range []struct {
+		ref  string
+		want int
+	}{
+		{"Rom.5.8", 1}, {"Rom.5", 1}, {"Rom.5.1-Rom.5.11", 1}, {"Rom.5.12-Rom.6.4", 2},
+		{"Rom.5-Rom.8", 4}, {"Rom", 16}, {"Jude", 1},
+		{"Matt.28.1-Mark.1.3", 2}, // across a book boundary
+		// Acts to Jude: 28+16+16+13+6+6+4+4+5+3+6+4+3+1+13+5+5+3+5+1+1+1
+		{"Acts.1.1-Jude.1.25", 149},
+	} {
+		r, err := Parse(c.ref)
+		if err != nil {
+			t.Fatalf("%s: %v", c.ref, err)
+		}
+		if got := r.Chapters(); got != c.want {
+			t.Errorf("%s: %d chapters, want %d", c.ref, got, c.want)
+		}
+	}
+}

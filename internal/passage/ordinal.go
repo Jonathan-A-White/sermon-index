@@ -217,3 +217,23 @@ func (p point) last() int {
 	}
 	return Ordinal(p.book.N, c, v)
 }
+
+// Chapters is how many chapters the range touches: 1 for a verse, a
+// chapter or a passage within one, 16 for the whole of Romans. A range
+// across books counts the chapters of each.
+func (r Range) Chapters() int {
+	book := func(ord int) (*Book, int) { // the book and chapter an ordinal is in
+		b := &books[ord/1000000-1]
+		return b, ord / 1000 % 1000
+	}
+	b1, c1 := book(r.Lo)
+	b2, c2 := book(r.Hi)
+	if b1 == b2 {
+		return c2 - c1 + 1
+	}
+	n := len(b1.Last) - c1 + 1 + c2
+	for i := b1.N; i < b2.N-1; i++ { // the books between
+		n += len(books[i].Last)
+	}
+	return n
+}
