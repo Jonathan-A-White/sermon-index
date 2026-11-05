@@ -4,12 +4,13 @@ A sermon index: which sermons speak to a Bible passage or theme; a small service
 
 The index points outward. A row is a sermon's title, its preaching text as a passage, and a link to where the sermon is (CCEL, Spurgeon Gems, a preacher's site); no sermon's words are kept. Rows come from **source directories** committed under `sources/`, one per sermon list or theme system, each with its licence quoted verbatim, so adding a preacher is a data change: a new directory, `sermons check`, `sermons load`. Passages are found by overlap first; themes (Thompson's 1934 topics, Torrey) come second.
 
-This repository is one Go module, `github.com/Jonathan-A-White/sermon-index`, with one binary, `sermons`. The HTTP API (`sermons serve`) is the next story.
+This repository is one Go module, `github.com/Jonathan-A-White/sermon-index`, with one binary, `sermons`: it loads the source directories into Postgres and answers a read-only HTTP API, `/v1`, that Lampas calls ([docs/api.md](docs/api.md)).
 
 <!-- toc -->
 
 - [The record shape](#the-record-shape)
 - [The commands](#the-commands)
+- [Running it](#running-it)
 - [Running the tests](#running-the-tests)
 - [Layout](#layout)
 - [Licence](#licence)
@@ -44,6 +45,24 @@ bin/sermons load --all sources               # every source directory (not those
 
 `sermons load` prints, for example, `spurgeon-20: 20 rows, 19 passages, 0 removed`; loading the same files again changes nothing.
 
+## Running it
+
+`sermons serve` answers the API ([docs/api.md](docs/api.md): every route, its query, its JSON shape and an example the tests hold it to).
+
+```sh
+make build                                   # stamps /v1/health's version with git describe
+export DATABASE_URL=postgres://user:password@127.0.0.1:5433/sermons
+bin/sermons migrate && bin/sermons load --all sources
+SERMONS_ADDR=127.0.0.1:8790 bin/sermons serve      # the default address; stops on Ctrl-C or SIGTERM
+
+curl -s 'http://127.0.0.1:8790/v1/health'
+curl -s 'http://127.0.0.1:8790/v1/sermons?ref=rom.5.8'           # the sermons on a verse, chapter or range
+curl -s 'http://127.0.0.1:8790/v1/themes?ref=Rom.5'
+curl -s 'http://127.0.0.1:8790/v1/search?q=spurgeon+grace'
+```
+
+`SERMONS_ORIGINS` is the origins a browser may call it from (default `https://lampas.allmymind.org,http://localhost:5173`). It refuses to start on a database with a migration not applied; with the database down it starts and `/v1/health` answers 503 until the database answers. Each request is one line on stderr (`GET /v1/sermons?ref=rom.5.8 200 3ms 412B`). Each client IP may make 60 requests a minute, 30 at once; behind a proxy on a private address, the proxy must send `X-Real-IP`.
+
 ## Running the tests
 
 ```sh
@@ -57,14 +76,15 @@ The tests need **no Docker and no installed Postgres**: they start a real Postgr
 
 | Path | What it is |
 | --- | --- |
-| `cmd/sermons` | The binary: `migrate`, `check`, `load`. |
+| `cmd/sermons` | The binary: `migrate`, `check`, `load`, `serve`. |
+| `internal/api` | The HTTP API: routes, CORS, ETag and gzip, the rate limit, the request log. |
 | `internal/passage` | OSIS references to verse-ordinal ranges; the 66-book table copied from Lampas. |
 | `internal/migrate` | The embedded SQL migrations (`sql/NNNN_name.sql`) and the code that applies them. |
-| `internal/store` | Opening the database; the tests' embedded Postgres. |
+| `internal/store` | Opening the database; the API's queries; the tests' embedded Postgres. |
 | `internal/sources` | Reading, checking and loading a source directory. |
 | `internal/themes` | A theme source's records and their tables. |
-| `sources/` | The source directories; `_template` and `_fixtures` are never loaded by `--all`. |
-| `docs/` | `schema.md` (the tables and why), `sources.md` (the source-directory format). |
+| `sources/` | The source directories; `_template` and `_fixtures` (twenty Spurgeon sermons; a demo theme source) are never loaded by `--all`. |
+| `docs/` | `api.md` (the HTTP API, its examples asserted by the tests), `schema.md` (the tables and why), `sources.md` (the source-directory format). |
 
 ## Licence
 

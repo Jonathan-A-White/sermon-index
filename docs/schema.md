@@ -115,11 +115,11 @@ No mapping between versifications is done anywhere in this service today: a refe
 These are not decided by v1. Each is a question for the story named, or for the Governor.
 
 1. **Removing a whole source.** `load` removes rows no longer in a source's files, but a source whose directory is deleted stays in the database. A `sermons unload <id>` (one `DELETE FROM sources`, the rest cascades) is not written. (Whoever first retires a source.)
-2. **Search.** There is no text index yet. A2's `/v1/search?q=` needs one: a migration `0002` adding a generated `tsvector` over title, preacher and notes with a GIN index is the expected shape. (A2.)
-3. **Ordering within an answer.** The schema gives what A2's "preaching text first, narrower first" needs (`role`, `upper(span) - lower(span)`); the order of equal widths (by source, by date, by id) is A2's to choose.
+2. **Search.** Answered by A2: migration `0002_search` adds a generated `tsvector` on `sermons` (title, weighted above preacher; not notes) and on `themes` (label), each with a GIN index. A theme's part labels are not searched. [api.md](api.md#get-v1search).
+3. **Ordering within an answer.** Answered by A2: text before cited, then `upper(span) - lower(span)`, then source id, then id (a number as a number). [api.md](api.md#get-v1sermons).
 4. **The theme tier's 300-verse cap.** A topic's width (the verses its links cover) is not stored; A5 may compute it in the query or add a materialised column in a migration. (A5.)
 5. **A link's `from` and `see` across sources** (`'spurgeon-ccel:330'`) are text, not foreign keys: a source may be loaded before the one it names. Whether `sermons check --all` should verify them is open.
 6. **Hosted sermons.** `kind = 'hosted'` exists, but nothing says where a hosted file lives or how it is served. (The later hosting story.)
 7. **Versification mapping** (the table above). (Lampas's versification story.)
-8. **Book names in the API.** The parser accepts OSIS names and Lampas codes in any case and stores OSIS. Whether the API answers in OSIS (`Rom.5.8`) or in Lampas's codes (`rom.5.8`) is A2's call.
+8. **Book names in the API.** Answered by A2: the API reads either, in any case, and answers OSIS (`Rom.5.8`), the form the files and the database keep.
 9. **The test helper is linked into the binary.** `internal/store/testdb.go` is in package `store`, so `sermons` carries embedded-postgres's code (the binary is about 17 MB). Moving it to its own package (`internal/store/storetest`) would drop that; it changes nothing the tests do.
