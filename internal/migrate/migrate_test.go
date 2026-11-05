@@ -34,7 +34,7 @@ func TestUpAppliesOnceAndASecondRunIsANoOp(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(pending, []string{"0001_init", "0002_search"}) {
+	if !reflect.DeepEqual(pending, []string{"0001_init", "0002_search", "0003_theme_verses"}) {
 		t.Errorf("pending before = %v", pending)
 	}
 
@@ -42,7 +42,7 @@ func TestUpAppliesOnceAndASecondRunIsANoOp(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(applied, []string{"0001_init", "0002_search"}) {
+	if !reflect.DeepEqual(applied, []string{"0001_init", "0002_search", "0003_theme_verses"}) {
 		t.Errorf("first Up applied %v", applied)
 	}
 	again, err := Up(ctx, db)
@@ -56,8 +56,8 @@ func TestUpAppliesOnceAndASecondRunIsANoOp(t *testing.T) {
 	if err := db.QueryRow(ctx, "select count(*) from schema_migrations").Scan(&n); err != nil {
 		t.Fatal(err)
 	}
-	if n != 2 {
-		t.Errorf("schema_migrations has %d rows, want 2", n)
+	if n != 3 {
+		t.Errorf("schema_migrations has %d rows, want 3", n)
 	}
 	pending, err = Pending(ctx, db)
 	if err != nil {

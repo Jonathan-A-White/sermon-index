@@ -372,3 +372,51 @@ func TestLoadSpurgeonCCEL(t *testing.T) {
 		t.Errorf("%d expositions, want 5", n)
 	}
 }
+
+// A topic's verses is what its links cover together, written by load and
+// kept right when the links change (the theme tier's 300-verse cap reads it).
+func TestLoadWritesATopicsVerses(t *testing.T) {
+	ctx := context.Background()
+	db := migrated(t)
+	topics := `{"id": "love", "label": "Love"}
+{"id": "grace", "label": "Grace"}
+{"id": "none", "label": "No links"}
+`
+	links := `{"topic": "love", "ref": "Rom.5.8"}
+{"topic": "grace", "ref": "Rom.5.15-Rom.5.21"}
+{"topic": "grace", "ref": "Rom.5.20"}
+{"topic": "grace", "ref": "Rom.6.1-Rom.6.2"}
+`
+	verses := func() map[string]int {
+		rows, err := db.Query(ctx, "select id, verses from themes order by id")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer rows.Close()
+		out := map[string]int{}
+		for rows.Next() {
+			var id string
+			var n *int
+			if err := rows.Scan(&id, &n); err != nil || n == nil {
+				t.Fatalf("%s: %v %v", id, n, err)
+			}
+			out[id] = *n
+		}
+		return out
+	}
+	dir := writeSource(t, map[string]string{"source.toml": goodThemeToml, "topics.jsonl": topics, "links.jsonl": links})
+	if _, err := Load(ctx, db, dir); err != nil {
+		t.Fatal(err)
+	}
+	if got := verses(); got["love"] != 1 || got["grace"] != 9 || got["none"] != 0 {
+		t.Errorf("verses after load: %v (want love 1, grace 7+2, none 0)", got)
+	}
+	dir = writeSource(t, map[string]string{"source.toml": goodThemeToml, "topics.jsonl": topics,
+		"links.jsonl": `{"topic": "love", "ref": "Rom.5"}` + "\n" + `{"topic": "grace", "ref": "Rom.5.15"}` + "\n"})
+	if _, err := Load(ctx, db, dir); err != nil {
+		t.Fatal(err)
+	}
+	if got := verses(); got["love"] != 21 || got["grace"] != 1 {
+		t.Errorf("verses after the links changed: %v", got)
+	}
+}

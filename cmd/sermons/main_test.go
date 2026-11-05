@@ -67,7 +67,7 @@ func TestMigrateAndLoadTwice(t *testing.T) {
 	env := map[string]string{"DATABASE_URL": db.Config().ConnString()}
 
 	code, out, errOut := runCmd(t, env, "migrate")
-	if code != 0 || out != "applied 0001_init\napplied 0002_search\n" {
+	if code != 0 || out != "applied 0001_init\napplied 0002_search\napplied 0003_theme_verses\n" {
 		t.Fatalf("migrate: %d %q %q", code, out, errOut)
 	}
 	if code, out, _ := runCmd(t, env, "migrate"); code != 0 || !strings.Contains(out, "nothing to apply") {

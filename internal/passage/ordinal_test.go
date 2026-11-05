@@ -139,3 +139,38 @@ func TestParseErrors(t *testing.T) {
 		}
 	}
 }
+
+func TestVerses(t *testing.T) {
+	for _, c := range []struct {
+		ref  string
+		want int
+	}{{"Rom.5.8", 1}, {"Rom.5", 21}, {"Rom.5.12-Rom.6.4", 14}, {"Isa.53", 12}} {
+		r, err := Parse(c.ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := Verses(r.Lo, r.Hi); got != c.want {
+			t.Errorf("Verses(%s) = %d, want %d", c.ref, got, c.want)
+		}
+	}
+}
+
+func TestCountVersesMergesOverlapsAndAdjoins(t *testing.T) {
+	r := func(s string) Range {
+		x, err := Parse(s)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return x
+	}
+	// Rom.5.1-Rom.5.11 and Rom.5.8-Rom.5.21 overlap (21 verses); Rom.5.21 and Rom.6.1 are two.
+	if got := CountVerses([]Range{r("Rom.5.8-Rom.5.21"), r("Rom.5.1-Rom.5.11"), r("Rom.5.8")}); got != 21 {
+		t.Errorf("overlapping: %d, want 21", got)
+	}
+	if got := CountVerses([]Range{r("Rom.5.21"), r("Rom.6.1")}); got != 2 {
+		t.Errorf("adjoining: %d, want 2", got)
+	}
+	if got := CountVerses(nil); got != 0 {
+		t.Errorf("none: %d", got)
+	}
+}

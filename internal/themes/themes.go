@@ -72,6 +72,12 @@ func Write(ctx context.Context, tx pgx.Tx, sourceID string, topics []Topic, link
 	var partTopic []string
 	var partN []int32
 
+	// A topic's width: the verses its links cover together.
+	spans := map[string][]passage.Range{}
+	for _, l := range links {
+		spans[l.Topic] = append(spans[l.Topic], l.Span)
+	}
+
 	b := &pgx.Batch{}
 	for _, t := range topics {
 		see := t.See
@@ -79,10 +85,10 @@ func Write(ctx context.Context, tx pgx.Tx, sourceID string, topics []Topic, link
 			see = []string{}
 		}
 		topicIDs = append(topicIDs, t.ID)
-		b.Queue(`INSERT INTO themes (source_id, id, label, see) VALUES ($1, $2, $3, $4)
-			ON CONFLICT (source_id, id) DO UPDATE SET label = EXCLUDED.label, see = EXCLUDED.see
-			WHERE (themes.label, themes.see) IS DISTINCT FROM (EXCLUDED.label, EXCLUDED.see)`,
-			sourceID, t.ID, t.Label, see)
+		b.Queue(`INSERT INTO themes (source_id, id, label, see, verses) VALUES ($1, $2, $3, $4, $5)
+			ON CONFLICT (source_id, id) DO UPDATE SET label = EXCLUDED.label, see = EXCLUDED.see, verses = EXCLUDED.verses
+			WHERE (themes.label, themes.see, themes.verses) IS DISTINCT FROM (EXCLUDED.label, EXCLUDED.see, EXCLUDED.verses)`,
+			sourceID, t.ID, t.Label, see, passage.CountVerses(spans[t.ID]))
 		for _, p := range t.Parts {
 			partTopic = append(partTopic, t.ID)
 			partN = append(partN, int32(p.N))
