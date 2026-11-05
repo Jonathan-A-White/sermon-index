@@ -1,6 +1,6 @@
 # Source directories
 
-A source is a directory under `sources/`, committed to this repository: a sermon list (Spurgeon from CCEL, Matthew Henry by hand, a modern preacher's catalogue) or a theme system (Thompson's 1934 topics, Torrey). The files are the truth; `sermons load` puts them in the database and `sermons check` says what is wrong with them, by file and line. Lampas bundles the same files for its offline copy, so the format is a contract with Lampas too. `sources/_template/` is a filled-in example with every field explained.
+A source is a directory under `sources/`, committed to this repository: a sermon list (Spurgeon from CCEL, Matthew Henry by hand, a modern preacher's catalogue) or a theme system (Thompson's 1934 topics, Torrey). The files are the truth; `sermons load` puts them in the database and `sermons check` says what is wrong with them, by file and line. [adding-a-source.md](adding-a-source.md) is the recipe for a new one. Lampas bundles the same files for its offline copy, so the format is a contract with Lampas too. `sources/_template/` is a filled-in example with every field explained.
 
 ```
 sources/
@@ -25,7 +25,9 @@ sources/
 - [rows.jsonl (a sermon source)](#rowsjsonl-a-sermon-source)
 - [topics.jsonl and links.jsonl (a theme source)](#topicsjsonl-and-linksjsonl-a-theme-source)
 - [References](#references)
+- [Host rules](#host-rules)
 - [sermons check](#sermons-check)
+- [sermons propose](#sermons-propose)
 - [sermons load](#sermons-load)
 - [Theme sources](#theme-sources)
 - [The fixture and the template](#the-fixture-and-the-template)
@@ -34,7 +36,7 @@ sources/
 
 ## source.toml
 
-TOML. Every key is required except `licence_note`; an unknown key is a fault, so a misspelt key is never silently lost.
+TOML. Every key is required except `licence_note` and `host_rules`; an unknown key is a fault, so a misspelt key is never silently lost.
 
 | Key | What it is |
 | --- | --- |
@@ -48,6 +50,7 @@ TOML. Every key is required except `licence_note`; an unknown key is a fault, so
 | `terms_url` | The page `licence` was quoted from, https. |
 | `added` | The day the source was added, a TOML date (`2026-11-05`, unquoted). |
 | `on_by_default` | `true` or `false`: whether a reader who has never chosen sees the source. Required, so the choice is always made on purpose. |
+| `host_rules` | Optional table: what `sermons check --urls` does for a host ([Host rules](#host-rules)). |
 
 ## rows.jsonl (a sermon source)
 
@@ -70,6 +73,8 @@ One JSON object a line, one sermon each. A blank line is skipped. An unknown fie
 | `duration_s` | optional | Length in seconds (audio, video); a positive whole number. |
 | `cited` | optional | Other references the sermon cites, `["John.3.16", "Rom.5.1-Rom.5.11"]`; indexed with the role `cited`, below the preaching text. |
 | `notes` | optional | Anything a later reader of the file should know: where the `ref` came from when the source did not tag it, why a field is missing. |
+| `series` | optional | `true` for a series or a whole book: a row whose `ref` spans more than 3 chapters. The row is kept, listed by its source and found by search, but it has **no passage**: `sermons load` writes none for it (not its `ref`, not its `cited`), so no passage query, `tier=theme` row or count ever meets it. Give it the narrowest text as its `ref`, or split the series into a row per text. Left out when false (`"series": false` is a fault). |
+| `expect_title` | optional | What `sermons check --urls` must find in the page at `url` when the page prints another title than `title`; the page is then fetched with GET. Not loaded. |
 
 ## topics.jsonl and links.jsonl (a theme source)
 
@@ -107,6 +112,23 @@ A link given twice (the same topic, part, reference, via and from) is a fault.
 
 A reference is OSIS: `Book.Chapter.Verse` (`Rom.5.8`), `Book.Chapter` (a whole chapter, `Ps.23`), `Book` (a whole book, `Jude`), or a range of two of those joined by `-` with the end written in full (`Rom.5.1-Rom.5.11`, `Rom.5.12-Rom.6.4`, `Rom.5-Rom.6`). The book is the OSIS name (`Gen`, `Exod`, `Ps`, `Song`, `Matt`, `1Cor`, `Phlm`, `Rev`) or Lampas's code (`gen`, `exo`, `psa`, `sng`, `mat`, `1co`, `phm`, `rev`), in any case; the database keeps the OSIS form. Chapters and verses are numbered as Lampas numbers them, which is the KJV's numbering with the exceptions in [schema.md, "The book table"](schema.md#the-book-table). `Rom.5.1-11` (a short end) is refused with the whole form suggested.
 
+## Host rules
+
+`source.toml` may hold a `[host_rules."<host>"]` table for each host its rows link to (the host name alone, lower case: `"www.truthforlife.org"`, no scheme, path or port). It says what `sermons check --urls` does for that host, and nothing else reads it.
+
+```toml
+[host_rules."www.example.org"]
+title_in_page = true   # the host answers 200 to an address it does not have
+delay_ms = 1000        # wait before each request to the host after the first
+```
+
+| Key | What it does |
+| --- | --- |
+| `title_in_page` | `true`: a `url` on the host is fetched with GET, and the row's `title` (or its `expect_title`) must be in the page's text (markup stripped, entities read, curly quotes made straight, case ignored): `200 OK but the title '...' is not in the page`. `false` turns a built-in rule off. |
+| `delay_ms` | The wait, in milliseconds, before each request to the host after the first: for a host whose `robots.txt` or terms ask for a crawl delay. |
+
+A rule needs at least one key. `ccel.org` and `www.ccel.org` have `title_in_page = true` built in (CCEL answers 200 to any section id), so `spurgeon-ccel` needs no table; a source's own table is laid over the built-in ones a key at a time. A row's `expect_title` is the per-row form: it makes `--urls` fetch that row's `url` and require those words, on any host.
+
 ## sermons check
 
 ```
@@ -129,7 +151,17 @@ It checks:
 - `rows.jsonl`: `id`, `title` and `url` given; ids well formed and unique (`id '104' repeats line 6`); `ref` and every `cited` reference parse (`unknown book 'Tob'`, `chapter past the book`, `verse past the chapter`, `verse 0 is not a verse ...`, `the range ends before it starts`); `url` and `alt_url` https and well formed; `kind`, `date` and `duration_s` well formed; no optional field given empty.
 - `topics.jsonl`: ids well formed and unique, a label, parts numbered and unique, every bare `see` id a topic of the file.
 - `links.jsonl`: the topic is in `topics.jsonl`, the part is one of the topic's, the reference parses, `via` is known, a link via a sermon names it in `from`, no link repeats.
-- `--urls N` (off by default; uses the network): sends a HEAD to a random N of the source's `url` and `alt_url` values and reports any that does not answer 200 after redirects (`rows.jsonl:12: url 'https://...': 404 Not Found`). It is run only when the rest passes. A 200 does not prove the page is the sermon: CCEL answers 200 to a made-up section id, so for a `url` on `ccel.org` the check fetches the page (a GET, not a HEAD) and reports `200 OK but the title '...' is not in the page` unless the row's title is in the page's text (markup stripped, entities read, curly quotes made straight, case ignored). The rule is per host (`titleHosts` in `internal/sources/check.go`); `alt_url` is only asked with HEAD.
+- `--urls N` (off by default; uses the network): sends a HEAD to a random N of the source's `url` and `alt_url` values and reports any that does not answer 200 after redirects (`rows.jsonl:12: url 'https://...': 404 Not Found`). It is run only when the rest passes. A 200 does not prove the page is the sermon: CCEL answers 200 to a made-up section id, so for a `url` on `ccel.org` the check fetches the page (a GET, not a HEAD) and reports `200 OK but the title '...' is not in the page` unless the row's title is in the page's text (markup stripped, entities read, curly quotes made straight, case ignored). The rule is per host (`DefaultHostRules` in `internal/sources/check.go`, and the source's `host_rules`); `alt_url` is only asked with HEAD. The rule is the source's [host rules](#host-rules) over the built-in CCEL one, and a row's `expect_title`.
+
+**Warnings.** A row that is valid and loads, but that the author should look at, is printed as `rows.jsonl:7: warning: ...` and does not change the exit status (`ok: 1 source(s), 1 warning(s)`). There is one: a row whose `ref` spans more than 3 chapters and is not `series` (`ref 'Acts.1.1-Jude.1.25' spans 149 chapters: a series over it would match every chapter: give the row a `series: true` and the narrowest text, or split it`). With a fault anywhere in the directory the rows that do parse still warn.
+
+## sermons propose
+
+```
+sermons propose sources/henry-sermons
+```
+
+Checks the sermon source (a fault is printed as `check` prints it and exits 1; a theme source is refused) and prints the story for adding it: [prompts/add-source.md](../prompts/add-source.md) filled from its `source.toml` and its rows: the source's name and id, the preacher (the one its rows name most, else the `credit`), the catalogue (`homepage`) and terms (`terms_url`) addresses, the `licence` quoted, the row counts (all, with a preaching text, `series`) and a size, S up to 300 rows, M up to 2,000, L more. It is what a Builder who has written a source hands the Mayor as the next step; [adding-a-source.md](adding-a-source.md) is the recipe it follows.
 
 ## sermons load
 
@@ -184,4 +216,4 @@ go run ./tools/sword-themes --module Torrey --cache .sword-cache --out sources/t
 
 `sources/_fixtures/themes-demo/` is a theme source of four invented topics on Romans 5 (Love with two parts, Grace, Atonement, Adam and Christ): not Thompson's or Torrey's index, only something for the API's tests and [api.md](api.md)'s examples to answer from.
 
-`sources/_template/` is a source directory with every field filled in and explained in `source.toml`'s comments; copy it to start a new source. `sermons check` passes on both (a test keeps it so).
+`sources/_template/` is a source directory with every field filled in and explained in `source.toml`'s comments (`host_rules`, `series` and `expect_title` too), with a README; copy it to start a new source, and follow [adding-a-source.md](adding-a-source.md). `sermons check` passes on both (a test keeps it so).

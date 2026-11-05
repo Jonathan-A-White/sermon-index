@@ -27,7 +27,7 @@ A sermon source is `sources/<id>/source.toml` (name, kind, the licence verbatim,
 {"id": "104", "title": "Love's Commendation", "ref": "Rom.5.8", "url": "https://ccel.org/ccel/spurgeon/sermons02/sermons02.l.html", "alt_url": "https://www.spurgeongems.org/sermon/chs104.pdf", "preacher": "C. H. Spurgeon"}
 ```
 
-Optional fields: `ref` (the preaching text, OSIS), `alt_url`, `kind` (`link`, `hosted`, `exposition`), `preacher`, `date` (`1855`, `1855-03` or `1855-03-18`), `duration_s`, `cited` (other references), `notes`. A theme source has `topics.jsonl` (`{id, label, parts?, see?}`) and `links.jsonl` (`{topic, part?, ref, via?, from?}`) instead. [docs/sources.md](docs/sources.md) is the full format; `sources/_template/` is a filled-in example.
+Optional fields: `ref` (the preaching text, OSIS), `alt_url`, `kind` (`link`, `hosted`, `exposition`), `preacher`, `date` (`1855`, `1855-03` or `1855-03-18`), `duration_s`, `cited` (other references), `notes`, `series` (a row over more than 3 chapters: kept and found by its title, matched by no passage), `expect_title` (what `--urls` must find in the page). A theme source has `topics.jsonl` (`{id, label, parts?, see?}`) and `links.jsonl` (`{topic, part?, ref, via?, from?}`) instead. [docs/sources.md](docs/sources.md) is the full format; `sources/_template/` is a filled-in example.
 
 In the database a passage is an `int4range` of verse ordinals (`book*1000000 + chapter*1000 + verse`, Lampas's book order: Romans 5:8 is 45005008) with a GiST index, so "sermons on this verse, chapter or pericope" is `span && $1`. [docs/schema.md](docs/schema.md) draws the tables and says why each choice was made.
 
@@ -46,6 +46,10 @@ In the database a passage is an `int4range` of verse ordinals (`book*1000000 + c
 
 The two theme sources are written the same way by `go run ./tools/sword-themes --module TCR --cache .sword-cache --out sources/themes-tcr1934 --report tools/sword-themes/REPORT.md` (and `--module Torrey ... --out sources/themes-torrey`), which fetches the SWORD module from CrossWire into the (git-ignored) cache and writes `topics.jsonl` and `links.jsonl`; `source.toml` is by hand. [tools/sword-themes/REPORT.md](tools/sword-themes/REPORT.md) lists the references and See terms the modules print in a form the tool cannot read. [docs/sources.md, "Theme sources"](docs/sources.md#theme-sources) says how a module's topics become parts, labels and links.
 
+## Adding a source
+
+A new preacher or collection is a data add: [docs/adding-a-source.md](docs/adding-a-source.md) is the recipe a Builder session follows (find the catalogue; read its terms and `robots.txt` first and quote them; link-out only; write `source.toml` and `rows.jsonl`, by a tool where the catalogue is machine-readable and by hand where it is a contents page; `sermons check` and `--urls`; load; the credit; the places outside this repository a new source touches), with Truth For Life as the worked example. [prompts/add-source.md](prompts/add-source.md) is the story a Mayor files for one, and `sermons propose sources/<id>` prints it filled from the source's `source.toml` and row count. [docs/candidates.md](docs/candidates.md) names the next three catalogues (Truth For Life, Ligonier, SermonAudio) with their terms quoted and a recommendation each.
+
 ## The commands
 
 ```sh
@@ -55,7 +59,8 @@ export DATABASE_URL=postgres://user:password@127.0.0.1:5433/sermons
 bin/sermons migrate                          # apply the embedded migrations (a second run is a no-op)
 bin/sermons check sources/spurgeon-ccel      # one line per fault, file:line; exit 1 on any
 bin/sermons check --urls 20 sources/spurgeon-ccel   # also HEAD a random 20 urls (network)
-bin/sermons check --all sources              # every source directory
+bin/sermons check --all sources              # every source directory (a warning, such as a row over 3 chapters not marked series, is printed and exits 0)
+bin/sermons propose sources/henry-sermons    # the story for adding the source, filled from its source.toml and row count
 bin/sermons load sources/spurgeon-ccel       # upsert the source in one transaction; prints the counts
 bin/sermons load --all sources               # every source directory (not those beginning with '_')
 ```
@@ -130,7 +135,8 @@ The tests need **no Docker and no installed Postgres**: they start a real Postgr
 
 | Path | What it is |
 | --- | --- |
-| `cmd/sermons` | The binary: `migrate`, `check`, `load`, `serve`. |
+| `cmd/sermons` | The binary: `migrate`, `check`, `propose`, `load`, `serve`. |
+| `prompts` | `add-source.md`, the story for a new source, embedded in the binary for `sermons propose`. |
 | `internal/api` | The HTTP API: routes, CORS, ETag and gzip, the rate limit, the request log. |
 | `internal/passage` | OSIS references to verse-ordinal ranges; the 66-book table copied from Lampas. |
 | `internal/migrate` | The embedded SQL migrations (`sql/NNNN_name.sql`) and the code that applies them. |
@@ -143,7 +149,7 @@ The tests need **no Docker and no installed Postgres**: they start a real Postgr
 | `deploy/laptop` | The two systemd user units for the Laptop and their line-by-line README. |
 | `scripts` | `install-laptop.sh`, `uninstall-laptop.sh`, `smoke.sh`. |
 | `tests` | The tests that drive those scripts with docker, systemctl, go and curl faked. |
-| `docs/` | `api.md` (the HTTP API, its examples asserted by the tests), `schema.md` (the tables and why), `sources.md` (the source-directory format), `operations.md` (running it: logs, reloads, failures). |
+| `docs/` | `api.md` (the HTTP API, its examples asserted by the tests), `schema.md` (the tables and why), `sources.md` (the source-directory format), `adding-a-source.md` (the recipe for a new source), `candidates.md` (the next three catalogues and their terms), `operations.md` (running it: logs, reloads, failures). |
 
 ## Licence
 
