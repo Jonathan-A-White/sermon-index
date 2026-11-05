@@ -1,0 +1,14 @@
+# A test fixture, not a source that is loaded: a handful of invented topics
+# on Romans 5, so the API's tests and docs/api.md's examples have a theme
+# source to answer from. It is not Thompson's or Torrey's index; those are
+# story A4's. `sermons load --all sources/` skips it (its parent begins '_').
+
+id = "themes-demo"
+name = "Demo themes (a fixture)"
+kind = "themes"
+licence = "Written for this repository's tests; MIT, as the code is."
+credit = "The sermon index's tests"
+homepage = "https://github.com/Jonathan-A-White/sermon-index"
+terms_url = "https://github.com/Jonathan-A-White/sermon-index/blob/main/LICENSE"
+added = 2026-11-05
+on_by_default = false

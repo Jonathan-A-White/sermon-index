@@ -149,4 +149,6 @@ demo-themes: 2 topics, 1 parts, 3 links, 0 removed
 
 `sources/_fixtures/spurgeon-20/` is the twenty Spurgeon sermons the 2026-11-05 probe tried (Lampas `docs/sources/sermon-index.md`, section 6), with their CCEL page urls (the section ids read from CCEL's ThML) and Spurgeon Gems pdfs. 19 have a preaching text; 385 has none. Sermon 12's text (Psalm 127:2) is from its printed head, which CCEL's ThML does not tag; 62 is an exposition with no Spurgeon Gems pdf. The tests load it.
 
+`sources/_fixtures/themes-demo/` is a theme source of four invented topics on Romans 5 (Love with two parts, Grace, Atonement, Adam and Christ): not Thompson's or Torrey's index, only something for the API's tests and [api.md](api.md)'s examples to answer from.
+
 `sources/_template/` is a source directory with every field filled in and explained in `source.toml`'s comments; copy it to start a new source. `sermons check` passes on both (a test keeps it so).

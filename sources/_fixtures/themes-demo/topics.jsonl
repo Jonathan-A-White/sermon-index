@@ -1,0 +1,4 @@
+{"id": "love", "label": "Love", "parts": [{"n": 1, "label": "Of God"}, {"n": 2, "label": "Of the brethren"}], "see": ["grace"]}
+{"id": "grace", "label": "Grace", "see": ["love", "themes-other:mercy"]}
+{"id": "atonement", "label": "Atonement"}
+{"id": "adam", "label": "Adam and Christ"}
