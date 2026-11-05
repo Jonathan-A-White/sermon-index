@@ -1,7 +1,7 @@
 # The sermon index's gate is `make test` and `make lint`.
 # The tests start their own Postgres (embedded-postgres): no Docker, no
 # installed Postgres, and DATABASE_URL is never read by them. The first run
-# downloads the Postgres binaries (about 25 MB) into ~/.cache/sermon-index.
+# downloads the Postgres binaries (about 15 MB) into ~/.cache/sermon-index.
 
 GO ?= go
 
