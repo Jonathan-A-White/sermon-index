@@ -73,7 +73,9 @@ func encode(v any) ([]byte, error) {
 // the headers only.
 func send(w http.ResponseWriter, r *http.Request, status int, b []byte) {
 	h := w.Header()
-	h.Set("Content-Type", "application/json")
+	if h.Get("Content-Type") == "" {
+		h.Set("Content-Type", "application/json")
+	}
 	if acceptsGzip(r.Header.Get("Accept-Encoding")) {
 		var z bytes.Buffer
 		zw, _ := gzip.NewWriterLevel(&z, gzip.BestSpeed)

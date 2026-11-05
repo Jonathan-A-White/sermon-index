@@ -494,7 +494,7 @@ func TestOneLogLineARequest(t *testing.T) {
 
 func TestNotFoundIsJSON(t *testing.T) {
 	ts := newTestServer(t, loadedDB(t))
-	for _, p := range []string{"/", "/v1", "/v1/sermon", "/v2/sermons?ref=rom.5.8"} {
+	for _, p := range []string{"/nope", "/v1", "/v1/sermon", "/v2/sermons?ref=rom.5.8"} {
 		res := ts.do("GET", p)
 		if res.StatusCode != 404 {
 			t.Errorf("%s: %d", p, res.StatusCode)
@@ -502,5 +502,47 @@ func TestNotFoundIsJSON(t *testing.T) {
 		if code, _ := errorBody(t, res); code != "not_found" {
 			t.Errorf("%s: error %q", p, code)
 		}
+	}
+}
+
+// The bare address is a short page for a person: the service's name, the
+// counts /v1/health gives, the routes and one example link.
+func TestBareAddressIsAPage(t *testing.T) {
+	ts := newTestServer(t, loadedDB(t))
+	res := ts.do("GET", "/")
+	if res.StatusCode != 200 {
+		t.Fatalf("GET /: %d", res.StatusCode)
+	}
+	if ct := res.Header.Get("Content-Type"); !strings.HasPrefix(ct, "text/html") {
+		t.Errorf("GET / Content-Type %q", ct)
+	}
+	b := body(t, res)
+	for _, want := range []string{
+		"Sermon index",
+		"2 sources", "20 sermons",
+		"/v1/health", "/v1/sources", "/v1/sermons", "/v1/themes", "/v1/search",
+		`href="/v1/sermons?ref=rom.5.8"`,
+		"docs/api.md",
+	} {
+		if !strings.Contains(b, want) {
+			t.Errorf("GET / lacks %q:\n%s", want, b)
+		}
+	}
+	if strings.Contains(b, "not_found") {
+		t.Errorf("GET / is an error:\n%s", b)
+	}
+	// HEAD answers the headers alone.
+	if h := ts.do("HEAD", "/"); h.StatusCode != 200 {
+		t.Errorf("HEAD /: %d", h.StatusCode)
+	}
+}
+
+func TestBareAddressIs503WhenTheDatabaseIsUnreachable(t *testing.T) {
+	db := loadedDB(t)
+	ts := newTestServer(t, db)
+	db.Close()
+	res := ts.do("GET", "/")
+	if res.StatusCode != 503 {
+		t.Errorf("GET / with the database down: %d", res.StatusCode)
 	}
 }

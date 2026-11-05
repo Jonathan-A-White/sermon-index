@@ -4,7 +4,7 @@
 // the server answers them byte for byte.
 //
 // Every route is a GET (HEAD too); every answer is JSON, indented by two
-// spaces. A 200 carries an ETag (a hash of its body) and is cached for five
+// spaces, except the bare address / (home.go), a short HTML page. A 200 carries an ETag (a hash of its body) and is cached for five
 // minutes; an error is {error, detail} and is not cached. Around the routes:
 // CORS for an allow-list of origins (cors.go), a token bucket per client IP
 // (ratelimit.go), gzip when the client accepts it (cache.go), and one log
@@ -71,6 +71,7 @@ func New(c Config) http.Handler {
 
 	mux := http.NewServeMux()
 	// A "GET" pattern answers HEAD too.
+	mux.HandleFunc("GET /{$}", s.home)
 	mux.HandleFunc("GET /v1/health", s.health)
 	mux.HandleFunc("GET /v1/sources", s.sources)
 	mux.HandleFunc("GET /v1/sermons", s.sermons)

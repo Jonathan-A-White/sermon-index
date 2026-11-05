@@ -1,6 +1,6 @@
 # The API (v1)
 
-`sermons serve` answers a small, read-only HTTP API: the contract Lampas's sermon client codes against. Every route is under `/v1`; a change that would break a client is a new version (`/v2`), never an edit to these shapes. A new field may be added to a row; a client must ignore fields it does not know.
+`sermons serve` answers a small, read-only HTTP API: the contract Lampas's sermon client codes against. Every route is under `/v1`, except the bare address `/`, a page for a person; a change that would break a client is a new version (`/v2`), never an edit to these shapes. A new field may be added to a row; a client must ignore fields it does not know.
 
 **The examples below are tests.** Each `Example:` line names a request, and the `json` block under it is the exact body the server answers, byte for byte, over the two test fixtures (`sources/_fixtures/spurgeon-20` and `sources/_fixtures/themes-demo`). `TestDocExamples` in `internal/api/server_test.go` reads this file, sends each request and compares; a 200 example is required for every route. So the doc is written by hand and the tests hold it to the server: change a shape and this file must change with it.
 
@@ -8,6 +8,7 @@
 
 - [Running it](#running-it)
 - [What every answer has in common](#what-every-answer-has-in-common)
+- [GET /](#get-)
 - [GET /v1/health](#get-v1health)
 - [GET /v1/sources](#get-v1sources)
 - [GET /v1/sermons](#get-v1sermons)
@@ -45,6 +46,10 @@ curl -s 'http://127.0.0.1:8790/v1/sermons?ref=rom.5.8'
 - **CORS.** A request whose `Origin` is in `SERMONS_ORIGINS` is answered with `Access-Control-Allow-Origin: <that origin>` and `Access-Control-Expose-Headers: ETag, Retry-After`; its preflight (`OPTIONS` with `Access-Control-Request-Method`) is answered 204 with `Access-Control-Allow-Methods: GET, HEAD` and `Access-Control-Allow-Headers: If-None-Match`. Any other origin gets no CORS header. Methods: `GET` and `HEAD` (the headers alone); any other is 405 (`OPTIONS` that is not a preflight is 204 with `Allow`).
 - **A rate limit per client IP**: a token bucket of 60 requests a minute, up to 30 at once (constants in `internal/api/ratelimit.go`, not settings). Past it: `429` with `Retry-After: <seconds>`. The client IP is the peer's address; when the peer is loopback or a private address (the VPS's nginx over WireGuard), `X-Real-IP`, else the last address in `X-Forwarded-For`, is believed instead, so **the front door must set `X-Real-IP`** or every reader shares the proxy's bucket.
 - **A log line a request** on stderr when it ends: method, path with its query, status, milliseconds and the bytes of body sent (after gzip), as `GET /v1/sermons?ref=rom.5.8 200 3ms 412B`. A database failure logs a second line with the error, which the client is not told.
+
+## GET /
+
+The bare address, for a person who opens the service's URL in a browser: a short HTML page (`Content-Type: text/html; charset=utf-8`, not JSON) that names the service, gives the `sources` and `sermons` counts of `/v1/health`, lists the routes below and links one example, [`/v1/sermons?ref=rom.5.8`](/v1/sermons?ref=rom.5.8). It has no `Example:` block because the examples here are JSON; `TestBareAddressIsAPage` holds it. Like every route it is cached for five minutes, and it answers `503` (`unavailable`, as JSON) when the database does not answer. Any other path that is not a route below is still `404` `not_found`.
 
 ## GET /v1/health
 
@@ -439,7 +444,7 @@ Every error is `{error, detail}`: `error` a stable code a client may branch on, 
 | 400 | `bad_tier`, `bad_theme` | `tier` is not `passage`, `theme`, `passage,theme` or `theme-only`; `theme` is not `<theme source>:<topic>`. |
 | 400 | `bad_limit`, `bad_offset` | `limit` is not 1 to 200; `offset` is not 0 or more. |
 | 400 | `bad_query` | `q` is empty or over 200 characters. |
-| 404 | `not_found` | No such route. |
+| 404 | `not_found` | No such route (`/` itself is the page above). |
 | 405 | `method_not_allowed` | A method other than GET, HEAD or OPTIONS; `Allow: GET, HEAD, OPTIONS`. |
 | 429 | `rate_limited` | Past the rate limit; `Retry-After` says when to try again. |
 | 500 | `internal` | A query failed while the database answers; the error is logged. |
