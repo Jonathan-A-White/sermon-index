@@ -420,3 +420,50 @@ func TestLoadWritesATopicsVerses(t *testing.T) {
 		t.Errorf("verses after the links changed: %v", got)
 	}
 }
+
+// The hand-made Matthew Henry source loads with the counts REPORT.md gives:
+// 52 rows (7 read from the 1847 Complete Works, 45 from the 1830
+// Miscellaneous Works), 46 of them with a preaching text, and Matthew 16:26
+// answers the six sermons of The Worth of the Soul. Every url is a reader
+// page of one of the two Archive items, never a page of Philip Henry's.
+func TestLoadHenrySermons(t *testing.T) {
+	const dir = "../../sources/henry-sermons"
+	if fs := Check(dir); len(fs) != 0 {
+		t.Fatalf("check: %v", Faults(fs))
+	}
+	ctx := context.Background()
+	db := migrated(t)
+	if _, err := Load(ctx, db, dir); err != nil {
+		t.Fatal(err)
+	}
+	if n := count(t, db, "select count(*) from sermons where source_id = 'henry-sermons'"); n != 52 {
+		t.Errorf("%d rows, want 52", n)
+	}
+	if n := count(t, db, "select count(*) from sermons where source_id = 'henry-sermons' and preacher <> 'Matthew Henry'"); n != 0 {
+		t.Errorf("%d rows by someone else than Matthew Henry", n)
+	}
+	if n := count(t, db, "select count(*) from sermon_passages where role = 'text' and sermon_id in (select id from sermons where source_id = 'henry-sermons')"); n != 46 {
+		t.Errorf("%d preaching texts, want 46", n)
+	}
+	for item, want := range map[string]int{"miscellaneouswor00henr": 45, "completeworksofr0001revm": 7} {
+		prefix := "https://archive.org/details/" + item + "/page/n"
+		if n := count(t, db, "select count(*) from sermons where source_id = 'henry-sermons' and url like $1", prefix+"%"); n != want {
+			t.Errorf("%d rows at %s, want %d", n, item, want)
+		}
+	}
+	if n := count(t, db, "select count(*) from sermons where source_id = 'henry-sermons' and url !~ '^https://archive.org/details/(miscellaneouswor00henr|completeworksofr0001revm)/page/n[0-9]+$'"); n != 0 {
+		t.Errorf("%d rows whose url is not an Archive reader page of the two items", n)
+	}
+	// Matthew 16:26: the six sermons of The Worth of the Soul.
+	mt, err := passage.Parse("Matt.16.26")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := count(t, db, "select count(*) from sermon_passages p join sermons s on s.id = p.sermon_id where s.source_id = 'henry-sermons' and p.role = 'text' and s.title like 'The Worth of the Soul%' and p.span && $1::int4range", mt.PG()); n != 6 {
+		t.Errorf("%d sermons of The Worth of the Soul on Matthew 16:26, want 6", n)
+	}
+	// A row without a preaching text says why.
+	if n := count(t, db, "select count(*) from sermons s where s.source_id = 'henry-sermons' and not exists (select 1 from sermon_passages p where p.sermon_id = s.id and p.role = 'text') and coalesce(s.notes, '') not like 'no text printed%'"); n != 0 {
+		t.Errorf("%d rows without a text and without the note 'no text printed'", n)
+	}
+}

@@ -1,0 +1,58 @@
+# Matthew Henry's sermons, 52 rows made by hand from the Internet Archive's
+# page scans: the OCR (`_djvu.txt`, `_djvu.xml`) of
+#
+#   miscellaneouswor00henr     The Miscellaneous Works of the Rev. Matthew
+#                              Henry, J. O. Robinson, London, 1830 (45 rows)
+#   completeworksofr0001revm   The Complete Works of the Rev. Matthew Henry,
+#                              vol. 1, A. Fullarton, Edinburgh, 1847 (7 rows)
+#
+# read on 2026-11-05. A row is a title as printed, the preaching text read from
+# the printed head of the sermon (no row names one the head does not print:
+# those carry the note "no text printed" and no ref) and the Archive's reader
+# page where the sermon begins (https://archive.org/details/<id>/page/n<N>, N
+# the scan leaf, counted from 0). No sentence of a sermon is written anywhere.
+# REPORT.md lists what was read, what was left out and what the OCR could not
+# place. There is no tool for this source: the files are the work.
+#
+# Not used: Philip Henry's 41 sermons in the 1830 Appendix (the father's, not
+# Matthew's); the 1979 Baker reprint of the Complete Works (a lending copy of
+# the Archive); the 1833 second printing (miscellaneouswo02henrgoog), which
+# has the same contents as the 1830 book and was looked at, not used.
+
+id = "henry-sermons"
+name = "Matthew Henry's sermons (Internet Archive scans)"
+kind = "sermons"
+
+# The Internet Archive's terms of use, https://archive.org/about/terms.php,
+# quoted verbatim from its text as read on 2026-11-05. The live page is drawn
+# by JavaScript and a script gets no text from it, so the words are those of
+# the Wayback Machine's copy of 2022 (https://web.archive.org/web/2022id_/https://archive.org/about/terms.php);
+# the Archive states no licence on either of the two items, and the 1830
+# item's metadata has no rights field.
+licence = """
+Access to the Archive's Collections is provided at no cost to you and is \
+granted for scholarship and research purposes only. Some of the content \
+available through the Archive may be governed by local, national, and/or \
+international laws and regulations, and your use of such content is solely at \
+your own risk. You agree to abide by all applicable laws and regulations, \
+including intellectual property laws, in connection with your use of the \
+Archive. In particular, you certify that your use of any part of the \
+Archive's Collections will be limited to noninfringing or fair use under \
+copyright law. If a Creative Commons or other license has been declared for \
+particular material on the Archive, to the extent you trust the declaration \
+and declarer (which is rarely the Internet Archive), you may use the content \
+according to the terms and conditions of the applicable license."""
+
+licence_note = """
+The words are public domain: Matthew Henry died in 1714 and the editions used \
+were printed in 1830 and 1847, before 1929. The Archive states no licence on \
+either item; its terms (above) ask that use be noninfringing, and the index \
+keeps only a title, a reference, a date and the address of a reader page, \
+never a word of a sermon or of the Archive's OCR. The 1979 Baker reprint of \
+the Complete Works is a lending copy of the Archive and is not used."""
+
+credit = "Matthew Henry; Internet Archive (scans of the 1830 Miscellaneous Works and the 1847 Complete Works)"
+homepage = "https://archive.org"
+terms_url = "https://archive.org/about/terms.php"
+added = 2026-11-05
+on_by_default = true
