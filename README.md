@@ -35,8 +35,12 @@ In the database a passage is an `int4range` of verse ordinals (`book*1000000 + c
 | Source | What | Rows | Terms |
 | --- | --- | --- | --- |
 | `sources/spurgeon-ccel` | C. H. Spurgeon's sermons, 3,539 entries of CCEL's ThML edition (63 volumes) as one row a sermon number: title, preaching text, the references it cites, a date where its head gives one, the CCEL page and the Spurgeon Gems pdf. On by default. | 3,543 (3,467 with a preaching text); `rows.jsonl` is 935 KB | CCEL's, quoted verbatim in its `source.toml`: personal, educational or non-profit use. The words are public domain; the index keeps none of them. |
+| `sources/themes-tcr1934` | Thompson Chain Topics, the subject index of Frank Charles Thompson's 1934 Bible, from CrossWire's SWORD module TCR: 1,728 topics with their numbered parts ("Love-Hatred (4) Of God"), See links between topics, and the passages each part names. On by default. | 1,728 topics, 2,229 parts, 27,076 links; `links.jsonl` is 1.4 MB | The module's: public domain; registered 1934 as A72501 and not renewed (the 1962 renewal catalogue was searched, see `licence_note`). The publisher's name for the printed book is a trademark and is never used for this source or any feature built on it. |
+| `sources/themes-torrey` | R. A. Torrey's New Topical Textbook (1897), from CrossWire's SWORD module Torrey: 628 topics, their lines as parts, See links and passages. On by default. | 628 topics, 23,695 parts, 38,849 links; `links.jsonl` is 2.1 MB | The module's: public domain. |
 
 `rows.jsonl` of `spurgeon-ccel` is written by a tool, not by hand: `go run ./tools/ccel-spurgeon --cache .ccel-cache --out sources/spurgeon-ccel --report tools/ccel-spurgeon/REPORT.md` fetches CCEL's 63 volumes into the (git-ignored) cache, one request at a time a second apart, and writes the same bytes again on a second run. [tools/ccel-spurgeon/REPORT.md](tools/ccel-spurgeon/REPORT.md) lists the numbers whose text is missing, doubled or left out.
+
+The two theme sources are written the same way by `go run ./tools/sword-themes --module TCR --cache .sword-cache --out sources/themes-tcr1934 --report tools/sword-themes/REPORT.md` (and `--module Torrey ... --out sources/themes-torrey`), which fetches the SWORD module from CrossWire into the (git-ignored) cache and writes `topics.jsonl` and `links.jsonl`; `source.toml` is by hand. [tools/sword-themes/REPORT.md](tools/sword-themes/REPORT.md) lists the references and See terms the modules print in a form the tool cannot read. [docs/sources.md, "Theme sources"](docs/sources.md#theme-sources) says how a module's topics become parts, labels and links.
 
 ## The commands
 
@@ -93,6 +97,7 @@ The tests need **no Docker and no installed Postgres**: they start a real Postgr
 | `internal/sources` | Reading, checking and loading a source directory. |
 | `internal/themes` | A theme source's records and their tables. |
 | `tools/ccel-spurgeon` | The tool that writes `sources/spurgeon-ccel/rows.jsonl` from CCEL's ThML, and its `REPORT.md`. |
+| `tools/sword-themes` | The tool that writes the two theme sources from CrossWire's SWORD modules, and its `REPORT.md`. |
 | `sources/` | The source directories; `_template` and `_fixtures` (twenty Spurgeon sermons; a demo theme source) are never loaded by `--all`. |
 | `docs/` | `api.md` (the HTTP API, its examples asserted by the tests), `schema.md` (the tables and why), `sources.md` (the source-directory format). |
 
