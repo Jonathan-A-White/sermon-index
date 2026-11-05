@@ -155,3 +155,69 @@ func TestSermonsRefusesBadQueries(t *testing.T) {
 		}
 	}
 }
+
+// The tiers over the fixtures: Romans 5:8's passage row is 104; its theme
+// row is 1191 (Rom.5.6 meets the demo Atonement's Rom.5.6-Rom.5.11), and 104
+// is not repeated in it though Love and Atonement both link it.
+func TestSermonsTiers(t *testing.T) {
+	ts := newTestServer(t, loadedDB(t))
+	both := getTiers(t, ts, "/v1/sermons?ref=rom.5.8&tier=theme")
+	if both.Ref != "Rom.5.8" || both.Passage == nil || both.Passage.Total != 1 || !both.Passage.has("spurgeon-20", "104") {
+		t.Errorf("passage tier: %+v", both.Passage)
+	}
+	if both.Theme == nil || both.Theme.Total != 1 || len(both.Theme.Rows) != 1 || !both.Theme.has("spurgeon-20", "1191") {
+		t.Fatalf("theme tier: %+v", both.Theme)
+	}
+	if r := both.Theme.Rows[0]; r.Ref != "Rom.5.6" || r.Role != "text" || r.Theme.Source != "themes-demo" || r.Theme.Topic != "atonement" ||
+		r.Theme.Label != "Atonement" || r.Theme.Part != nil || r.Theme.PartLabel != nil {
+		t.Errorf("theme row: %+v %+v", r, r.Theme)
+	}
+
+	only := getTiers(t, ts, "/v1/sermons?ref=rom.5.8&tier=theme-only")
+	if only.Passage != nil || only.Theme == nil || only.Theme.Total != 1 {
+		t.Errorf("theme-only: %+v", only)
+	}
+	// The comma list names the same two.
+	if c := getTiers(t, ts, "/v1/sermons?ref=rom.5.8&tier=passage,theme"); c.Passage == nil || c.Theme == nil {
+		t.Errorf("tier=passage,theme: %+v", c)
+	}
+	// theme= restricts to a topic; another topic's sermons are not listed.
+	if r := getTiers(t, ts, "/v1/sermons?ref=rom.5.8&tier=theme&theme=themes-demo:love"); r.Theme.Total != 0 || r.Theme.Rows == nil {
+		t.Errorf("theme=themes-demo:love: %+v", r.Theme)
+	}
+	if r := getTiers(t, ts, "/v1/sermons?ref=rom.5.8&tier=theme&theme=themes-demo:atonement"); r.Theme.Total != 1 {
+		t.Errorf("theme=themes-demo:atonement: %+v", r.Theme)
+	}
+	// limit and offset apply to each tier.
+	if r := getTiers(t, ts, "/v1/sermons?ref=Rom.5&tier=theme&limit=2&offset=5"); len(r.Passage.Rows) != 1 || r.Passage.Total != 6 || r.Theme.Rows == nil {
+		t.Errorf("Rom.5 limit 2 offset 5: %+v %+v", r.Passage, r.Theme)
+	}
+	// With no tier the answer is the flat one, as before.
+	res := ts.do("GET", "/v1/sermons?ref=rom.5.8")
+	var flat map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(body(t, res)), &flat); err != nil || flat["rows"] == nil || flat["passage"] != nil || flat["theme"] != nil {
+		t.Errorf("no tier: %v %v", flat, err)
+	}
+	if res := ts.do("GET", "/v1/sermons?ref=rom.5.8&tier=passage"); body(t, res) != body(t, ts.do("GET", "/v1/sermons?ref=rom.5.8")) {
+		t.Error("tier=passage is not the flat answer")
+	}
+}
+
+func TestSermonsRefusesBadTierAndTheme(t *testing.T) {
+	ts := newTestServer(t, loadedDB(t))
+	for _, c := range []struct{ target, code string }{
+		{"/v1/sermons?ref=Rom.5&tier=story", "bad_tier"},
+		{"/v1/sermons?ref=Rom.5&tier=", "bad_tier"},
+		{"/v1/sermons?ref=Rom.5&tier=theme&theme=love", "bad_theme"},
+		{"/v1/sermons?ref=Rom.5&tier=theme&theme=:love", "bad_theme"},
+	} {
+		res := ts.do("GET", c.target)
+		if res.StatusCode != 400 {
+			t.Errorf("%s: %d", c.target, res.StatusCode)
+			continue
+		}
+		if code, detail := errorBody(t, res); code != c.code || detail == "" {
+			t.Errorf("%s: {%q, %q}", c.target, code, detail)
+		}
+	}
+}
