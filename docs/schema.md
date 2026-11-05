@@ -38,6 +38,7 @@ themes                      │         one line of topics.jsonl
   PK (source_id, id)        │
   source_id, source_kind='themes' ───► sources (id, kind)  ON DELETE CASCADE
   label, see text[]  (a bare id: this source's topic; 'src:id': another's)
+  verses int?  the verses its links cover together (migration 0003; written by load)
                             │
 theme_parts                           a topic's numbered parts, "(4) Of God"
   PK (theme_source_id, theme_id, n) ─► themes  ON DELETE CASCADE
@@ -75,7 +76,7 @@ schema_migrations (version PK, name, applied_at)   made by `sermons migrate`
 
 **The ordinal is not stored on its own; `ref_osis` is kept beside the span.** `ref_osis` is the canonical OSIS form of the reference as written (`Rom.5.1-Rom.5.11`; a Lampas code such as `rom.5.8` in a file is stored as `Rom.5.8`), so the API can show the reference without turning numbers back into names, and the passage's key is readable. The span is derived from it by `internal/passage` at load time.
 
-**A sermon's preaching text and its cited references are both passages, told apart by `role`.** `'text'` is the text the sermon is preached on (Spurgeon's `scripCom type="Sermon"`); `'cited'` is a reference it quotes. The API answers by the text first (A2: "preaching text first"); the theme tier (A5) matches only the text. A sermon with no single text (an address, a series introduction) has no `'text'` passage and is still listed by its source and found by search.
+**A sermon's preaching text and its cited references are both passages, told apart by `role`.** `'text'` is the text the sermon is preached on (Spurgeon's `scripCom type="Sermon"`); `'cited'` is a reference it quotes. The API answers by the text first (A2: "preaching text first"); the theme tier (A5, [api.md](api.md#the-theme-tier)) matches only the text. A sermon with no single text (an address, a series introduction) has no `'text'` passage and is still listed by its source and found by search.
 
 **The date is text, ISO 8601 at the precision known.** `'1855'`, `'1855-03'` or `'1855-03-18'`: many sermons are known only to the year (Matthew Henry's) or the month, and a `date` column would force a made-up day. Text in this shape sorts in time order. `sermons check` also refuses a day that does not exist (`1855-02-30`).
 
@@ -117,7 +118,7 @@ These are not decided by v1. Each is a question for the story named, or for the 
 1. **Removing a whole source.** `load` removes rows no longer in a source's files, but a source whose directory is deleted stays in the database. A `sermons unload <id>` (one `DELETE FROM sources`, the rest cascades) is not written. (Whoever first retires a source.)
 2. **Search.** Answered by A2: migration `0002_search` adds a generated `tsvector` on `sermons` (title, weighted above preacher; not notes) and on `themes` (label), each with a GIN index. A theme's part labels are not searched. [api.md](api.md#get-v1search).
 3. **Ordering within an answer.** Answered by A2: text before cited, then `upper(span) - lower(span)`, then source id, then id (a number as a number). [api.md](api.md#get-v1sermons).
-4. **The theme tier's 300-verse cap.** A topic's width (the verses its links cover) is not stored; A5 may compute it in the query or add a materialised column in a migration. (A5.)
+4. **The theme tier's 300-verse cap.** Answered by A5: migration `0003_theme_verses` adds `themes.verses`, the verses a topic's links cover together (overlaps counted once, by the book table), written by `sermons load`; a topic loaded before the migration has NULL until it is reloaded, and the theme tier leaves a NULL topic out. A column rather than a query because the ordinals are not contiguous: counting verses needs the chapter lengths, which SQL does not have. [api.md](api.md#the-theme-tier).
 5. **A link's `from` and `see` across sources** (`'spurgeon-ccel:330'`) are text, not foreign keys: a source may be loaded before the one it names. Whether `sermons check --all` should verify them is open.
 6. **Hosted sermons.** `kind = 'hosted'` exists, but nothing says where a hosted file lives or how it is served. (The later hosting story.)
 7. **Versification mapping** (the table above). (Lampas's versification story.)

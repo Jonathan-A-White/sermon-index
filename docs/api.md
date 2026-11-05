@@ -11,6 +11,7 @@
 - [GET /v1/health](#get-v1health)
 - [GET /v1/sources](#get-v1sources)
 - [GET /v1/sermons](#get-v1sermons)
+  - [The theme tier](#the-theme-tier)
 - [GET /v1/themes](#get-v1themes)
 - [GET /v1/search](#get-v1search)
 - [Errors](#errors)
@@ -101,8 +102,10 @@ The sermons whose passages overlap a reference.
 | --- | --- | --- |
 | `ref` | required | The passage: a verse, chapter, book or range (above). A bad one is 400 `bad_ref` with the parser's message. |
 | `source` | optional | Comma-separated source ids: only those sources. An id that is not a sermon source is ignored (it matches nothing), so a client's stale list does not fail. |
+| `tier` | optional | Which tiers to answer: `passage` (the default: the answer below), `theme` (or `passage,theme`: the passage rows, then the theme tier, [below](#the-theme-tier)) or `theme-only`. Anything else is 400 `bad_tier`. |
+| `theme` | optional | With a theme tier: only these topics, comma-separated `<theme source>:<topic>` (`themes-torrey:atonement-the`). Not of that shape is 400 `bad_theme`; a topic that does not link the ref, or is over the cap, matches nothing. Ignored for `tier=passage`. |
 | `limit` | optional | Rows in the page, 1 to 200; default 50. Outside that, 400 `bad_limit`. |
-| `offset` | optional | Rows to skip, 0 or more; default 0. Otherwise 400 `bad_offset`. |
+| `offset` | optional | Rows to skip, 0 or more; default 0. Otherwise 400 `bad_offset`. With two tiers, `limit` and `offset` apply to each tier's page. |
 
 The answer is `{ref, total, rows}`: `ref` the reference read, in OSIS; `total` the number of sermons that overlap it (all pages); `rows` this page. **One row a sermon**, with the one passage of it that answered:
 
@@ -190,6 +193,121 @@ Example (400): `GET /v1/sermons?ref=Rom.5.99`
 }
 ```
 
+### The theme tier
+
+`tier=theme` adds a second tier below the passage rows: **sermons whose preaching text shares a topic with the passage** ("if a Bible passage you are reading covers a theme, it would note sermons on the same theme"). The answer is nested, `{ref, passage: {total, rows}, theme: {total, rows}}`; with `tier=theme-only` it is the same with `"passage": null` (so every answer has the same three keys). `passage` is exactly the flat answer's `total` and `rows`.
+
+A sermon is in the theme tier when all of these hold:
+
+- **its preaching text** (`role: "text"`, never a cited reference) overlaps a link of a topic, and **that topic also has a link overlapping `ref`**. The match is on the preaching text only: a sermon that merely cites a verse of the topic is not matched.
+- **the topic covers at most 300 verses** (all its links together, a verse counted once; `THEME_MAX_VERSES` in `internal/store/queries.go`, `store.ThemeMaxVerses`). The probe that set it (Lampas `docs/sources/sermon-index.md`, section 4) found Nave's whole-subject topics, `JESUS, THE CHRIST` over 4,800 verses and `GOD` 4,000, put 2,735 sermons on Romans 5, and topics of 300 verses or fewer still 799; a topic's verse count is `verses` on `/v1/themes`.
+- **it is not already a passage row.** A sermon with any passage (text or cited) overlapping `ref` is in the passage tier and is never repeated in the theme tier, so the two tiers' rows are different sermons.
+
+**One row a sermon**: a sermon that meets several topics is listed once, with its **narrowest topic** (fewest verses; then theme source id, then topic id). Each row is the sermon's row (as above; `ref` is the preaching text that met the topic, `role` is always `text`, `width` its verses) and a `theme` naming how it came in:
+
+| Field | What it is |
+| --- | --- |
+| `theme.source`, `theme.topic`, `theme.label` | The theme source's id, the topic's id and its name: "Love of God, The". |
+| `theme.part`, `theme.part_label` | The numbered part of the topic the sermon's text met (`4`, `"Of God"`), or both `null` for a link to the whole topic. Of the topic's links the text meets, the narrowest, then the lowest part. |
+
+**The order**: the topic's size ascending (a six-verse topic's sermons before a 140-verse topic's: the narrower the topic, the closer the sermon), then the sermon's source id, then its id as a number. A topic can still merge two senses (Thompson's `Oil` has a part "Figuratively used" beside the oil itself); the row names the topic and part so the reader can judge.
+
+Example: `GET /v1/sermons?ref=rom.5.8&tier=theme`
+
+```json
+{
+  "ref": "Rom.5.8",
+  "passage": {
+    "total": 1,
+    "rows": [
+      {
+        "source": "spurgeon-20",
+        "id": "104",
+        "title": "Love's Commendation",
+        "preacher": "C. H. Spurgeon",
+        "date": null,
+        "url": "https://ccel.org/ccel/spurgeon/sermons02/sermons02.l.html",
+        "alt_url": "https://www.spurgeongems.org/sermon/chs104.pdf",
+        "kind": "link",
+        "ref": "Rom.5.8",
+        "role": "text",
+        "width": 1
+      }
+    ]
+  },
+  "theme": {
+    "total": 1,
+    "rows": [
+      {
+        "source": "spurgeon-20",
+        "id": "1191",
+        "title": "For Whom Did Christ Die?",
+        "preacher": "C. H. Spurgeon",
+        "date": null,
+        "url": "https://ccel.org/ccel/spurgeon/sermons20/sermons20.viii_1.html",
+        "alt_url": "https://www.spurgeongems.org/sermon/chs1191.pdf",
+        "kind": "link",
+        "ref": "Rom.5.6",
+        "role": "text",
+        "width": 1,
+        "theme": {
+          "source": "themes-demo",
+          "topic": "atonement",
+          "label": "Atonement",
+          "part": null,
+          "part_label": null
+        }
+      }
+    ]
+  }
+}
+```
+
+Over the fixtures Romans 5:8 has one passage row (104, preached on the verse) and one theme row: 1191 (Romans 5:6) meets the demo topic Atonement, which links Romans 5:6-11. 104 meets Love and Atonement as well and is not repeated.
+
+Example: `GET /v1/sermons?ref=rom.5.8&tier=theme-only&theme=themes-demo:atonement`
+
+```json
+{
+  "ref": "Rom.5.8",
+  "passage": null,
+  "theme": {
+    "total": 1,
+    "rows": [
+      {
+        "source": "spurgeon-20",
+        "id": "1191",
+        "title": "For Whom Did Christ Die?",
+        "preacher": "C. H. Spurgeon",
+        "date": null,
+        "url": "https://ccel.org/ccel/spurgeon/sermons20/sermons20.viii_1.html",
+        "alt_url": "https://www.spurgeongems.org/sermon/chs1191.pdf",
+        "kind": "link",
+        "ref": "Rom.5.6",
+        "role": "text",
+        "width": 1,
+        "theme": {
+          "source": "themes-demo",
+          "topic": "atonement",
+          "label": "Atonement",
+          "part": null,
+          "part_label": null
+        }
+      }
+    ]
+  }
+}
+```
+
+Example (400): `GET /v1/sermons?ref=Rom.5&tier=story`
+
+```json
+{
+  "error": "bad_tier",
+  "detail": "tier must be passage (the default), theme (the passage rows, then the theme tier), theme-only, or passage,theme"
+}
+```
+
 ## GET /v1/themes
 
 The topics of every theme source linked to a passage overlapping `ref` (required, as above): `{ref, total, rows}`, all of them (no paging). One row per topic, or per numbered part of a topic, with the narrowest of its links that overlaps:
@@ -201,6 +319,8 @@ The topics of every theme source linked to a passage overlapping `ref` (required
 | `part`, `part_label` | The numbered part the link names (`4`, `"Of God"`), or both `null` for a link to the whole topic. |
 | `ref` | The link's passage (OSIS). |
 | `see` | Related topics: a bare id is a topic of the same source, `"<source>:<id>"` another source's; `[]` when none. |
+| `sermons` | How many sermons are on the **whole topic** (any part) by their preaching text, from every sermon source: so a client can say "Atonement · 158 sermons". A sermon with several texts counts once. |
+| `verses` | How many verses the topic's links cover together. **A topic of more than 300 verses is not used by the theme tier** (above), so its `sermons` is a count of sermons the tier would not list: a client that links "N sermons" to the tier shows it only when `verses` is 300 or fewer. `0` for a topic loaded before migration `0003` and not yet reloaded (`sermons load`). |
 
 **The order**: grouped by theme source (by id); within a source, narrower links first (as for sermons), then by label and part.
 
@@ -220,7 +340,9 @@ Example: `GET /v1/themes?ref=rom.5.8`
       "ref": "Rom.5.8",
       "see": [
         "grace"
-      ]
+      ],
+      "sermons": 1,
+      "verses": 3
     },
     {
       "source": "themes-demo",
@@ -229,7 +351,9 @@ Example: `GET /v1/themes?ref=rom.5.8`
       "part": null,
       "part_label": null,
       "ref": "Rom.5.6-Rom.5.11",
-      "see": []
+      "see": [],
+      "sermons": 2,
+      "verses": 7
     }
   ]
 }
@@ -312,6 +436,7 @@ Every error is `{error, detail}`: `error` a stable code a client may branch on, 
 | Status | `error` | When |
 | --- | --- | --- |
 | 400 | `bad_ref` | `ref` is missing or does not parse; `detail` is the parser's message (`ref 'Rom.5.99': verse past the chapter`). |
+| 400 | `bad_tier`, `bad_theme` | `tier` is not `passage`, `theme`, `passage,theme` or `theme-only`; `theme` is not `<theme source>:<topic>`. |
 | 400 | `bad_limit`, `bad_offset` | `limit` is not 1 to 200; `offset` is not 0 or more. |
 | 400 | `bad_query` | `q` is empty or over 200 characters. |
 | 404 | `not_found` | No such route. |
@@ -324,7 +449,7 @@ Every error is `{error, detail}`: `error` a stable code a client may branch on, 
 
 The API reads; it does not yet do these, each its own story:
 
-- **The theme tier on `/v1/sermons`** (`?tier=theme`: sermons whose preaching text shares a topic with the passage) and sermon counts per topic on `/v1/themes`: story A5 (mw-hxztgfo.5).
+- **Topics left out of the theme tier by hand.** A topic that merges two senses (Thompson's `Oil` and its paired topics such as `Faith-Unbelief`, Torrey's `Man`) is used whole; an `exclude` list on a theme source's `source.toml` is proposed, not built (the story mw-hxztgfo.5 sweep).
 - **Writes** of any kind: the sources are files, loaded by `sermons load`; there is no route that changes the index.
 - **Authentication**: the API is free and public; it has no keys and no accounts.
 - **A hosted sermon's file**: `kind: "hosted"` exists in the schema, but no route serves a file.
