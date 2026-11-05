@@ -1,0 +1,47 @@
+# R. A. Torrey's New Topical Textbook (1897), CrossWire's SWORD module
+# Torrey, 628 topics. Written (topics.jsonl, links.jsonl) by
+#
+#   go run ./tools/sword-themes --module Torrey --cache <dir> --out sources/themes-torrey --report tools/sword-themes/REPORT.md
+#
+# from https://www.crosswire.org/ftpmirror/pub/sword/packages/rawzip/Torrey.zip
+# (module version 1.3, 422,465 bytes zipped) and
+# https://www.crosswire.org/ftpmirror/pub/sword/raw/mods.d/torrey.conf, read
+# on 2026-11-05.
+#
+# What the tool counted (2026-11-05; the probe's figures in brackets, Lampas
+# docs/sources/sermon-index.md section 7):
+#   628 topics [628]; 23,695 parts: a line beginning "- " is a part (10,436),
+#   and a line beginning ". " under it that has references is a part of its
+#   own, its label the part's, ": ", then its own ("Described as: Sovereign");
+#   21,687 reference groups, 13 of which hold an item the reader leaves out (14
+#   items, listed in tools/sword-themes/REPORT.md: a verse past a chapter in
+#   Lampas's numbering, Romans 16:25-27 above all, a chapter a book does not
+#   have, a slip in the keying);
+#   38,849 links as OSIS ranges [38,823] covering 57,959 verses, one a comma
+#   element of a group (one more was the same topic, part and reference twice
+#   and is written once);
+#   6 See links, all of which name a topic of the module.
+# A topic's label is its key in title case ("ATONEMENT, THE" is "Atonement,
+# The"); its id is the key's slug.
+
+id = "themes-torrey"
+name = "Torrey's New Topical Textbook (1897)"
+kind = "themes"
+
+# The module's mods.d/torrey.conf, quoted verbatim as read on 2026-11-05: the
+# DistributionLicense line, then the About line (the \par is the module's).
+licence = '''
+DistributionLicense=Public Domain
+About=These topical references are from R. A. Torrey's New Topical Textbook\par published by Sword of the Lord Publishers, P.O. Box 1099, Murfreesboro, TN, 37133.  No copyright notice appears on the book, and it is a reprint of the original edition which is out of copyright. The most current and correct copies of these files can be obtained from the following.  If any errors are located, please ensure you have the latest files, and if so, we would appreciate being informed of the error.\par Bible Foundation, http://www.bf.org\par Or by contacting:\par   Mark Fuller\par   1129 East Loyola Drive\par   Tempe, Arizona, 85282\par   602-829-8542 (voice)'''
+
+licence_note = """
+Torrey's book is of 1897; he died in 1928 and the book carries no copyright \
+notice, and the module says it is public domain. The index keeps a topic's \
+name, its part labels, the See links and the passages; it keeps no sentence \
+of the book."""
+
+credit = "R. A. Torrey, The New Topical Textbook (1897); the CrossWire Bible Society's SWORD module Torrey, from the Bible Foundation's text"
+homepage = "https://crosswire.org/study/fulllibrary.jsp?show=Torrey"
+terms_url = "https://www.crosswire.org/ftpmirror/pub/sword/raw/mods.d/torrey.conf"
+added = 2026-11-05
+on_by_default = true

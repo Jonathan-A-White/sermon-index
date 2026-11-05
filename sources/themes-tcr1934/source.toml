@@ -1,0 +1,76 @@
+# Thompson Chain Topics, CrossWire's SWORD module TCR: the subject index of
+# Frank Charles Thompson's 1934 Bible, 1,728 topics. Written (topics.jsonl,
+# links.jsonl) by
+#
+#   go run ./tools/sword-themes --module TCR --cache <dir> --out sources/themes-tcr1934 --report tools/sword-themes/REPORT.md
+#
+# from https://www.crosswire.org/ftpmirror/pub/sword/packages/rawzip/TCR.zip
+# (module version 1.1, 270,381 bytes zipped) and
+# https://www.crosswire.org/ftpmirror/pub/sword/raw/mods.d/tcr.conf, read on
+# 2026-11-05. This is a subject index only: the Bible's margin chains are not
+# in the module.
+#
+# What the tool counted (2026-11-05; the probe's figures in brackets, Lampas
+# docs/sources/sermon-index.md section 7):
+#   1,728 topics [1,728]; 2,229 parts [2,229], of them 116 topics whose
+#   lettered sections (A), (B)... each begin again at (1), so a repeated
+#   number took a number past the topic's printed ones (REPORT.md lists them);
+#   8,242 reference groups, of which 12 hold an item the reader leaves out (20
+#   items, listed in tools/sword-themes/REPORT.md with the reason: a book
+#   missing in the print, a verse past a chapter in Lampas's numbering, a
+#   slip in the keying);
+#   27,076 links as OSIS ranges, one a comma element of a group (335 more
+#   were the same topic, part and reference twice and are written once; the
+#   probe's 27,403 counted them), covering 31,913 verses [about 31,800];
+#   3,644 `<term>` tags read [3,644 See links], of which 2,118 name a topic of
+#   the module (a term names a topic by its whole key, by one half of a pair
+#   as POVERTY for POVERTY-WEALTH, or by the word before the comma; only an
+#   unambiguous one is kept) and 363 name none or are page numbers or
+#   half of more than one (listed) and are not kept; the rest repeat a topic
+#   already listed.
+# A topic's label is its key in title case ("LOVE-HATRED" is "Love-Hatred");
+# its id is the key's slug.
+#
+# The name never uses the publisher's trademark as a product name, and the
+# feature built on it must not either: see docs/sources.md, "Theme sources".
+
+id = "themes-tcr1934"
+name = "Thompson Chain Topics (1934 subject index)"
+kind = "themes"
+
+# The module's mods.d/tcr.conf, quoted verbatim as read on 2026-11-05: the
+# DistributionLicense line, then the About line (its header's claim).
+licence = '''
+DistributionLicense=Public Domain
+About=Frank Thompson's 1934 "The New Chain-Reference Bible". Copyright May 24 1934, US. registration number A72501; not renewed; became public domain material in 1962. Spellings Anglicisied. Errors in cross-references corrected. Material keyed and proofed by Paul Houghton. This material contains information that is a proper subset of the material distributed by B.B. Kirkbride under the trademark of "Thompson Chain-References". The errors in the cross-references that Kirkbide have been published in all their editions of the Thompson's Bibles have been corrected.'''
+
+licence_note = """
+The module says it is public domain: registered 1934 as A72501, not \
+renewed. We did not take that on the module's word alone. In the Internet \
+Archive's scans of the Catalog of Copyright Entries, Third Series, Part 1 \
+(Books and Pamphlets), the volumes that list renewal registrations made from \
+24 May 1961 (the start of the 28th year of a work registered on 24 May 1934) \
+to the end of 1962, searched in their OCR text on 2026-11-05: Vol. 15 No. 1 \
+(Jan-June 1961, archive.org/details/catalogofcopyrig3151lib), Vol. 15 No. 2 \
+(Jul-Dec 1961, catalogofcopyrig3151libr), Vol. 16 No. 1 (Jan-June 1962, \
+catalogofcopyrig3161libr) and Vol. 16 No. 2 (Jul-Dec 1962, \
+catalogofcopyrig3161lib), no entry was found: the registration number \
+A72501 is in none of the four; no renewal is listed for Frank Charles \
+Thompson (in the renewals of Jan-June 1962 the T entries run THOMPSON, AMES; \
+THOMPSON (EDWARD) CO.; THOMPSON, HUGH; THOMPSON, KEITH; THOMPSON, OSCAR; \
+THOMPSON, SYLVIA, and in Jul-Dec 1961 THOMPSON (EDWARD) CO.; THOMPSON, \
+HOLLAND); and no line has 'chain' with 'reference' or 'Bible' in any of \
+them. Registrations of May 1934 close to it (A72497, A72499, A72500, A72510) \
+are listed in the Jan-June 1962 renewals with their R numbers, so the OCR is \
+readable at that number. This is a finding of absence in OCR text of uneven quality, not \
+a legal opinion, and it covers only the volumes named. The index keeps a \
+topic's name, its part labels, the See links and the passages; it keeps no \
+sentence of the book. 'Thompson Chain-Reference' is a trademark of the \
+publisher of the current editions: the source's name is the module's own \
+('Thompson Chain Topics') and no feature is to be named with the trademark."""
+
+credit = "Frank Charles Thompson (the 1934 subject index of his Bible); the CrossWire Bible Society's SWORD module TCR, keyed and proofed by Paul Houghton"
+homepage = "https://crosswire.org/study/fulllibrary.jsp?show=TCR"
+terms_url = "https://www.crosswire.org/ftpmirror/pub/sword/raw/mods.d/tcr.conf"
+added = 2026-11-05
+on_by_default = true
