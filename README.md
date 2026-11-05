@@ -12,6 +12,7 @@ This repository is one Go module, `github.com/Jonathan-A-White/sermon-index`, wi
 - [The sources](#the-sources)
 - [The commands](#the-commands)
 - [Running it](#running-it)
+- [On the Laptop](#on-the-laptop)
 - [Running the tests](#running-the-tests)
 - [Layout](#layout)
 - [Licence](#licence)
@@ -79,6 +80,43 @@ curl -s 'http://127.0.0.1:8790/v1/search?q=spurgeon+grace'
 
 `SERMONS_ORIGINS` is the origins a browser may call it from (default `https://lampas.allmymind.org,http://localhost:5173`). It refuses to start on a database with a migration not applied; with the database down it starts and `/v1/health` answers 503 until the database answers. Each request is one line on stderr (`GET /v1/sermons?ref=rom.5.8 200 3ms 412B`). Each client IP may make 60 requests a minute, 30 at once; behind a proxy on a private address, the proxy must send `X-Real-IP`.
 
+## On the Laptop
+
+The Laptop runs it as two systemd **user** units (no sudo): `sermon-index-pg` (Postgres 17 in Docker, `127.0.0.1:5433`) and `sermon-index` (`sermons serve` on `10.88.0.2:8790`, the WireGuard address the VPS's nginx will reach). [deploy/laptop/README.md](deploy/laptop/README.md) documents both unit files line by line.
+
+```sh
+scripts/install-laptop.sh      # build, env files, units, enable, migrate, load every source, smoke test
+scripts/smoke.sh               # health 200 with at least 2 sources; Romans 5:8 starts with Love's Commendation
+scripts/uninstall-laptop.sh    # the way back: stops and removes the units and the binary
+```
+
+The install is idempotent: a second run changes nothing and says "nothing changed". It generates the database password once (`openssl rand -hex 24`), never prints it, and keeps it in `~/.config/sermon-index/pg.env` and `env` (mode 0600). The uninstall leaves the database and those two files, and names them.
+
+| What | Where |
+| --- | --- |
+| The service | `10.88.0.2:8790` (`SERMONS_ADDR` in `~/.config/sermon-index/env`) |
+| Postgres | `127.0.0.1:5433`, loopback only, container `sermon-index-pg` |
+| The binary | `~/.local/bin/sermons` |
+| The data | `~/.local/state/sermon-index/pg` (owned by the container's `postgres` user, mode 0700: reading it takes `docker exec` or sudo) |
+| The units | `~/.config/systemd/user/sermon-index-pg.service`, `sermon-index.service` |
+
+**Back up** (the whole database; a few tens of megabytes; the sources are files in this repository, so the backup is a convenience, not the only copy):
+
+```sh
+docker exec sermon-index-pg pg_dump -U sermons sermons | gzip > ~/sermons-$(date +%F).sql.gz
+```
+
+**Restore, or move it to another host.** The sources are files, so the simpler move is nearly always: clone this repository on the new host, run `scripts/install-laptop.sh` there (set `SERMONS_ADDR` in `~/.config/sermon-index/env` to that host's address first, or edit it after and restart), and `sermons load --all sources/` fills the empty database. To carry the dump instead, install, then replace the fresh database with it:
+
+```sh
+systemctl --user stop sermon-index
+docker exec sermon-index-pg psql -U sermons -d postgres -c 'DROP DATABASE sermons' -c 'CREATE DATABASE sermons'
+gunzip -c sermons-2026-11-05.sql.gz | docker exec -i sermon-index-pg psql -U sermons -d sermons
+systemctl --user start sermon-index
+```
+
+[docs/operations.md](docs/operations.md) has the logs, reloading after a new source, and what each failure looks like.
+
 ## Running the tests
 
 ```sh
@@ -102,7 +140,10 @@ The tests need **no Docker and no installed Postgres**: they start a real Postgr
 | `tools/ccel-spurgeon` | The tool that writes `sources/spurgeon-ccel/rows.jsonl` from CCEL's ThML, and its `REPORT.md`. |
 | `tools/sword-themes` | The tool that writes the two theme sources from CrossWire's SWORD modules, and its `REPORT.md`. |
 | `sources/` | The source directories; `_template` and `_fixtures` (twenty Spurgeon sermons; a demo theme source) are never loaded by `--all`. |
-| `docs/` | `api.md` (the HTTP API, its examples asserted by the tests), `schema.md` (the tables and why), `sources.md` (the source-directory format). |
+| `deploy/laptop` | The two systemd user units for the Laptop and their line-by-line README. |
+| `scripts` | `install-laptop.sh`, `uninstall-laptop.sh`, `smoke.sh`. |
+| `tests` | The tests that drive those scripts with docker, systemctl, go and curl faked. |
+| `docs/` | `api.md` (the HTTP API, its examples asserted by the tests), `schema.md` (the tables and why), `sources.md` (the source-directory format), `operations.md` (running it: logs, reloads, failures). |
 
 ## Licence
 
