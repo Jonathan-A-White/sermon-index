@@ -467,3 +467,42 @@ func TestLoadHenrySermons(t *testing.T) {
 		t.Errorf("%d rows without a text and without the note 'no text printed'", n)
 	}
 }
+
+// A `series` row is a sermon like any other, found by its title and listed
+// by its source, but it has no passage: nothing a passage asks for matches it.
+func TestLoadASeriesRowKeepsTheRowAndNoPassage(t *testing.T) {
+	ctx := context.Background()
+	db := migrated(t)
+	rows := `{"id": "1", "title": "One Verse", "ref": "Rom.5.8", "url": "https://example.org/1"}
+{"id": "2", "title": "Romans, Verse by Verse", "ref": "Rom.1.1-Rom.16.24", "cited": ["John.3.16"], "url": "https://example.org/2", "series": true}
+`
+	dir := writeSource(t, map[string]string{"source.toml": goodToml, "rows.jsonl": rows})
+	c, err := Load(ctx, db, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Rows != 2 || c.Passages != 1 {
+		t.Errorf("counts %+v: want 2 rows and 1 passage (the series row has none)", c)
+	}
+	if n := count(t, db, "select count(*) from sermons where source_id = 'demo'"); n != 2 {
+		t.Errorf("%d sermons, want 2", n)
+	}
+	if n := count(t, db, "select count(*) from sermon_passages where source_id = 'demo' and sermon_id = '2'"); n != 0 {
+		t.Errorf("the series row has %d passages, want 0", n)
+	}
+	// Taking `series` off a row that was loaded as one gives it its passages
+	// back, and putting it on takes them away.
+	dir2 := writeSource(t, map[string]string{"source.toml": goodToml, "rows.jsonl": strings.Replace(rows, `, "series": true`, "", 1)})
+	if _, err := Load(ctx, db, dir2); err != nil {
+		t.Fatal(err)
+	}
+	if n := count(t, db, "select count(*) from sermon_passages where source_id = 'demo' and sermon_id = '2'"); n != 2 {
+		t.Errorf("the row without series has %d passages, want 2", n)
+	}
+	if _, err := Load(ctx, db, dir); err != nil {
+		t.Fatal(err)
+	}
+	if n := count(t, db, "select count(*) from sermon_passages where source_id = 'demo' and sermon_id = '2'"); n != 0 {
+		t.Errorf("the series row has %d passages again, want 0", n)
+	}
+}

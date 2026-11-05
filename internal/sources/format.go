@@ -51,6 +51,21 @@ type Source struct {
 	TermsURL    string    `toml:"terms_url"`
 	Added       time.Time `toml:"added"`
 	OnByDefault bool      `toml:"on_by_default"`
+
+	// HostRules are what `sermons check --urls` does for a host, by host
+	// name (optional): see HostRule and DefaultHostRules.
+	HostRules map[string]HostRule `toml:"host_rules"`
+}
+
+// HostRule is how `sermons check --urls` treats the urls of one host.
+type HostRule struct {
+	// TitleInPage: the host answers 200 to an address it does not have
+	// (CCEL does), so a 200 proves nothing: GET the page and require the
+	// row's title (or its expect_title) in it.
+	TitleInPage *bool `toml:"title_in_page"`
+	// DelayMS is the wait, in milliseconds, before each request to the
+	// host after the first (a host that asks for a crawl delay).
+	DelayMS *int `toml:"delay_ms"`
 }
 
 // Row is one line of rows.jsonl: a sermon. An optional field is a pointer
@@ -67,6 +82,14 @@ type Row struct {
 	DurationS *int     `json:"duration_s,omitempty"`
 	Cited     []string `json:"cited,omitempty"`
 	Notes     *string  `json:"notes,omitempty"`
+	// Series: the row is a series or a whole book, wider than one text
+	// (three chapters is the most a text has). It is kept and found by its
+	// title, but it has no passage and no passage matches it.
+	Series *bool `json:"series,omitempty"`
+	// ExpectTitle: what `--urls` requires in the page at url, where it
+	// differs from the title (a catalogue's short name for a sermon whose
+	// page prints a longer one); given, the page is fetched with GET.
+	ExpectTitle *string `json:"expect_title,omitempty"`
 
 	Line int `json:"-"` // the line of rows.jsonl it came from
 
@@ -82,6 +105,9 @@ const (
 	RowHosted     = "hosted"     // the sermon is a file this service hosts
 	RowExposition = "exposition" // an exposition of a passage, not a sermon on a text
 )
+
+// IsSeries is whether the row is marked `series`.
+func (r Row) IsSeries() bool { return r.Series != nil && *r.Series }
 
 // KindOrDefault is the row's kind, RowLink when it is not given.
 func (r Row) KindOrDefault() string {

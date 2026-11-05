@@ -31,6 +31,58 @@ func Check(dir string) []Fault {
 	return fs
 }
 
+// WideChapters is the most chapters a row's preaching text may span before
+// `sermons check` warns: more is a series, or a whole book, and would match
+// every chapter in it.
+const WideChapters = 3
+
+// CheckReport is Check and the warnings besides: a warning is a row that is
+// valid and loads, but that the author should look at. There are none for a
+// directory with a fault in it, but the rows that parse still warn.
+func CheckReport(dir string) (faults, warnings []Fault) {
+	d, faults := checked(dir)
+	return faults, warn(d)
+}
+
+// CheckAllReport is CheckAll and the warnings besides, their files named
+// from root as the faults' are.
+func CheckAllReport(root string) (dirs []string, faults, warnings []Fault) {
+	dirs, err := sourceDirs(root)
+	if err != nil {
+		return nil, []Fault{{File: root, Msg: err.Error()}}, nil
+	}
+	for _, dir := range dirs {
+		fs, ws := CheckReport(dir)
+		for _, f := range fs {
+			f.File = filepath.Base(dir) + "/" + f.File
+			faults = append(faults, f)
+		}
+		for _, w := range ws {
+			w.File = filepath.Base(dir) + "/" + w.File
+			warnings = append(warnings, w)
+		}
+	}
+	return dirs, faults, warnings
+}
+
+// warn lists the warnings of a checked directory, in line order: a row
+// whose preaching text spans more than WideChapters chapters and is not
+// marked `series`.
+func warn(d *Dir) []Fault {
+	var ws []Fault
+	for _, r := range d.Rows {
+		if r.text == nil || r.IsSeries() {
+			continue
+		}
+		if n := r.text.Chapters(); n > WideChapters {
+			ws = append(ws, Fault{File: RowsFile, Line: r.Line, Msg: fmt.Sprintf(
+				"warning: ref '%s' spans %d chapters: a series over it would match every chapter: give the row a `series: true` and the narrowest text, or split it",
+				r.text.OSIS, n)})
+		}
+	}
+	return ws
+}
+
 // checked reads and checks a directory; on no faults the Dir's references
 // are parsed, ready to load.
 func checked(dir string) (*Dir, []Fault) {
@@ -91,8 +143,27 @@ func checkSource(d *Dir) []Fault {
 			}
 		}
 	}
+	hosts := make([]string, 0, len(s.HostRules))
+	for h := range s.HostRules {
+		hosts = append(hosts, h)
+	}
+	sort.Strings(hosts)
+	for _, h := range hosts {
+		rule := s.HostRules[h]
+		switch {
+		case !hostName.MatchString(h):
+			add("host_rules '%s': a host name only, lower case, with no scheme, path or port", h)
+		case rule.TitleInPage == nil && rule.DelayMS == nil:
+			add("host_rules '%s': no rule given (title_in_page or delay_ms)", h)
+		case rule.DelayMS != nil && *rule.DelayMS < 0:
+			add("host_rules '%s': delay_ms %d: not 0 or more", h, *rule.DelayMS)
+		}
+	}
 	return fs
 }
+
+// hostName is a lower-case DNS name: labels of letters, digits and '-'.
+var hostName = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$`)
 
 // checkURL returns why a URL is refused, or "".
 func checkURL(s string) string {
@@ -183,13 +254,16 @@ func checkRows(d *Dir) []Fault {
 		for _, f := range []struct {
 			name  string
 			value *string
-		}{{"preacher", r.Preacher}, {"notes", r.Notes}, {"date", r.Date}} {
+		}{{"preacher", r.Preacher}, {"notes", r.Notes}, {"date", r.Date}, {"expect_title", r.ExpectTitle}} {
 			if f.value != nil && strings.TrimSpace(*f.value) == "" {
 				add("%s is empty: leave it out instead", f.name)
 			}
 		}
 		if r.Date != nil && *r.Date != "" && !checkDate(*r.Date) {
 			add("date '%s': not YYYY, YYYY-MM or YYYY-MM-DD", *r.Date)
+		}
+		if r.Series != nil && !*r.Series {
+			add("series is false: leave it out instead")
 		}
 		if r.DurationS != nil && *r.DurationS <= 0 {
 			add("duration_s %d: not a positive number of seconds", *r.DurationS)
@@ -312,15 +386,28 @@ func checkThemes(d *Dir) []Fault {
 // alt_url of its rows) and returns a fault for each that does not answer
 // 200 OK after redirects. It uses the network; `sermons check` runs it only
 // when asked (--urls N).
+//
+// A host with a title_in_page rule (the source's host_rules, over
+// DefaultHostRules) and a row with an expect_title are asked with GET, and
+// the title, or the expect_title, must also be in the page. A host with a
+// delay_ms rule is waited for between requests.
 func CheckURLs(ctx context.Context, d *Dir, n int, client *http.Client, rnd *rand.Rand) []Fault {
 	type target struct {
 		line       int
 		field, url string
-		title      string
+		title      string // required in the page ("" to ask only for a 200)
 	}
+	rules := hostRules(d.Source)
 	var ts []target
 	for _, r := range d.Rows {
-		ts = append(ts, target{r.Line, "url", r.URL, r.Title})
+		title := ""
+		switch {
+		case r.ExpectTitle != nil:
+			title = *r.ExpectTitle
+		case rules[hostOf(r.URL)].titleInPage():
+			title = r.Title
+		}
+		ts = append(ts, target{r.Line, "url", r.URL, title})
 		if r.AltURL != nil {
 			ts = append(ts, target{r.Line, "alt_url", *r.AltURL, ""})
 		}
@@ -332,13 +419,26 @@ func CheckURLs(ctx context.Context, d *Dir, n int, client *http.Client, rnd *ran
 	sort.Slice(ts, func(i, j int) bool { return ts[i].line < ts[j].line })
 
 	var fs []Fault
+	last := map[string]time.Time{} // when each host was last asked
 	for _, t := range ts {
+		host := hostOf(t.url)
+		if delay := rules[host].delay(); delay > 0 {
+			if at, ok := last[host]; ok {
+				if wait := time.Until(at.Add(delay)); wait > 0 {
+					select {
+					case <-time.After(wait):
+					case <-ctx.Done():
+					}
+				}
+			}
+		}
 		var msg string
-		if t.field == "url" && titleHosts[hostOf(t.url)] {
+		if t.title != "" {
 			msg = checkTitle(ctx, client, t.url, t.title) // a GET: it needs the page, and says a non-200 too
 		} else {
 			msg = head(ctx, client, t.url)
 		}
+		last[host] = time.Now()
 		if msg != "" {
 			fs = append(fs, Fault{File: RowsFile, Line: t.line, Msg: fmt.Sprintf("%s '%s': %s", t.field, t.url, msg)})
 		}
@@ -346,10 +446,44 @@ func CheckURLs(ctx context.Context, d *Dir, n int, client *http.Client, rnd *ran
 	return fs
 }
 
-// titleHosts are the hosts that answer 200 to any address (CCEL does, to a
-// section id that does not exist), so a 200 proves nothing: a row's url on
-// such a host must also have the row's title in the page it answers with.
-var titleHosts = map[string]bool{"ccel.org": true, "www.ccel.org": true}
+// DefaultHostRules are the rules every source has, which its own host_rules
+// override: CCEL answers 200 to a section id that does not exist, so a 200
+// proves nothing and a row's url on CCEL must have the row's title in the
+// page it answers with.
+var DefaultHostRules = map[string]HostRule{
+	"ccel.org":     {TitleInPage: ptr(true)},
+	"www.ccel.org": {TitleInPage: ptr(true)},
+}
+
+func ptr[T any](v T) *T { return &v }
+
+// hostRules is the default rules with the source's laid over them, a key at
+// a time (a source's delay_ms leaves the default title_in_page).
+func hostRules(s Source) map[string]hostRule {
+	out := map[string]hostRule{}
+	for _, m := range []map[string]HostRule{DefaultHostRules, s.HostRules} {
+		for h, r := range m {
+			cur := out[h]
+			if r.TitleInPage != nil {
+				cur.title = *r.TitleInPage
+			}
+			if r.DelayMS != nil {
+				cur.delayMS = *r.DelayMS
+			}
+			out[h] = cur
+		}
+	}
+	return out
+}
+
+// hostRule is a HostRule with its defaults filled in.
+type hostRule struct {
+	title   bool
+	delayMS int
+}
+
+func (r hostRule) titleInPage() bool    { return r.title }
+func (r hostRule) delay() time.Duration { return time.Duration(r.delayMS) * time.Millisecond }
 
 func hostOf(raw string) string {
 	u, err := url.Parse(raw)

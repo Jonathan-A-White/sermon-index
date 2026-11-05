@@ -182,6 +182,9 @@ func writeSermons(ctx context.Context, tx pgx.Tx, d *Dir, c *Counts) error {
 		kSermon, kRole, kRef, kSpan = append(kSermon, sermon), append(kRole, role), append(kRef, ref), append(kSpan, span)
 	}
 	for _, r := range d.Rows {
+		if r.IsSeries() {
+			continue // a series is kept as a sermon but has no passage: nothing a passage asks for matches it
+		}
 		if r.text != nil {
 			addPassage(r.ID, RoleText, r.text.OSIS, r.text.PG())
 		}

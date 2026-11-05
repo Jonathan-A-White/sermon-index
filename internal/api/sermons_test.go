@@ -221,3 +221,57 @@ func TestSermonsRefusesBadTierAndTheme(t *testing.T) {
 		}
 	}
 }
+
+// A `series` row (a catalogue's whole-book teaching, here Romans in 16
+// chapters) is kept, and found by its title, but a passage never answers with
+// it: Romans 5:8 gets the one verse's sermon alone.
+func TestSermonsExcludeSeriesRows(t *testing.T) {
+	db := loadedDB(t)
+	dir := filepath.Join(t.TempDir(), "series-demo")
+	if err := os.Mkdir(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	toml := `id = "series-demo"
+name = "Series demo"
+kind = "sermons"
+licence = "Public domain."
+credit = "Someone"
+homepage = "https://example.org"
+terms_url = "https://example.org/terms"
+added = 2026-11-05
+on_by_default = false
+`
+	rows := `{"id": "v8", "title": "Commended Love", "ref": "Rom.5.8", "url": "https://example.org/v8"}
+{"id": "all", "title": "Romans Whole Book Overview", "ref": "Rom.1.1-Rom.16.24", "url": "https://example.org/all", "series": true}
+`
+	for name, body := range map[string]string{"source.toml": toml, "rows.jsonl": rows} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := sources.Load(context.Background(), db, dir); err != nil {
+		t.Fatal(err)
+	}
+	ts := newTestServer(t, db)
+	for _, target := range []string{"/v1/sermons?ref=rom.5.8", "/v1/sermons?ref=Rom.5", "/v1/sermons?ref=Rom", "/v1/sermons?ref=Rom.5.8&tier=theme"} {
+		code, s, _ := getSermons(t, ts, target)
+		if code != 200 {
+			t.Fatalf("%s: %d", target, code)
+		}
+		for _, r := range s.Rows {
+			if r.Source == "series-demo" && r.ID == "all" {
+				t.Errorf("%s answered the series row: %+v", target, r)
+			}
+		}
+	}
+	code, s, _ := getSermons(t, ts, "/v1/sermons?ref=rom.5.8&source=series-demo")
+	if code != 200 || s.Total != 1 || s.Rows[0].ID != "v8" {
+		t.Errorf("series-demo at rom.5.8: %d %+v", code, s)
+	}
+	// ... but the row is in the database and search finds it by its title.
+	res := ts.do("GET", "/v1/search?q=Romans+Overview")
+	b := body(t, res)
+	if !strings.Contains(b, `"id":"all"`) && !strings.Contains(b, `"id": "all"`) {
+		t.Errorf("search does not find the series row: %s", b)
+	}
+}

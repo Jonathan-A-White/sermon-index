@@ -296,3 +296,145 @@ func TestTitleInPage(t *testing.T) {
 		}
 	}
 }
+
+// A row over more than 3 chapters is warned, never faulted: the source still
+// loads. A `series` row is the way to keep it.
+func TestAWideRefIsWarnedNotFaulted(t *testing.T) {
+	rows := `{"id": "1", "title": "Three", "ref": "Rom.5-Rom.7", "url": "https://example.org/1"}
+{"id": "2", "title": "Four", "ref": "Rom.5-Rom.8", "url": "https://example.org/2"}
+{"id": "3", "title": "A series", "ref": "Acts.1.1-Jude.1.25", "url": "https://example.org/3", "series": true}
+{"id": "4", "title": "A book", "ref": "Acts.1.1-Jude.1.25", "url": "https://example.org/4"}
+`
+	dir := writeSource(t, map[string]string{"source.toml": goodToml, "rows.jsonl": rows})
+	faults, warnings := CheckReport(dir)
+	if len(faults) != 0 {
+		t.Fatalf("faults %q", faultStrings(faults))
+	}
+	got := faultStrings(warnings)
+	want := []string{
+		"rows.jsonl:2: warning: ref 'Rom.5-Rom.8' spans 4 chapters: a series over it would match every chapter: give the row a `series: true` and the narrowest text, or split it",
+		"rows.jsonl:4: warning: ref 'Acts.1.1-Jude.1.25' spans 149 chapters: a series over it would match every chapter: give the row a `series: true` and the narrowest text, or split it",
+	}
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Errorf("warnings\n got %q\nwant %q", got, want)
+	}
+	// Check itself still says no fault: a warning does not stop a load.
+	if fs := Check(dir); len(fs) != 0 {
+		t.Errorf("Check: %q", faultStrings(fs))
+	}
+	// A directory with a fault warns nothing about its rows.
+	_, w := CheckReport(writeSource(t, map[string]string{"source.toml": goodToml, "rows.jsonl": rows + `{"id": "5", "title": "Bad", "ref": "Rom.99", "url": "https://example.org/5"}` + "\n"}))
+	if len(w) != 2 {
+		t.Errorf("warnings with a fault elsewhere: %q", faultStrings(w))
+	}
+}
+
+func TestCheckAllReportsWarnings(t *testing.T) {
+	root := t.TempDir()
+	for _, id := range []string{"a", "b"} {
+		dir := filepath.Join(root, id)
+		os.Mkdir(dir, 0o755)
+		os.WriteFile(filepath.Join(dir, "source.toml"), []byte(strings.Replace(goodToml, `id = "demo"`, `id = "`+id+`"`, 1)), 0o644)
+		os.WriteFile(filepath.Join(dir, "rows.jsonl"), []byte(`{"id": "1", "title": "Wide", "ref": "Rom", "url": "https://example.org/1"}`+"\n"), 0o644)
+	}
+	dirs, faults, warnings := CheckAllReport(root)
+	if len(dirs) != 2 || len(faults) != 0 || len(warnings) != 2 || !strings.HasPrefix(warnings[1].String(), "b/rows.jsonl:1: warning: ref 'Rom' spans 16 chapters") {
+		t.Errorf("%v %q %q", dirs, faultStrings(faults), faultStrings(warnings))
+	}
+}
+
+func TestSeriesAndExpectTitleAreCheckedFields(t *testing.T) {
+	src := func(rows string) map[string]string {
+		return map[string]string{"source.toml": goodToml, "rows.jsonl": rows}
+	}
+	if fs := Check(writeSource(t, src(`{"id": "1", "title": "One", "ref": "Rom.5", "url": "https://example.org/1", "series": true, "expect_title": "One (Part 1)"}`))); len(fs) != 0 {
+		t.Errorf("%q", faultStrings(fs))
+	}
+	expectFault(t, src(`{"id": "1", "title": "One", "ref": "Rom.5", "url": "https://example.org/1", "series": false}`),
+		"rows.jsonl:1: series is false: leave it out instead")
+	expectFault(t, src(`{"id": "1", "title": "One", "ref": "Rom.5", "url": "https://example.org/1", "expect_title": " "}`),
+		"rows.jsonl:1: expect_title is empty: leave it out instead")
+}
+
+func TestFaultsInHostRules(t *testing.T) {
+	rules := func(toml string) map[string]string {
+		return map[string]string{"source.toml": goodToml + toml, "rows.jsonl": goodRow}
+	}
+	good := "\n[host_rules.\"www.example.org\"]\ntitle_in_page = true\ndelay_ms = 500\n"
+	if fs := Check(writeSource(t, rules(good))); len(fs) != 0 {
+		t.Errorf("%q", faultStrings(fs))
+	}
+	expectFault(t, rules("\n[host_rules.\"https://example.org\"]\ntitle_in_page = true\n"),
+		"source.toml: host_rules 'https://example.org': a host name only, lower case, with no scheme, path or port")
+	expectFault(t, rules("\n[host_rules.\"Example.org\"]\ntitle_in_page = true\n"),
+		"source.toml: host_rules 'Example.org': a host name only, lower case, with no scheme, path or port")
+	expectFault(t, rules("\n[host_rules.\"example.org\"]\ndelay_ms = -1\n"),
+		"source.toml: host_rules 'example.org': delay_ms -1: not 0 or more")
+	expectFault(t, rules("\n[host_rules.\"example.org\"]\ntitle_in_pag = true\n"),
+		`source.toml: unknown key 'host_rules."example.org".title_in_pag'`)
+	expectFault(t, rules("\n[host_rules.\"example.org\"]\n"),
+		"source.toml: host_rules 'example.org': no rule given (title_in_page or delay_ms)")
+}
+
+// titlePage answers a page with a title only for /ok, and 200 with another
+// for everything else; it counts the requests by method.
+func titleServer(t *testing.T, counts map[string]int) *httptest.Server {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		counts[r.Method]++
+		if r.URL.Path == "/ok" {
+			fmt.Fprint(w, `<h1>Sermon One: Part 1</h1>`)
+			return
+		}
+		fmt.Fprint(w, `<h1>Not found, but 200</h1>`)
+	}))
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+func TestHostRuleTitleInPage(t *testing.T) {
+	counts := map[string]int{}
+	srv := titleServer(t, counts)
+	rows := `{"id": "1", "title": "Sermon One", "ref": "Rom.5.8", "url": "https://sermons.example.org/ok"}
+{"id": "2", "title": "Sermon Two", "ref": "Rom.5.8", "url": "https://sermons.example.org/ok"}
+{"id": "3", "title": "Elsewhere", "ref": "Rom.5.8", "url": "https://other.example.org/anything"}
+`
+	toml := goodToml + "\n[host_rules.\"sermons.example.org\"]\ntitle_in_page = true\ndelay_ms = 1\n"
+	d, fs := Read(writeSource(t, map[string]string{"source.toml": toml, "rows.jsonl": rows}))
+	if len(fs) != 0 {
+		t.Fatal(faultStrings(fs))
+	}
+	client := &http.Client{Transport: toServer{srv}}
+	got := faultStrings(CheckURLs(context.Background(), d, 10, client, rand.New(rand.NewSource(1))))
+	want := "rows.jsonl:2: url 'https://sermons.example.org/ok': 200 OK but the title 'Sermon Two' is not in the page"
+	if len(got) != 1 || got[0] != want {
+		t.Errorf("CheckURLs = %q, want [%q]", got, want)
+	}
+	if counts["GET"] != 2 || counts["HEAD"] != 1 {
+		t.Errorf("requests %v: want 2 GET (the ruled host) and 1 HEAD", counts)
+	}
+}
+
+// A row's expect_title is what the page must hold instead of its title, on
+// a host with no rule; and a source's rule can turn the CCEL default off.
+func TestExpectTitleAndOverridingTheCCELDefault(t *testing.T) {
+	counts := map[string]int{}
+	srv := titleServer(t, counts)
+	rows := `{"id": "1", "title": "Catalogue Name", "ref": "Rom.5.8", "url": "https://other.example.org/ok", "expect_title": "Sermon One"}
+{"id": "2", "title": "Catalogue Name", "ref": "Rom.5.8", "url": "https://other.example.org/ok", "expect_title": "Sermon Nine"}
+{"id": "3", "title": "Whatever", "ref": "Rom.5.8", "url": "https://ccel.org/ccel/x/y.html"}
+`
+	toml := goodToml + "\n[host_rules.\"ccel.org\"]\ntitle_in_page = false\n"
+	d, fs := Read(writeSource(t, map[string]string{"source.toml": toml, "rows.jsonl": rows}))
+	if len(fs) != 0 {
+		t.Fatal(faultStrings(fs))
+	}
+	client := &http.Client{Transport: toServer{srv}}
+	got := faultStrings(CheckURLs(context.Background(), d, 10, client, rand.New(rand.NewSource(1))))
+	want := "rows.jsonl:2: url 'https://other.example.org/ok': 200 OK but the title 'Sermon Nine' is not in the page"
+	if len(got) != 1 || got[0] != want {
+		t.Errorf("CheckURLs = %q, want [%q]", got, want)
+	}
+	if counts["GET"] != 2 || counts["HEAD"] != 1 {
+		t.Errorf("requests %v: want 2 GET (the expect_title rows) and 1 HEAD (ccel.org, rule off)", counts)
+	}
+}
