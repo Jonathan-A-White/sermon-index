@@ -1,0 +1,36 @@
+# A test fixture, not a source that is loaded: the twenty Spurgeon sermons the
+# 2026-11-05 probe tried (Lampas docs/sources/sermon-index.md section 6), as
+# rows. Its CCEL section ids are read from CCEL's ThML (sermons<VV>.xml, the
+# div1 id of each sermon). The tests load it; `sermons load --all sources/`
+# skips it because its parent directory begins with '_'.
+
+id = "spurgeon-20"
+name = "C. H. Spurgeon's sermons (twenty, a fixture)"
+kind = "sermons"
+
+# CCEL's copyright policy, https://ccel.org/about/copyright.html, quoted
+# verbatim as read on 2026-10-31 (the probe's copy, mw-5r3p30.898).
+licence = """
+CCEL.org website and special contents copyright 1993-2020 Harry Plantinga. \
+Most of the editions at the Christian Classics Ethereal library are based on \
+books that are public domain in the United States. However, they may have \
+copyrighted introductions, cover art, and other special contents. A few books \
+are under another publisher's copyright and are used by permission; these are \
+noted on the book information page. These books may be used for personal, \
+educational, or non-profit purposes. Contact us for permission to republish \
+CCEL works or to use them commercially. Copyright laws in other countries \
+vary; it may be that some books that are in the public domain in the United \
+States but are still under copyright in other countries. Check your local \
+copyright law before copying."""
+
+licence_note = """
+Spurgeon died in 1892 and his sermons were printed 1855-1917: the words are \
+public domain in the United States. The index keeps only a title, a reference \
+and a link to CCEL's page (and to Spurgeon Gems' pdf), never the words or \
+CCEL's markup, so CCEL's terms bind the pages we link to, not this row."""
+
+credit = "Charles Haddon Spurgeon; the Christian Classics Ethereal Library (ccel.org); Spurgeon Gems (spurgeongems.org)"
+homepage = "https://ccel.org/ccel/spurgeon"
+terms_url = "https://ccel.org/about/copyright.html"
+added = 2026-11-05
+on_by_default = false

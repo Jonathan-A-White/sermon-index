@@ -1,0 +1,3 @@
+{"id": "1", "title": "A Sermon on One Verse", "ref": "Rom.5.8", "url": "https://example.org/sermons/1", "alt_url": "https://example.org/sermons/1.pdf", "kind": "link", "preacher": "An Example Preacher", "date": "1855-03-18", "duration_s": 2700, "cited": ["John.3.16", "1John.4.9-1John.4.10"], "notes": "Every field, filled in."}
+{"id": "2", "title": "A Sermon With Only What Is Required", "ref": "Ps.23", "url": "https://example.org/sermons/2"}
+{"id": "3", "title": "An Address With No Single Text", "url": "https://example.org/sermons/3", "date": "1861"}

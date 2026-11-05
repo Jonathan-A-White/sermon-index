@@ -1,0 +1,81 @@
+# The template of a source directory. Copy sources/_template to
+# sources/<id>/, fill in every field, write rows.jsonl, then run
+#   sermons check sources/<id>
+#   sermons check --urls 20 sources/<id>
+# docs/sources.md is the full description; `sermons load` skips any
+# directory whose name begins with '_', so this one is never loaded.
+#
+# Every key below is required unless it says "optional". An unknown key is a
+# fault (`sermons check` names it), so a misspelt key is never silently lost.
+
+# The source's id: lower-case letters, digits and '-', and the same as the
+# directory's name. It is the first half of every row's key in the database
+# and the id Lampas and the API name the source by; never change it once
+# loaded (a new id is a new source).
+id = "example-preacher"
+
+# The name a reader sees, with the edition when it matters.
+name = "An Example Preacher's sermons (Example Library)"
+
+# "sermons": the directory has rows.jsonl, one sermon a line.
+# "themes":  the directory has topics.jsonl and links.jsonl instead.
+kind = "sermons"
+
+# The terms of the site or edition the rows come from (or link to), QUOTED
+# VERBATIM from its terms page, never summarised: a reader of this file must
+# be able to see exactly what was promised. Not empty. Use a TOML multi-line
+# string; a line ending in a backslash joins the next line to it.
+licence = """
+Example Library's terms, copied word for word from the page named in \
+terms_url, with the date it was read in the comment above."""
+
+# Optional: our reading of the licence, in our own words: why rows from this
+# source may be indexed (or linked), and anything to watch. Leave the key out
+# rather than writing it empty.
+licence_note = "The sermons were printed before 1929 and are public domain in the United States; the index keeps only titles, references and links."
+
+# Whom the app credits: the preacher and the edition or site.
+credit = "An Example Preacher; Example Library (example.org)"
+
+# The source's home page and its terms page: https only.
+homepage = "https://example.org/sermons"
+terms_url = "https://example.org/terms"
+
+# The day the source was added (a TOML date, not a string).
+added = 2026-11-05
+
+# Whether a reader who has never chosen sees this source: true only for a
+# source that is free of licence doubt and of the quality the app vouches for.
+on_by_default = false
+
+# ---------------------------------------------------------------------------
+# rows.jsonl, field by field (JSON has no comments, so they are here). One
+# JSON object a line; a blank line is skipped; an unknown field is a fault.
+# An optional field is left out when it has no value, never given as "".
+#
+#   id          required. The row's id within the source: letters, digits,
+#               '.', '_' and '-'. Stable: the preacher's number when there is
+#               one ("104"), else a slug. Unique in the file.
+#   title       required. The sermon's title as the source prints it.
+#   ref         optional. The preaching text: an OSIS reference or range
+#               ("Rom.5.8", "Rom.5.1-Rom.5.11", "Ps.23", "Rom.5.12-Rom.6.4").
+#               Left out only when the sermon has no single text.
+#   url         required. https. The page a reader is sent to.
+#   alt_url     optional. https. A second form (a pdf, an audio file).
+#   kind        optional. "link" (the default: the sermon is elsewhere),
+#               "hosted" (a file this service hosts) or "exposition" (an
+#               exposition of a passage rather than a sermon on a text).
+#   preacher    optional. The preacher's name as the app shows it.
+#   date        optional. When it was preached, ISO 8601 at the precision
+#               known: "1855", "1855-03" or "1855-03-18".
+#   duration_s  optional. Length in seconds, for audio or video.
+#   cited       optional. Other references the sermon cites: ["John.3.16"].
+#               They are indexed as 'cited', below the preaching text.
+#   notes       optional. Anything a later reader of the file should know
+#               (where the ref came from when the source did not tag it).
+#
+# A theme source (kind = "themes") has no rows.jsonl; it has topics.jsonl
+#   {"id": "atonement", "label": "Atonement", "parts": [{"n": 1, "label": "Doctrine of"}], "see": ["reconciliation"]}
+# and links.jsonl
+#   {"topic": "atonement", "part": 1, "ref": "Rom.5.11", "via": "source"}
+# docs/sources.md describes them.
