@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -329,5 +330,45 @@ func TestLoadAThemeSource(t *testing.T) {
 	}
 	if n := count(t, db, "select count(*) from theme_parts"); n != 0 {
 		t.Errorf("%d parts after the reload", n)
+	}
+}
+
+// The real Spurgeon source loads in a few seconds with the counts the tool
+// printed when it wrote rows.jsonl (tools/ccel-spurgeon): 3,543 rows, 3,467
+// of them with a preaching text that resolves.
+func TestLoadSpurgeonCCEL(t *testing.T) {
+	const dir = "../../sources/spurgeon-ccel"
+	if fs := Check(dir); len(fs) != 0 {
+		t.Fatalf("check: %v", Faults(fs))
+	}
+	ctx := context.Background()
+	db := migrated(t)
+
+	start := time.Now()
+	res, err := Load(ctx, db, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if took := time.Since(start); took > 10*time.Second {
+		t.Errorf("load took %v, want under 10 s", took)
+	}
+	t.Log(res.String())
+
+	if n := count(t, db, "select count(*) from sermons where source_id = 'spurgeon-ccel'"); n != 3543 {
+		t.Errorf("%d sermons, want 3543", n)
+	}
+	if n := count(t, db, "select count(*) from sermon_passages where role = 'text'"); n != 3467 {
+		t.Errorf("%d preaching texts, want 3467", n)
+	}
+	// Romans 5: the preaching text of 22 sermons lies in the chapter.
+	rom5, err := passage.Parse("Rom.5")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := count(t, db, "select count(distinct sermon_id) from sermon_passages where role = 'text' and span && $1::int4range", rom5.PG()); n != 22 {
+		t.Errorf("%d sermons with their text in Romans 5, want 22", n)
+	}
+	if n := count(t, db, "select count(*) from sermons where source_id = 'spurgeon-ccel' and kind = 'exposition'"); n != 5 {
+		t.Errorf("%d expositions, want 5", n)
 	}
 }

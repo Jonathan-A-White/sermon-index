@@ -79,9 +79,17 @@ func TestMigrateAndLoadTwice(t *testing.T) {
 			t.Errorf("load %d: %d %q %q", i+1, code, out, errOut)
 		}
 	}
-	// --all over sources/ loads no directory beginning with '_'.
-	code, out, errOut = runCmd(t, env, "load", "--all", "../../sources")
-	if code != 0 || out != "no source directories under ../../sources\n" {
+	// --all loads no directory beginning with '_': a root holding only the
+	// fixtures and the template (a copy, so that the real sources/ may grow)
+	// has nothing to load.
+	root := t.TempDir()
+	for _, name := range []string{"_fixtures", "_template"} {
+		if err := os.CopyFS(filepath.Join(root, name), os.DirFS(filepath.Join("../../sources", name))); err != nil {
+			t.Fatal(err)
+		}
+	}
+	code, out, errOut = runCmd(t, env, "load", "--all", root)
+	if code != 0 || out != "no source directories under "+root+"\n" {
 		t.Errorf("load --all: %d %q %q", code, out, errOut)
 	}
 }

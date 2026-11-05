@@ -1,0 +1,66 @@
+# Spurgeon's sermons, 3,539 entries of CCEL's ThML edition (63 volumes,
+# 1855-1917) as one row a sermon number. Written (rows.jsonl) by
+#
+#   go run ./tools/ccel-spurgeon --cache <dir> --out sources/spurgeon-ccel --report tools/ccel-spurgeon/REPORT.md
+#
+# from https://ccel.org/ccel/spurgeon/sermons01.xml to sermons63.xml, read on
+# 2026-11-05. The index keeps facts only: a number, a title, a reference, the
+# addresses; no sentence of a sermon is written anywhere.
+#
+# What the tool counted (2026-11-05):
+#   3,539 sermon entries read; 3,543 rows and 3,531 distinct sermon numbers.
+#   The probe counted 3,527 distinct numbers from the entries' headings; the
+#   other four are numbers CCEL's entries cover but do not head: 298 (the
+#   entry "Sermon 297-8") and 386, 387, 388 (the entry "Sermon 385", whose
+#   head reads "Nos. 385-88."). CCEL's heading "6823" (volume 12, between 682
+#   and 684) is read as 683, which has no entry of its own: the count is the
+#   same. Twelve numbers have two entries (1331, 1451A and B, ... 2237); each
+#   has its own row (ids 1331 and 1331-2, 1451A and 1451B).
+#   3,467 rows have a preaching text that resolves (the `ref`). The probe's
+#   3,414 counted an osisRef that is a single reference; the tool also takes
+#   the 48 fields of several verses ("Bible:A Bible:B": the first is the ref,
+#   the rest are cited) and every other reading Lampas's book table accepts,
+#   and the earlier probe note's 3,476 of 3,527 counts every reading. Of the 3,477 entries with a machine-read text, eleven
+#   name a verse that does not exist (a slip in CCEL's print) and are left
+#   out; 71 entries have no usable preaching text (a meeting, a dedication,
+#   an address, an empty or a misspelt field): tools/ccel-spurgeon/REPORT.md
+#   lists them, the 53 numbers with two or more preaching texts, and the
+#   references left out.
+#   Romans 5: 22 rows have their preaching text in Romans 5, as the probe
+#   found.
+#   Dates (2,734 rows) are the date the head of the sermon gives for its
+#   preaching, where it gives one.
+
+id = "spurgeon-ccel"
+name = "Spurgeon's sermons (CCEL)"
+kind = "sermons"
+
+# CCEL's copyright policy, https://ccel.org/about/copyright.html, quoted
+# verbatim as read on 2026-11-05.
+licence = """
+CCEL.org website and special contents copyright 1993-2020 Harry Plantinga. \
+Most of the editions at the Christian Classics Ethereal library are based on \
+books that are public domain in the United States. However, they may have \
+copyrighted introductions, cover art, and other special contents. A few books \
+are under another publisher's copyright and are used by permission; these are \
+noted on the book information page. These books may be used for personal, \
+educational, or non-profit purposes. Contact us for permission to republish \
+CCEL works or to use them commercially. Copyright laws in other countries \
+vary; it may be that some books that are in the public domain in the United \
+States but are still under copyright in other countries. Check your local \
+copyright law before copying."""
+
+licence_note = """
+The words are public domain: Spurgeon died in 1892 and the last volume was \
+printed in 1917. What CCEL adds (its typing, markup and any introduction) is \
+under CCEL's terms above. The index keeps only a number, a title, a \
+reference, a date and the addresses of CCEL's page and Spurgeon Gems' pdf, \
+never the words or CCEL's markup, so CCEL's terms bind the pages we link to, \
+not these rows. A sermon's title and its reference are read from CCEL's \
+ThML."""
+
+credit = "Christian Classics Ethereal Library, Calvin University"
+homepage = "https://ccel.org/ccel/spurgeon"
+terms_url = "https://ccel.org/about/copyright.html"
+added = 2026-11-05
+on_by_default = true
