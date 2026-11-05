@@ -1,5 +1,7 @@
 # sources/henry-sermons: what was read and what was not
 
+<!-- toc: none -->
+
 Made by hand on 2026-11-05 from the Internet Archive's OCR (`<id>_djvu.txt` and `<id>_djvu.xml`, kept in the git-ignored `.archive-cache/`; nothing of it is committed). No tool wrote `rows.jsonl`: the contents tables and the printed heads of the sermons were read, and a row is a title, the preaching text as the printed head gives it, the Archive's reader page and, where printed, a date. No sentence of a sermon is in this repository.
 
 ## Counts
