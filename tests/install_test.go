@@ -25,12 +25,30 @@ func repoRoot(t *testing.T) string {
 	return filepath.Dir(wd)
 }
 
+// fakeDocker, with FAKE_DOCKER=needs-sg, refuses as the Laptop's user manager
+// does (it started before the user joined the docker group): every call that
+// is not run under sg is refused and logged as "docker-refused".
 const fakeDocker = `#!/bin/sh
+if [ "$FAKE_DOCKER" = needs-sg ] && [ "$FAKE_IN_SG" != 1 ]; then
+	echo "docker-refused $*" >> "$FAKE_LOG"
+	echo "permission denied while trying to connect to the Docker daemon socket at unix:///var/run/docker.sock" >&2
+	exit 1
+fi
 echo "docker $*" >> "$FAKE_LOG"
 case "$*" in
 *pg_isready*) [ "$FAKE_PG" = down ] && exit 2; exit 0 ;;
 esac
 exit 0
+`
+
+// fakeSg answers "sg docker -c CMD" by running CMD with FAKE_IN_SG=1, which
+// is what the fake docker takes for the docker group; FAKE_SG=down makes it
+// fail as sg does for a user who is not in the group.
+const fakeSg = `#!/bin/sh
+echo "sg $*" >> "$FAKE_LOG"
+if [ "$FAKE_SG" = down ]; then echo "sg: failed" >&2; exit 1; fi
+[ "$1" = docker ] && [ "$2" = -c ] || exit 2
+FAKE_IN_SG=1 exec sh -c "$3"
 `
 
 // fakeSystemctl keeps what is enabled and active as files under
@@ -110,7 +128,7 @@ func newRig(t *testing.T) *rig {
 			t.Fatal(err)
 		}
 	}
-	for name, body := range map[string]string{"docker": fakeDocker, "systemctl": fakeSystemctl, "go": fakeGo, "curl": fakeCurl} {
+	for name, body := range map[string]string{"docker": fakeDocker, "systemctl": fakeSystemctl, "go": fakeGo, "curl": fakeCurl, "sg": fakeSg} {
 		if err := os.WriteFile(filepath.Join(r.stubs, name), []byte(body), 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -190,12 +208,35 @@ func TestUnitsHaveWhatTheStoryNames(t *testing.T) {
 		"-p 127.0.0.1:5433:5432",
 		"--env-file %h/.config/sermon-index/pg.env",
 		"postgres:17",
-		"ExecStop=/usr/bin/docker stop sermon-index-pg",
 		"Restart=on-failure",
 	} {
 		if !strings.Contains(pg, want) {
 			t.Errorf("sermon-index-pg.service lacks %q", want)
 		}
+	}
+	// Docker goes through sg in all three Exec lines (the user manager may
+	// have started before the user joined the docker group), %h still
+	// expanded, and nowhere is /usr/bin/docker run bare.
+	for _, key := range []string{"ExecStartPre", "ExecStart", "ExecStop"} {
+		found := false
+		for _, line := range strings.Split(pg, "\n") {
+			if strings.HasPrefix(line, key+"=") {
+				found = true
+				if !strings.HasPrefix(strings.TrimPrefix(line, key+"=-"), "/usr/bin/sg docker -c '") &&
+					!strings.HasPrefix(strings.TrimPrefix(line, key+"="), "/usr/bin/sg docker -c '") {
+					t.Errorf("%s does not run docker through /usr/bin/sg docker -c: %s", key, line)
+				}
+			}
+		}
+		if !found {
+			t.Errorf("sermon-index-pg.service has no %s", key)
+		}
+	}
+	if strings.Contains(pg, "=/usr/bin/docker") || strings.Contains(pg, "=-/usr/bin/docker") {
+		t.Error("sermon-index-pg.service still calls /usr/bin/docker directly")
+	}
+	if !strings.Contains(pg, "docker stop sermon-index-pg'") {
+		t.Error("sermon-index-pg.service lacks the docker stop under sg")
 	}
 	svc := read("sermon-index.service")
 	for _, want := range []string{
@@ -438,5 +479,80 @@ func TestSmoke(t *testing.T) {
 		if code != 1 {
 			t.Errorf("FAKE_SMOKE=%s: exit %d, want 1:\n%s", mode, code, out)
 		}
+	}
+}
+
+// refusedCalls counts the docker calls the fake refused.
+func (r *rig) refusedCalls() int {
+	n := 0
+	for _, l := range strings.Split(r.calls(), "\n") {
+		if strings.HasPrefix(l, "docker-refused ") {
+			n++
+		}
+	}
+	return n
+}
+
+// The Laptop's case: the user manager (and so every session) has no docker
+// group, `docker info` is refused, `sg docker -c 'docker info'` answers.
+func TestInstallGoesThroughSgWhenDockerIsRefused(t *testing.T) {
+	r := newRig(t)
+	out, code := r.run("scripts/install-laptop.sh", "FAKE_DOCKER=needs-sg")
+	if code != 0 {
+		t.Fatalf("install exited %d though sg answers:\n%s\ncalls:\n%s", code, out, r.calls())
+	}
+	c := r.calls()
+	if !strings.Contains(c, "sg docker -c docker info") {
+		t.Errorf("the install did not try sg docker -c 'docker info':\n%s", c)
+	}
+	if !strings.Contains(c, "sg docker -c docker exec sermon-index-pg pg_isready -h 127.0.0.1 -U sermons -d sermons") {
+		t.Errorf("the pg_isready call did not go through sg:\n%s", c)
+	}
+	// The only refused call is the first, plain `docker info` probe.
+	if n := r.refusedCalls(); n != 1 {
+		t.Errorf("%d docker calls were refused, want 1 (the probe):\n%s", n, c)
+	}
+	if !strings.Contains(out, "sg docker") {
+		t.Errorf("the install does not say it is using sg:\n%s", out)
+	}
+}
+
+func TestInstallDoesNotUseSgWhenDockerAnswers(t *testing.T) {
+	r := newRig(t)
+	r.install()
+	if strings.Contains(r.calls(), "sg ") {
+		t.Errorf("the install used sg though docker answered:\n%s", r.calls())
+	}
+}
+
+func TestInstallDiesWhenNeitherDockerNorSgAnswers(t *testing.T) {
+	r := newRig(t)
+	out, code := r.run("scripts/install-laptop.sh", "FAKE_DOCKER=needs-sg", "FAKE_SG=down")
+	if code == 0 {
+		t.Fatalf("install succeeded with docker refused and sg failing:\n%s", out)
+	}
+	if !strings.Contains(out, "cannot talk to Docker") {
+		t.Errorf("the die message did not fire:\n%s", out)
+	}
+	if strings.Contains(r.calls(), "go build") {
+		t.Error("the install went on after the die")
+	}
+}
+
+func TestUninstallPrintsTheDockerLineThroughSgWhenRefused(t *testing.T) {
+	r := newRig(t)
+	out, code := r.run("scripts/uninstall-laptop.sh", "FAKE_DOCKER=needs-sg")
+	if code != 0 {
+		t.Fatalf("uninstall exited %d:\n%s", code, out)
+	}
+	if !strings.Contains(out, "sg docker -c 'docker run --rm -v ") {
+		t.Errorf("the printed docker line does not go through sg:\n%s", out)
+	}
+	out, code = r.run("scripts/uninstall-laptop.sh")
+	if code != 0 {
+		t.Fatalf("uninstall exited %d:\n%s", code, out)
+	}
+	if strings.Contains(out, "sg docker") || !strings.Contains(out, "  docker run --rm -v ") {
+		t.Errorf("the printed docker line is not the plain one:\n%s", out)
 	}
 }

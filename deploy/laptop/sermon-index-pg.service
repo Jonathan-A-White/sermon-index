@@ -3,9 +3,9 @@ Description=Sermon index: Postgres 17 in Docker (the Laptop; 127.0.0.1:5433)
 After=network-online.target docker.service
 
 [Service]
-ExecStartPre=-/usr/bin/docker rm -f sermon-index-pg
-ExecStart=/usr/bin/docker run --rm --name sermon-index-pg -v %h/.local/state/sermon-index/pg:/var/lib/postgresql/data -p 127.0.0.1:5433:5432 --env-file %h/.config/sermon-index/pg.env postgres:17
-ExecStop=/usr/bin/docker stop sermon-index-pg
+ExecStartPre=-/usr/bin/sg docker -c 'docker rm -f sermon-index-pg'
+ExecStart=/usr/bin/sg docker -c 'exec docker run --rm --name sermon-index-pg -v %h/.local/state/sermon-index/pg:/var/lib/postgresql/data -p 127.0.0.1:5433:5432 --env-file %h/.config/sermon-index/pg.env postgres:17'
+ExecStop=/usr/bin/sg docker -c 'docker stop sermon-index-pg'
 Restart=on-failure
 RestartSec=5
 

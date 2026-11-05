@@ -17,9 +17,9 @@ Description=Sermon index: Postgres 17 in Docker (the Laptop; 127.0.0.1:5433)
 After=network-online.target docker.service
 
 [Service]
-ExecStartPre=-/usr/bin/docker rm -f sermon-index-pg
-ExecStart=/usr/bin/docker run --rm --name sermon-index-pg -v %h/.local/state/sermon-index/pg:/var/lib/postgresql/data -p 127.0.0.1:5433:5432 --env-file %h/.config/sermon-index/pg.env postgres:17
-ExecStop=/usr/bin/docker stop sermon-index-pg
+ExecStartPre=-/usr/bin/sg docker -c 'docker rm -f sermon-index-pg'
+ExecStart=/usr/bin/sg docker -c 'exec docker run --rm --name sermon-index-pg -v %h/.local/state/sermon-index/pg:/var/lib/postgresql/data -p 127.0.0.1:5433:5432 --env-file %h/.config/sermon-index/pg.env postgres:17'
+ExecStop=/usr/bin/sg docker -c 'docker stop sermon-index-pg'
 Restart=on-failure
 RestartSec=5
 
@@ -29,12 +29,16 @@ WantedBy=default.target
 
 - `Description`: what `systemctl --user status` shows.
 - `After`: start after the network and the system's Docker daemon are up. (A user unit cannot `Requires` a system unit, so this only orders; if Docker is not up yet the start fails and `Restart` tries again.)
-- `ExecStartPre`: the leading `-` lets it fail. It removes a container of this name that a hard kill left behind (a container run with `--rm` is removed on a clean stop only), which would otherwise make `docker run` fail with "name already in use".
-- `ExecStart`: `docker run` in the foreground, so systemd owns the process. `--rm` removes the container when it stops; the data survives in the mounted directory. `--name sermon-index-pg` is the name `docker exec` and `docker stop` use. `-v ...:/var/lib/postgresql/data` keeps the database on the host. `-p 127.0.0.1:5433:5432` publishes Postgres on the loopback only, port 5433 (5432 is left for any Postgres of the user's own). `--env-file` reads `POSTGRES_USER`, `POSTGRES_PASSWORD` and `POSTGRES_DB`; the image applies them **only when it first fills an empty data directory**, so changing the password in the file later does not change the database's. `postgres:17` is the major version, pinned: a major upgrade is a dump and a restore, never a changed tag (the image's data layout changes at 18).
-- `ExecStop`: `docker stop`, which sends Postgres SIGTERM (a clean shutdown) and waits up to ten seconds.
+- `ExecStartPre`: `/usr/bin/sg docker -c '...'` runs the docker command with the `docker` group taken from `/etc/group` (see "Why `sg docker -c`" below). The leading `-` lets it fail. It removes a container of this name that a hard kill left behind (a container run with `--rm` is removed on a clean stop only), which would otherwise make `docker run` fail with "name already in use".
+- `ExecStart`: `docker run` (under `sg docker -c`; the `exec` makes it replace sg's shell) in the foreground, so systemd owns the process. `--rm` removes the container when it stops; the data survives in the mounted directory. `--name sermon-index-pg` is the name `docker exec` and `docker stop` use. `-v ...:/var/lib/postgresql/data` keeps the database on the host. `-p 127.0.0.1:5433:5432` publishes Postgres on the loopback only, port 5433 (5432 is left for any Postgres of the user's own). `--env-file` reads `POSTGRES_USER`, `POSTGRES_PASSWORD` and `POSTGRES_DB`; the image applies them **only when it first fills an empty data directory**, so changing the password in the file later does not change the database's. `postgres:17` is the major version, pinned: a major upgrade is a dump and a restore, never a changed tag (the image's data layout changes at 18).
+- `ExecStop`: `docker stop` (under `sg docker -c`), which sends Postgres SIGTERM (a clean shutdown) and waits up to ten seconds.
 - `Restart`: restart when the process exits non-zero or is killed; a `systemctl --user stop` is not restarted.
 - `RestartSec`: wait five seconds between restarts, so a fault does not spin.
 - `WantedBy`: `default.target`, started when the user's manager starts (at boot with lingering on, at login otherwise: `loginctl show-user $USER -p Linger`).
+
+### Why `sg docker -c`
+
+A systemd user manager gets its groups when it starts, at the user's first login. The Laptop's started (2026-10-14) before `jwhite` was added to the `docker` group, so the manager, every unit under it and every session shell started from it lack the group even though `getent group docker` lists the user: `docker info` answers `permission denied` at `/var/run/docker.sock`, and a plain `ExecStart=/usr/bin/docker run ...` fails the same way. Restarting the manager (or rebooting) would cure it but ends every session, so the unit runs docker through `/usr/bin/sg docker -c '...'`, which starts the command with the `docker` group read from `/etc/group` now. For a manager that has the group, `sg` does the same thing and changes nothing. `%h` is still expanded by systemd inside the single quotes. `scripts/install-laptop.sh` does likewise for its own docker calls when `docker info` is refused and `sg docker -c 'docker info'` answers.
 
 ## sermon-index.service
 

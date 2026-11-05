@@ -40,7 +40,25 @@ need go "the factory's Go is pinned under ~/.local; put it on PATH for this run"
 need docker "Docker is not installed"
 need openssl "openssl makes the database password"
 need systemctl "this installs systemd user units"
-docker info >/dev/null 2>&1 || die "cannot talk to Docker: is this user in the docker group (getent group docker), and has the session been restarted since it was added?"
+
+# Docker may be refused to this session (and to the user manager that runs the
+# Postgres unit) because it started before the user joined the docker group;
+# `sg docker -c` takes the group from /etc/group, so then every docker call of
+# the install goes through it. The unit does the same.
+DOCKER_SG=0
+if ! docker info >/dev/null 2>&1; then
+	if command -v sg >/dev/null 2>&1 && sg docker -c 'docker info' >/dev/null 2>&1; then
+		DOCKER_SG=1
+		echo "note: docker is refused to this session (it started before the docker group was added); using sg docker -c for the install's docker calls"
+	else
+		die "cannot talk to Docker, with or without sg docker -c: is this user in the docker group (getent group docker), and is the Docker daemon running?"
+	fi
+fi
+# docker_run ARGS...: docker with the fixed arguments of this script (none has
+# a space or a quote), through sg when the probe above needed it.
+docker_run() {
+	if [ "$DOCKER_SG" = 1 ]; then sg docker -c "docker $*"; else docker "$@"; fi
+}
 
 # 1. The binary.
 mkdir -p "$H/.local/bin"
@@ -114,9 +132,9 @@ echo "waiting for Postgres (up to ${PG_WAIT}s)..."
 waited=0
 # -h 127.0.0.1: while the image initialises a new data directory it listens
 # on its socket only, and would answer ready before it is.
-until docker exec sermon-index-pg pg_isready -h 127.0.0.1 -U sermons -d sermons >/dev/null 2>&1; do
+until docker_run exec sermon-index-pg pg_isready -h 127.0.0.1 -U sermons -d sermons >/dev/null 2>&1; do
 	if [ "$waited" -ge "$PG_WAIT" ]; then
-		die "Postgres did not answer in ${PG_WAIT}s: docker logs sermon-index-pg; journalctl --user -u sermon-index-pg"
+		die "Postgres did not answer in ${PG_WAIT}s: sg docker -c 'docker logs sermon-index-pg' (or docker logs sermon-index-pg); journalctl --user -u sermon-index-pg"
 	fi
 	sleep 1
 	waited=$((waited + 1))

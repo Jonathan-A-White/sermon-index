@@ -28,6 +28,13 @@ if [ -f "$BIN" ]; then
 	echo "removed $BIN"
 fi
 
+# The docker line printed below goes through sg when this session is refused
+# Docker (it started before the user joined the docker group) and sg answers.
+DOCKER_RUN="docker run --rm -v $DATA:/d alpine find /d -mindepth 1 -delete"
+if ! docker info >/dev/null 2>&1 && command -v sg >/dev/null 2>&1 && sg docker -c 'docker info' >/dev/null 2>&1; then
+	DOCKER_RUN="sg docker -c '$DOCKER_RUN'"
+fi
+
 cat <<LEFT
 
 Left in place (the install finds them again):
@@ -35,7 +42,7 @@ Left in place (the install finds them again):
   $CONF    pg.env and env: the database password
 
 To remove them too, for good, back up first (README, "On the Laptop"), then:
-  docker run --rm -v $DATA:/d alpine find /d -mindepth 1 -delete
+  $DOCKER_RUN
   rmdir $DATA
   rm -r $CONF
 LEFT
