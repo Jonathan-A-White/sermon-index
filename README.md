@@ -29,6 +29,14 @@ Optional fields: `ref` (the preaching text, OSIS), `alt_url`, `kind` (`link`, `h
 
 In the database a passage is an `int4range` of verse ordinals (`book*1000000 + chapter*1000 + verse`, Lampas's book order: Romans 5:8 is 45005008) with a GiST index, so "sermons on this verse, chapter or pericope" is `span && $1`. [docs/schema.md](docs/schema.md) draws the tables and says why each choice was made.
 
+## The sources
+
+| Source | What | Rows | Terms |
+| --- | --- | --- | --- |
+| `sources/spurgeon-ccel` | C. H. Spurgeon's sermons, 3,539 entries of CCEL's ThML edition (63 volumes) as one row a sermon number: title, preaching text, the references it cites, a date where its head gives one, the CCEL page and the Spurgeon Gems pdf. On by default. | 3,543 (3,467 with a preaching text); `rows.jsonl` is 935 KB | CCEL's, quoted verbatim in its `source.toml`: personal, educational or non-profit use. The words are public domain; the index keeps none of them. |
+
+`rows.jsonl` of `spurgeon-ccel` is written by a tool, not by hand: `go run ./tools/ccel-spurgeon --cache .ccel-cache --out sources/spurgeon-ccel --report tools/ccel-spurgeon/REPORT.md` fetches CCEL's 63 volumes into the (git-ignored) cache, one request at a time a second apart, and writes the same bytes again on a second run. [tools/ccel-spurgeon/REPORT.md](tools/ccel-spurgeon/REPORT.md) lists the numbers whose text is missing, doubled or left out.
+
 ## The commands
 
 ```sh
@@ -83,6 +91,7 @@ The tests need **no Docker and no installed Postgres**: they start a real Postgr
 | `internal/store` | Opening the database; the API's queries; the tests' embedded Postgres. |
 | `internal/sources` | Reading, checking and loading a source directory. |
 | `internal/themes` | A theme source's records and their tables. |
+| `tools/ccel-spurgeon` | The tool that writes `sources/spurgeon-ccel/rows.jsonl` from CCEL's ThML, and its `REPORT.md`. |
 | `sources/` | The source directories; `_template` and `_fixtures` (twenty Spurgeon sermons; a demo theme source) are never loaded by `--all`. |
 | `docs/` | `api.md` (the HTTP API, its examples asserted by the tests), `schema.md` (the tables and why), `sources.md` (the source-directory format). |
 
