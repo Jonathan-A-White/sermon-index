@@ -2,6 +2,15 @@
 
 Three modern catalogues, in the order the recipe ([adding-a-source.md](adding-a-source.md)) would take them, with their terms quoted and a recommendation each. Read on 2026-11-05 (mw-hxztgfo.8): for each, only its `robots.txt` and its terms or copyright pages (and, for SermonAudio, the one news page that says where an API key comes from). No sermon page, passage page or API call was fetched. None of this is legal advice or a licence: what is quoted is what the pages say.
 
+<!-- toc -->
+
+- [Which first: Truth For Life](#which-first-truth-for-life)
+- [Truth For Life (`www.truthforlife.org`)](#truth-for-life-wwwtruthforlifeorg)
+- [Ligonier Ministries (`learn.ligonier.org`, `www.ligonier.org`)](#ligonier-ministries-learnligonierorg-wwwligonierorg)
+- [SermonAudio (`www.sermonaudio.com`)](#sermonaudio-wwwsermonaudiocom)
+
+<!-- /toc -->
+
 ## Which first: Truth For Life
 
 **File Truth For Life first.** It is the only one of the three where a script may read the catalogue (its `robots.txt` allows it, and nothing in its terms forbids automated access), it has a page per passage that gives the passage as a printed label, and it is free. Its one open question is a small one the Governor can answer in a word: the Policies page does not say whether an index of titles, passages and addresses may be kept. So the story's first step is that question, with the quoted words, and the tool is written after the answer. Ligonier should not be filed (its terms forbid the tool), and SermonAudio waits for the Governor (a key, terms unread).
