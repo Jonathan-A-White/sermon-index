@@ -96,6 +96,8 @@ scripts/smoke.sh               # health 200 with at least 2 sources; Romans 5:8 
 scripts/uninstall-laptop.sh    # the way back: stops and removes the units and the binary
 ```
 
+**If Docker is refused** (`permission denied ... /var/run/docker.sock` although `getent group docker` lists you): the user manager, and every shell started from it, began before you were added to the `docker` group, and a group is taken only at start. The Postgres unit therefore runs docker through `/usr/bin/sg docker -c '...'`, and the install does the same for its own docker calls when plain `docker info` is refused and `sg docker -c 'docker info'` answers (it says so). It stops with "cannot talk to Docker" only when neither answers. In such a shell, run the `docker` commands below as `sg docker -c 'docker ...'`. Why, in full: [deploy/laptop/README.md](deploy/laptop/README.md), "Why `sg docker -c`".
+
 The install is idempotent: a second run changes nothing and says "nothing changed". It generates the database password once (`openssl rand -hex 24`), never prints it, and keeps it in `~/.config/sermon-index/pg.env` and `env` (mode 0600). The uninstall leaves the database and those two files, and names them.
 
 | What | Where |

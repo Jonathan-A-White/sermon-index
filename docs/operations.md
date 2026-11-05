@@ -16,7 +16,7 @@ Running the sermon index on the Laptop: where to look, what to do after a change
 systemctl --user status sermon-index sermon-index-pg
 journalctl --user -u sermon-index -f          # the service: one line a request on stderr, and its start and stop
 journalctl --user -u sermon-index-pg -f       # Postgres, as the container prints it
-docker logs sermon-index-pg                   # the same, from Docker
+docker logs sermon-index-pg                   # the same, from Docker (if refused: sg docker -c 'docker logs sermon-index-pg')
 scripts/smoke.sh                              # is it up, loaded and right: exit 0 or 1 with the reason
 curl -s http://10.88.0.2:8790/v1/health       # {status, version, sources, sermons}; 503 when the database does not answer
 ```
@@ -42,7 +42,7 @@ curl -s http://10.88.0.2:8790/v1/health       # {status, version, sources, sermo
 | Assumed | A wrong one shows as |
 | --- | --- |
 | `10.88.0.2` (the WireGuard address, `SERMONS_ADDR`) | `sermon-index` fails to start with `listen tcp 10.88.0.2:8790: bind: cannot assign requested address` when the interface is down or the address differs; the install's smoke test says "service down" |
-| The user is in the `docker` group | the install stops at once with "cannot talk to Docker"; the Postgres unit fails with `permission denied while trying to connect to the Docker daemon socket` |
+| The user is in the `docker` group, in `/etc/group` | the install stops at once with "cannot talk to Docker, with or without sg docker -c" (when only the session lacks the group, the install and the unit use `sg docker -c` and work); the Postgres unit fails with `permission denied while trying to connect to the Docker daemon socket` |
 | `/usr/bin/docker` (the unit's absolute path) | `status` shows `Failed to locate executable /usr/bin/docker` (status 203/EXEC); `which docker` says where it is, edit the unit |
 | `~/.local/bin` on the user manager's `PATH` | not needed by the units (absolute `%h` paths); the install's `go` must be on the shell's `PATH` or it stops with "go is not on PATH" |
 | `~/.config/sermon-index/env` | a missing file: the unit fails with `Failed to load environment files: No such file or directory`; a file without `DATABASE_URL`: `no database URL: set DATABASE_URL` in the journal |
