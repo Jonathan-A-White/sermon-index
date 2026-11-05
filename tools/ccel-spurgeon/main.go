@@ -170,7 +170,7 @@ func (r *Report) Summary() string {
 // Markdown is REPORT.md: the numbers a build or a recheck should look at.
 func (r *Report) Markdown() string {
 	var b strings.Builder
-	b.WriteString("# CCEL Spurgeon: what the ThML does not settle\n\n")
+	b.WriteString("# CCEL Spurgeon: what the ThML does not settle\n\n<!-- toc: none -->\n\n")
 	b.WriteString("Written by `go run ./tools/ccel-spurgeon --cache <dir> --out sources/spurgeon-ccel --report tools/ccel-spurgeon/REPORT.md`; do not edit by hand. Only numbers, titles and references are listed.\n\n")
 	b.WriteString("## Counts\n\n```\n" + r.Summary() + "```\n\n")
 	list := func(title, why string, items []string) {

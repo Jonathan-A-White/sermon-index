@@ -9,6 +9,7 @@ This repository is one Go module, `github.com/Jonathan-A-White/sermon-index`, wi
 <!-- toc -->
 
 - [The record shape](#the-record-shape)
+- [The sources](#the-sources)
 - [The commands](#the-commands)
 - [Running it](#running-it)
 - [Running the tests](#running-the-tests)

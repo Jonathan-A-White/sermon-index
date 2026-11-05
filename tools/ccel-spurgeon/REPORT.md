@@ -1,5 +1,7 @@
 # CCEL Spurgeon: what the ThML does not settle
 
+<!-- toc: none -->
+
 Written by `go run ./tools/ccel-spurgeon --cache <dir> --out sources/spurgeon-ccel --report tools/ccel-spurgeon/REPORT.md`; do not edit by hand. Only numbers, titles and references are listed.
 
 ## Counts
