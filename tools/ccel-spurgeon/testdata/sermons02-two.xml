@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE ThML PUBLIC 
+    "-//CCEL/DTD Theological Markup Language//EN"
+    "http://www.ccel.org/dtd/ThML10.dtd">
+<!-- A test fixture: the markup of two sermon entries of CCEL's sermons02.xml
+     (Spurgeon's Sermons Volume 02: 1856) with the bodies cut away, so that no
+     sentence of a sermon is kept. Copyright Christian Classics Ethereal Library. -->
+<ThML>
+  <ThML.head>
+    <electronicEdInfo>
+      <bookID>sermons02</bookID>
+    </electronicEdInfo>
+  </ThML.head>
+  <ThML.body>
+<div1 title="Sermon 62. Exposition: 1 John 3:1-10" n="ix" shorttitle="Sermon 62. Exposition: 1 John 3:1-10" progress="16.18%" prev="viii" next="x" id="ix">
+
+		<p class="Body" id="ix-p1" />
+		<h1 id="ix-p1.1">Exposition: <scripRef passage="1 John 3:1-10" id="ix-p1.2" parsed="|1John|3|1|3|10" osisRef="Bible:1John.3.1-1John.3.10">1 John 3:1-10</scripRef> </h1> 
+
+		<p class="Body" id="ix-p2" />
+
+		<p class="Body" id="ix-p3">(body cut)</p>
+</div1>
+<div1 title="Sermon 104. Love's Commendation" n="l" shorttitle="Sermon 104. Love's Commendation" progress="93.90%" prev="xlix" next="li" id="l">
+		<scripCom type="Sermon" passage="Romans 5:8." id="l-p0.1" parsed="|Rom|5|8|0|0" osisRef="Bible:Rom.5.8" /> 
+
+		<p class="Body" id="l-p1" />
+		<h1 id="l-p1.1">Love’s Commendation </h1> 
+
+		<p class="Body" id="l-p2" />
+
+		<p class="Body" id="l-p3">A Sermon</p>
+
+		<p class="Body" id="l-p4">No. 104</p>
+
+		<p class="Body" id="l-p5">Delivered on Sabbath Morning, November 23, 1856, by the</p>
+
+		<p class="Body" id="l-p6">REV. C.H. SPURGEON</p>
+
+		<p class="Body" id="l-p7">at the Music Hall, Royal Surrey Gardens.</p>
+
+		<p class="Body" id="l-p10">(text cut)—<scripRef passage="Romans 5:8." id="l-p10.1" parsed="|Rom|5|8|0|0" osisRef="Bible:Rom.5.8">Romans 5:8.</scripRef></p>
+
+		<p class="Body" id="l-p11">(body cut) <scripRef passage="John 3:16" id="l-p11.1" parsed="|John|3|16|0|0" osisRef="Bible:John.3.16">John 3:16</scripRef> and <scripRef passage="Romans 5:1-11" id="l-p11.2" parsed="|Rom|5|1|5|11" osisRef="Bible:Rom.5.1-Rom.5.11">Romans 5:1-11</scripRef>, and again <scripRef passage="John 3:16" id="l-p11.3" parsed="|John|3|16|0|0" osisRef="Bible:John.3.16">John 3:16</scripRef>.</p>
+</div1>
+<div1 title="Indexes" progress="100.00%" prev="lii" next="liii.i" id="liii">
+<h1 id="liii-p0.1">Indexes</h1>
+<div2 title="Index of Scripture References" progress="100.00%" id="liii.i">
+  <insertIndex type="scripRef" id="liii.i-p0.2" />
+<div class="Index"><p class="bbook">Genesis</p></div>
+</div2>
+</div1>
+  </ThML.body>
+</ThML>
