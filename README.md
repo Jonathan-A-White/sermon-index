@@ -6,6 +6,16 @@ The index points outward. A row is a sermon's title, its preaching text as a pas
 
 This repository is one Go module, `github.com/Jonathan-A-White/sermon-index`, with one binary, `sermons`. The HTTP API (`sermons serve`) is the next story.
 
+<!-- toc -->
+
+- [The record shape](#the-record-shape)
+- [The commands](#the-commands)
+- [Running the tests](#running-the-tests)
+- [Layout](#layout)
+- [Licence](#licence)
+
+<!-- /toc -->
+
 ## The record shape
 
 A sermon source is `sources/<id>/source.toml` (name, kind, the licence verbatim, credit, homepage, terms url, date added, on by default) and `sources/<id>/rows.jsonl`, one sermon a line:

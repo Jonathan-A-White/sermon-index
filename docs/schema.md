@@ -2,6 +2,15 @@
 
 The sermon index's database, as `internal/migrate/sql/0001_init.sql` makes it, and why each choice was made. The API (story A2) and Lampas's sermon epic build on this shape; the questions it leaves open are named at the end.
 
+<!-- toc -->
+
+- [The tables](#the-tables)
+- [Why](#why)
+- [The book table](#the-book-table)
+- [Left open, by name](#left-open-by-name)
+
+<!-- /toc -->
+
 ## The tables
 
 ```

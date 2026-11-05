@@ -18,6 +18,18 @@ sources/
 
 `sermons load --all sources/` and `sermons check --all sources/` take every directory under `sources/` whose name does not begin with `_` or `.`.
 
+<!-- toc -->
+
+- [source.toml](#sourcetoml)
+- [rows.jsonl (a sermon source)](#rowsjsonl-a-sermon-source)
+- [topics.jsonl and links.jsonl (a theme source)](#topicsjsonl-and-linksjsonl-a-theme-source)
+- [References](#references)
+- [sermons check](#sermons-check)
+- [sermons load](#sermons-load)
+- [The fixture and the template](#the-fixture-and-the-template)
+
+<!-- /toc -->
+
 ## source.toml
 
 TOML. Every key is required except `licence_note`; an unknown key is a fault, so a misspelt key is never silently lost.
