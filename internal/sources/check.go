@@ -70,7 +70,11 @@ func checkSource(d *Dir) []Fault {
 		}
 		// A directory whose name begins with '_' (the template, a fixture's
 		// parent) is never loaded by --all, so its id need not match.
-		base := filepath.Base(filepath.Clean(d.Path))
+		path := d.Path
+		if abs, err := filepath.Abs(path); err == nil {
+			path = abs // so that `sermons check .` knows the directory's name
+		}
+		base := filepath.Base(path)
 		if base != s.ID && !strings.HasPrefix(base, "_") {
 			add("id '%s' is not the directory's name '%s'", s.ID, base)
 		}

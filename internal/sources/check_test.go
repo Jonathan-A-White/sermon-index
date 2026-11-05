@@ -97,6 +97,14 @@ func TestFaultVersePastTheChapterNamesTheLine(t *testing.T) {
 		"rows.jsonl:7: ref 'Rom.5.99': verse past the chapter")
 }
 
+func TestCheckDotKnowsTheDirectorysName(t *testing.T) {
+	dir := writeSource(t, map[string]string{"source.toml": goodToml, "rows.jsonl": goodRow + "\n"})
+	t.Chdir(dir)
+	if fs := Check("."); len(fs) != 0 {
+		t.Errorf("%q", faultStrings(fs))
+	}
+}
+
 func TestFaultsInSourceToml(t *testing.T) {
 	expectFault(t, map[string]string{"rows.jsonl": goodRow}, "source.toml: missing")
 	expectFault(t, map[string]string{"source.toml": strings.Replace(goodToml, `licence = "Public domain."`, `licence = "  "`, 1), "rows.jsonl": goodRow},
