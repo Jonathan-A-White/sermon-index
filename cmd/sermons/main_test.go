@@ -160,3 +160,38 @@ func TestServeRefusesAnUnmigratedDatabase(t *testing.T) {
 		t.Errorf("serve with no DATABASE_URL: %d %q", code, errOut)
 	}
 }
+
+func TestCheckPrintsWarningsAndStillExits0(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "demo")
+	os.Mkdir(dir, 0o755)
+	b, _ := os.ReadFile("../../sources/_template/source.toml")
+	os.WriteFile(filepath.Join(dir, "source.toml"), []byte(strings.Replace(string(b), `id = "example-preacher"`, `id = "demo"`, 1)), 0o644)
+	os.WriteFile(filepath.Join(dir, "rows.jsonl"), []byte(
+		`{"id": "1", "title": "One", "ref": "Acts.1.1-Jude.1.25", "url": "https://example.org/1"}`+"\n"), 0o644)
+	code, out, errOut := runCmd(t, nil, "check", dir)
+	if code != 0 || !strings.HasPrefix(out, "rows.jsonl:1: warning: ref 'Acts.1.1-Jude.1.25' spans 149 chapters: ") ||
+		!strings.HasSuffix(out, "ok: 1 source(s), 1 warning(s)\n") {
+		t.Errorf("check: %d %q %q", code, out, errOut)
+	}
+	// --all says the same, naming the source's directory.
+	code, out, _ = runCmd(t, nil, "check", "--all", filepath.Dir(dir))
+	if code != 0 || !strings.Contains(out, "demo/rows.jsonl:1: warning: ") {
+		t.Errorf("check --all: %d %q", code, out)
+	}
+}
+
+func TestProposePrintsTheStory(t *testing.T) {
+	code, out, errOut := runCmd(t, nil, "propose", "../../sources/_fixtures/spurgeon-20")
+	if code != 0 || !strings.Contains(out, "20 rows") || !strings.Contains(out, "Size: S") || errOut != "" {
+		t.Errorf("propose: %d %q %q", code, out, errOut)
+	}
+	if code, _, _ := runCmd(t, nil, "propose"); code != 2 {
+		t.Errorf("propose with no directory: %d", code)
+	}
+	dir := filepath.Join(t.TempDir(), "demo")
+	os.Mkdir(dir, 0o755)
+	code, out, errOut = runCmd(t, nil, "propose", dir)
+	if code != 1 || !strings.Contains(out, "source.toml: missing") || !strings.Contains(errOut, "fault(s)") {
+		t.Errorf("propose of a broken dir: %d %q %q", code, out, errOut)
+	}
+}

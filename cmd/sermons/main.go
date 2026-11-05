@@ -3,6 +3,7 @@
 //	sermons migrate                    apply the schema's migrations to DATABASE_URL
 //	sermons check [--urls N] <dir>     check a source directory; exit 1 on any fault
 //	sermons check --all <root>         check every source directory under root
+//	sermons propose <dir>              print the story for adding a source, filled from it
 //	sermons load <dir>                 load a source directory into DATABASE_URL
 //	sermons load --all <root>          load every source directory under root
 //	sermons serve                      answer the read-only HTTP API (docs/api.md)
@@ -41,6 +42,7 @@ const usage = `usage:
   sermons migrate                  apply the schema's migrations to DATABASE_URL
   sermons check [--urls N] <dir>   check a source directory; exit 1 on any fault
   sermons check --all <root>       check every source directory under root
+  sermons propose <dir>            print the story for adding this source, filled from its source.toml
   sermons load <dir>               load a source directory into DATABASE_URL
   sermons load --all <root>        load every source directory under root
   sermons serve                    answer the HTTP API on SERMONS_ADDR (default 127.0.0.1:8790)
@@ -74,6 +76,8 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, getenv fu
 		return runMigrate(ctx, args[1:], stdout, stderr, getenv)
 	case "check":
 		return runCheck(ctx, args[1:], stdout, stderr)
+	case "propose":
+		return runPropose(args[1:], stdout, stderr)
 	case "load":
 		return runLoad(ctx, args[1:], stdout, stderr, getenv)
 	case "serve":
@@ -134,12 +138,13 @@ func runCheck(ctx context.Context, args []string, stdout, stderr io.Writer) int 
 	}
 	dir := fs.Arg(0)
 
-	var faults []sources.Fault
+	var faults, warnings []sources.Fault
 	var dirs []string
 	if *all {
-		dirs, faults = sources.CheckAll(dir)
+		dirs, faults, warnings = sources.CheckAllReport(dir)
 	} else {
-		dirs, faults = []string{dir}, sources.Check(dir)
+		dirs = []string{dir}
+		faults, warnings = sources.CheckReport(dir)
 	}
 	if *urls > 0 && len(faults) == 0 {
 		client := &http.Client{Timeout: 30 * time.Second}
@@ -149,6 +154,10 @@ func runCheck(ctx context.Context, args []string, stdout, stderr io.Writer) int 
 			faults = append(faults, sources.CheckURLs(ctx, src, *urls, client, rnd)...)
 		}
 	}
+	// A warning does not fail the check: it is a valid row to look at.
+	for _, f := range warnings {
+		fmt.Fprintln(stdout, f.String())
+	}
 	for _, f := range faults {
 		fmt.Fprintln(stdout, f.String())
 	}
@@ -156,7 +165,37 @@ func runCheck(ctx context.Context, args []string, stdout, stderr io.Writer) int 
 		fmt.Fprintf(stderr, "%d fault(s)\n", len(faults))
 		return 1
 	}
+	if len(warnings) > 0 {
+		fmt.Fprintf(stdout, "ok: %d source(s), %d warning(s)\n", len(dirs), len(warnings))
+		return 0
+	}
 	fmt.Fprintf(stdout, "ok: %d source(s)\n", len(dirs))
+	return 0
+}
+
+// runPropose prints the story for adding a source, filled from the source
+// directory given (prompts/add-source.md); a directory with a fault is
+// refused with the faults.
+func runPropose(args []string, stdout, stderr io.Writer) int {
+	fs := newFlags("propose", stderr)
+	if err := fs.Parse(args); err != nil || fs.NArg() != 1 {
+		if err == nil {
+			fmt.Fprint(stderr, usage)
+		}
+		return 2
+	}
+	text, err := sources.Propose(fs.Arg(0))
+	if err != nil {
+		var faults sources.Faults
+		if errors.As(err, &faults) {
+			fmt.Fprintln(stdout, faults.Error())
+			fmt.Fprintf(stderr, "%d fault(s)\n", len(faults))
+		} else {
+			fmt.Fprintf(stderr, "sermons propose: %v\n", err)
+		}
+		return 1
+	}
+	fmt.Fprint(stdout, text)
 	return 0
 }
 
