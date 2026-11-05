@@ -4,11 +4,13 @@
 # downloads the Postgres binaries (about 15 MB) into ~/.cache/sermon-index.
 
 GO ?= go
+# The build's version, as /v1/health answers it.
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 
 .PHONY: build test lint clean
 
 build:
-	$(GO) build -o bin/sermons ./cmd/sermons
+	$(GO) build -ldflags "-X main.version=$(VERSION)" -o bin/sermons ./cmd/sermons
 
 test:
 	$(GO) test ./...

@@ -3,10 +3,14 @@ package main
 import (
 	"bytes"
 	"context"
+	"io"
+	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/Jonathan-A-White/sermon-index/internal/store"
 )
@@ -50,7 +54,7 @@ func TestUsage(t *testing.T) {
 	if code, _, _ := runCmd(t, nil); code != 2 {
 		t.Errorf("no args: %d", code)
 	}
-	if code, _, _ := runCmd(t, nil, "serve"); code != 2 {
+	if code, _, _ := runCmd(t, nil, "nonsense"); code != 2 {
 		t.Errorf("unknown command: %d", code)
 	}
 	if code, _, errOut := runCmd(t, nil, "migrate"); code != 1 || !strings.Contains(errOut, "DATABASE_URL") {
@@ -63,7 +67,7 @@ func TestMigrateAndLoadTwice(t *testing.T) {
 	env := map[string]string{"DATABASE_URL": db.Config().ConnString()}
 
 	code, out, errOut := runCmd(t, env, "migrate")
-	if code != 0 || out != "applied 0001_init\n" {
+	if code != 0 || out != "applied 0001_init\napplied 0002_search\n" {
 		t.Fatalf("migrate: %d %q %q", code, out, errOut)
 	}
 	if code, out, _ := runCmd(t, env, "migrate"); code != 0 || !strings.Contains(out, "nothing to apply") {
@@ -79,5 +83,72 @@ func TestMigrateAndLoadTwice(t *testing.T) {
 	code, out, errOut = runCmd(t, env, "load", "--all", "../../sources")
 	if code != 0 || out != "no source directories under ../../sources\n" {
 		t.Errorf("load --all: %d %q %q", code, out, errOut)
+	}
+}
+
+func TestServe(t *testing.T) {
+	db := store.TestDB(t)
+	env := map[string]string{"DATABASE_URL": db.Config().ConnString()}
+	if code, _, errOut := runCmd(t, env, "migrate"); code != 0 {
+		t.Fatalf("migrate: %s", errOut)
+	}
+	if code, _, errOut := runCmd(t, env, "load", "../../sources/_fixtures/spurgeon-20"); code != 0 {
+		t.Fatalf("load: %s", errOut)
+	}
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	addr := l.Addr().String()
+	l.Close()
+	env["SERMONS_ADDR"] = addr
+
+	ctx, cancel := context.WithCancel(context.Background())
+	var out, errOut bytes.Buffer
+	done := make(chan int)
+	go func() {
+		done <- run(ctx, []string{"serve"}, &out, &errOut, func(k string) string { return env[k] })
+	}()
+	var res *http.Response
+	for i := 0; i < 100; i++ {
+		res, err = http.Get("http://" + addr + "/v1/health")
+		if err == nil {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	if err != nil {
+		cancel()
+		code := <-done
+		t.Fatalf("serve never answered: %v (exit %d)\n%s", err, code, errOut.String())
+	}
+	b, _ := io.ReadAll(res.Body)
+	res.Body.Close()
+	if res.StatusCode != 200 || !strings.Contains(string(b), `"sermons": 20`) || !strings.Contains(string(b), `"version": "dev"`) {
+		t.Errorf("health: %d %s", res.StatusCode, b)
+	}
+	res, err = http.Get("http://" + addr + "/v1/sources")
+	if err != nil || res.Header.Get("Access-Control-Allow-Origin") != "" {
+		t.Errorf("sources: %v", err)
+	}
+	cancel()
+	if code := <-done; code != 0 {
+		t.Errorf("serve exited %d: %s", code, errOut.String())
+	}
+	if !strings.Contains(errOut.String(), "sermons serve: listening on "+addr) ||
+		!strings.Contains(errOut.String(), "GET /v1/health 200 ") {
+		t.Errorf("stderr: %q", errOut.String())
+	}
+}
+
+func TestServeRefusesAnUnmigratedDatabase(t *testing.T) {
+	db := store.TestDB(t)
+	env := map[string]string{"DATABASE_URL": db.Config().ConnString(), "SERMONS_ADDR": "127.0.0.1:0"}
+	code, _, errOut := runCmd(t, env, "serve")
+	if code != 1 || !strings.Contains(errOut, "sermons migrate") {
+		t.Errorf("serve on an empty database: %d %q", code, errOut)
+	}
+	if code, _, errOut := runCmd(t, map[string]string{}, "serve"); code != 1 || !strings.Contains(errOut, "DATABASE_URL") {
+		t.Errorf("serve with no DATABASE_URL: %d %q", code, errOut)
 	}
 }

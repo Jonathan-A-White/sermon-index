@@ -5,8 +5,11 @@
 //	sermons check --all <root>         check every source directory under root
 //	sermons load <dir>                 load a source directory into DATABASE_URL
 //	sermons load --all <root>          load every source directory under root
+//	sermons serve                      answer the read-only HTTP API (docs/api.md)
 //
 // DATABASE_URL is a Postgres URL (postgres://user:password@host:port/db).
+// serve also reads SERMONS_ADDR (default 127.0.0.1:8790) and
+// SERMONS_ORIGINS (the origins CORS allows, comma-separated).
 // A directory under root whose name begins with '_' (the template, the test
 // fixtures) is never checked or loaded by --all.
 package main
@@ -18,10 +21,17 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
+	"net"
 	"net/http"
 	"os"
+	"os/signal"
+	"strings"
+	"syscall"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/Jonathan-A-White/sermon-index/internal/api"
 	"github.com/Jonathan-A-White/sermon-index/internal/migrate"
 	"github.com/Jonathan-A-White/sermon-index/internal/sources"
 	"github.com/Jonathan-A-White/sermon-index/internal/store"
@@ -33,10 +43,23 @@ const usage = `usage:
   sermons check --all <root>       check every source directory under root
   sermons load <dir>               load a source directory into DATABASE_URL
   sermons load --all <root>        load every source directory under root
+  sermons serve                    answer the HTTP API on SERMONS_ADDR (default 127.0.0.1:8790)
 `
 
+// version is the build's git describe, set by make build:
+//
+//	go build -ldflags "-X main.version=$(git describe --tags --always --dirty)"
+//
+// /v1/health answers it; a plain go build or go run says "dev".
+var version = "dev"
+
+// defaultAddr is SERMONS_ADDR when it is not set.
+const defaultAddr = "127.0.0.1:8790"
+
 func main() {
-	os.Exit(run(context.Background(), os.Args[1:], os.Stdout, os.Stderr, os.Getenv))
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	os.Exit(run(ctx, os.Args[1:], os.Stdout, os.Stderr, os.Getenv))
 }
 
 // run is the command; it returns the exit status: 0 done, 1 a fault or a
@@ -53,6 +76,8 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, getenv fu
 		return runCheck(ctx, args[1:], stdout, stderr)
 	case "load":
 		return runLoad(ctx, args[1:], stdout, stderr, getenv)
+	case "serve":
+		return runServe(ctx, args[1:], stderr, getenv)
 	case "help", "-h", "--help":
 		fmt.Fprint(stdout, usage)
 		return 0
@@ -192,5 +217,88 @@ func runLoad(ctx context.Context, args []string, stdout, stderr io.Writer, geten
 		fmt.Fprintf(stderr, "sermons load: %v\n", err)
 		return 1
 	}
+	return 0
+}
+
+// runServe answers the API until ctx ends (SIGINT or SIGTERM), then lets
+// requests in flight finish for up to 10 seconds.
+func runServe(ctx context.Context, args []string, stderr io.Writer, getenv func(string) string) int {
+	fs := newFlags("serve", stderr)
+	if err := fs.Parse(args); err != nil || fs.NArg() != 0 {
+		return 2
+	}
+	url := getenv("DATABASE_URL")
+	if url == "" {
+		fmt.Fprintln(stderr, "sermons serve: no database URL: set DATABASE_URL (postgres://user:password@host:port/db)")
+		return 1
+	}
+	addr := getenv("SERMONS_ADDR")
+	if addr == "" {
+		addr = defaultAddr
+	}
+	origins := getenv("SERMONS_ORIGINS")
+	if strings.TrimSpace(origins) == "" {
+		origins = api.DefaultOrigins
+	}
+
+	// The pool connects when asked, so serve starts with the database
+	// down and answers 503 until it is up.
+	cfg, err := pgxpool.ParseConfig(url)
+	if err != nil {
+		fmt.Fprintf(stderr, "sermons serve: DATABASE_URL: %v\n", err)
+		return 1
+	}
+	db, err := pgxpool.NewWithConfig(ctx, cfg)
+	if err != nil {
+		fmt.Fprintf(stderr, "sermons serve: %v\n", err)
+		return 1
+	}
+	defer db.Close()
+	pctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	pending, err := migrate.Pending(pctx, db)
+	cancel()
+	switch {
+	case err != nil:
+		fmt.Fprintf(stderr, "sermons serve: warning: the database at %s:%d is not answering (%v); /v1/health answers 503 until it does\n",
+			cfg.ConnConfig.Host, cfg.ConnConfig.Port, err)
+	case len(pending) > 0:
+		fmt.Fprintf(stderr, "sermons serve: the database lacks migrations %s: run sermons migrate first\n", strings.Join(pending, ", "))
+		return 1
+	}
+
+	l, err := net.Listen("tcp", addr)
+	if err != nil {
+		fmt.Fprintf(stderr, "sermons serve: %v\n", err)
+		return 1
+	}
+	srv := &http.Server{
+		Handler: api.New(api.Config{
+			DB:      db,
+			Version: version,
+			Origins: api.ParseOrigins(origins),
+			Log:     stderr,
+		}),
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       2 * time.Minute,
+		MaxHeaderBytes:    16 << 10,
+	}
+	fmt.Fprintf(stderr, "sermons serve: listening on %s (version %s)\n", l.Addr(), version)
+	errc := make(chan error, 1)
+	go func() { errc <- srv.Serve(l) }()
+	select {
+	case err := <-errc:
+		fmt.Fprintf(stderr, "sermons serve: %v\n", err)
+		return 1
+	case <-ctx.Done():
+	}
+	sctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(sctx); err != nil {
+		fmt.Fprintf(stderr, "sermons serve: shutting down: %v\n", err)
+		return 1
+	}
+	fmt.Fprintln(stderr, "sermons serve: stopped")
 	return 0
 }
