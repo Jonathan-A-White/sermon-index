@@ -7,7 +7,7 @@ GO ?= go
 # The build's version, as /v1/health answers it.
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 
-.PHONY: build test lint clean
+.PHONY: build test lint clean install-laptop smoke
 
 build:
 	$(GO) build -ldflags "-X main.version=$(VERSION)" -o bin/sermons ./cmd/sermons
@@ -18,6 +18,12 @@ test:
 lint:
 	$(GO) vet ./...
 	@out=$$(gofmt -l .); if [ -n "$$out" ]; then echo "gofmt needed:"; echo "$$out"; exit 1; fi
+
+install-laptop:
+	sh scripts/install-laptop.sh
+
+smoke:
+	sh scripts/smoke.sh
 
 clean:
 	$(RM) bin/sermons

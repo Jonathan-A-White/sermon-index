@@ -1,0 +1,13 @@
+[Unit]
+Description=Sermon index: the read-only HTTP API (the Laptop; 10.88.0.2:8790, behind the VPS)
+After=sermon-index-pg.service
+Requires=sermon-index-pg.service
+
+[Service]
+ExecStart=%h/.local/bin/sermons serve
+EnvironmentFile=%h/.config/sermon-index/env
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
