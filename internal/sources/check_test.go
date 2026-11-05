@@ -222,3 +222,77 @@ func TestCheckURLsReportsAnyNot200(t *testing.T) {
 		t.Errorf("--urls 1 made %d requests", calls)
 	}
 }
+
+// toServer is a client that sends every request, whatever its host, to srv.
+type toServer struct {
+	srv *httptest.Server
+}
+
+func (t toServer) RoundTrip(r *http.Request) (*http.Response, error) {
+	r = r.Clone(r.Context())
+	r.URL.Scheme = "https"
+	r.URL.Host = strings.TrimPrefix(t.srv.URL, "https://")
+	return t.srv.Client().Transport.RoundTrip(r)
+}
+
+// CCEL answers 200 to any section id, so a CCEL row's title must be in the
+// page it names.
+func TestCheckURLsCCELTitleMustBeInThePage(t *testing.T) {
+	var methods []string
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		methods = append(methods, r.Method+" "+r.URL.Path)
+		switch {
+		case strings.HasSuffix(r.URL.Path, ".l.html"):
+			// the page of 104: the title in the navbar and, with a curly apostrophe, in the heading
+			fmt.Fprint(w, `<html><td class="book_navbar_title">Sermon 104. Love&#39;s <i>Commendation</i></td><h1>Love’s Commendation </h1>`)
+		default:
+			fmt.Fprint(w, `<html><td class="book_navbar_title">Sermon 1. Something else</td></html>`) // 200 for anything
+		}
+	}))
+	defer srv.Close()
+	rows := `{"id": "104", "title": "Love's Commendation", "ref": "Rom.5.8", "url": "https://ccel.org/ccel/spurgeon/sermons02/sermons02.l.html", "alt_url": "https://www.spurgeongems.org/sermon/chs104.pdf"}
+{"id": "105", "title": "A Made-Up Title", "ref": "Rom.5.8", "url": "https://ccel.org/ccel/spurgeon/sermons02/sermons02.zzz.html"}
+{"id": "106", "title": "Elsewhere", "ref": "Rom.5.8", "url": "https://example.org/106"}
+`
+	dir := writeSource(t, map[string]string{"source.toml": goodToml, "rows.jsonl": rows})
+	d, fs := Read(dir)
+	if len(fs) != 0 {
+		t.Fatal(faultStrings(fs))
+	}
+	client := &http.Client{Transport: toServer{srv}}
+	got := faultStrings(CheckURLs(context.Background(), d, 10, client, rand.New(rand.NewSource(1))))
+	want := "rows.jsonl:2: url 'https://ccel.org/ccel/spurgeon/sermons02/sermons02.zzz.html': 200 OK but the title 'A Made-Up Title' is not in the page"
+	if len(got) != 1 || got[0] != want {
+		t.Errorf("CheckURLs = %q, want [%q]", got, want)
+	}
+	// A CCEL page is fetched with GET (a HEAD has no title to read); the
+	// other hosts are still only asked with HEAD.
+	for _, m := range methods {
+		ccel := strings.Contains(m, " /ccel/")
+		if ccel != strings.HasPrefix(m, "GET ") {
+			t.Errorf("request %q: only a CCEL page is fetched with GET", m)
+		}
+	}
+	if len(methods) != 4 {
+		t.Errorf("requests = %q, want one for each of the four urls", methods)
+	}
+}
+
+func TestTitleInPage(t *testing.T) {
+	for _, c := range []struct {
+		title, page string
+		want        bool
+	}{
+		{"Love's Commendation", `<h1>Love’s Commendation </h1>`, true},
+		{"Love's Commendation", `<td>Sermon 104. Love&#39;s  <i>Commendation</i></td>`, true},
+		{`"This Year Also"`, `<td>Sermon 1451A. &quot;This Year Also&quot;</td>`, true},
+		{`"This Year Also"`, `<h1>&#8220;This Year Also&#8221;</h1>`, true},
+		{"The Immutability of God", `<td>Sermon 1. Something else</td>`, false},
+		{"A & B", `<h1>A &amp; B</h1>`, true},
+		{"Trust In God—True Wisdom", `<h1>Trust In God&#8212;True Wisdom</h1>`, true},
+	} {
+		if got := titleInPage(c.title, c.page); got != c.want {
+			t.Errorf("titleInPage(%q, %q) = %v, want %v", c.title, c.page, got, c.want)
+		}
+	}
+}

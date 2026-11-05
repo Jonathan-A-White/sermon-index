@@ -3,6 +3,8 @@ package sources
 import (
 	"context"
 	"fmt"
+	"html"
+	"io"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -314,12 +316,13 @@ func CheckURLs(ctx context.Context, d *Dir, n int, client *http.Client, rnd *ran
 	type target struct {
 		line       int
 		field, url string
+		title      string
 	}
 	var ts []target
 	for _, r := range d.Rows {
-		ts = append(ts, target{r.Line, "url", r.URL})
+		ts = append(ts, target{r.Line, "url", r.URL, r.Title})
 		if r.AltURL != nil {
-			ts = append(ts, target{r.Line, "alt_url", *r.AltURL})
+			ts = append(ts, target{r.Line, "alt_url", *r.AltURL, ""})
 		}
 	}
 	rnd.Shuffle(len(ts), func(i, j int) { ts[i], ts[j] = ts[j], ts[i] })
@@ -330,12 +333,74 @@ func CheckURLs(ctx context.Context, d *Dir, n int, client *http.Client, rnd *ran
 
 	var fs []Fault
 	for _, t := range ts {
-		msg := head(ctx, client, t.url)
+		var msg string
+		if t.field == "url" && titleHosts[hostOf(t.url)] {
+			msg = checkTitle(ctx, client, t.url, t.title) // a GET: it needs the page, and says a non-200 too
+		} else {
+			msg = head(ctx, client, t.url)
+		}
 		if msg != "" {
 			fs = append(fs, Fault{File: RowsFile, Line: t.line, Msg: fmt.Sprintf("%s '%s': %s", t.field, t.url, msg)})
 		}
 	}
 	return fs
+}
+
+// titleHosts are the hosts that answer 200 to any address (CCEL does, to a
+// section id that does not exist), so a 200 proves nothing: a row's url on
+// such a host must also have the row's title in the page it answers with.
+var titleHosts = map[string]bool{"ccel.org": true, "www.ccel.org": true}
+
+func hostOf(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return ""
+	}
+	return strings.ToLower(u.Hostname())
+}
+
+// checkTitle fetches the page (GET) and returns "" when the title is in it,
+// else what is wrong.
+func checkTitle(ctx context.Context, client *http.Client, u, title string) string {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return err.Error()
+	}
+	req.Header.Set("User-Agent", "sermon-index-check (+https://github.com/Jonathan-A-White/sermon-index)")
+	resp, err := client.Do(req)
+	if err != nil {
+		return err.Error()
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return resp.Status
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
+	if err != nil {
+		return err.Error()
+	}
+	if !titleInPage(title, string(body)) {
+		return fmt.Sprintf("%s but the title '%s' is not in the page", resp.Status, title)
+	}
+	return ""
+}
+
+var (
+	tagRE   = regexp.MustCompile(`<[^>]*>`)
+	quoteFx = strings.NewReplacer("\u2018", "'", "\u2019", "'", "\u201c", `"`, "\u201d", `"`, "\u00a0", " ")
+)
+
+// titleInPage reports whether a title is in an HTML page's text, the markup
+// stripped, entities read, curly quotes made straight, spaces collapsed and
+// case ignored.
+func titleInPage(title, page string) bool {
+	norm := func(s string) string {
+		s = quoteFx.Replace(html.UnescapeString(s))
+		return strings.ToLower(strings.Join(strings.Fields(s), " "))
+	}
+	return strings.Contains(norm(tagRE.ReplaceAllString(page, "")), norm(title))
 }
 
 // head returns "" when the URL answers 200, else the status or the error.
