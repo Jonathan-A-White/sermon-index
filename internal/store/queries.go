@@ -8,7 +8,6 @@ package store
 import (
 	"context"
 	"fmt"
-	"math"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -141,7 +140,10 @@ func Sermons(ctx context.Context, db *pgxpool.Pool, q SermonQuery) (int, []Sermo
 
 // ThemeRow is a row of /v1/themes: a topic (or one numbered part of it)
 // with a link overlapping the passage asked about; Ref is the narrowest
-// such link. See is never nil.
+// such link. See is never nil. Sermons is how many sermons are on the whole
+// topic by their preaching text (any part, any sermon source) and Verses how
+// many verses the topic's links cover together; a topic over ThemeMaxVerses
+// is not used by the theme tier, whatever its sermon count.
 type ThemeRow struct {
 	Source    string   `json:"source"`
 	Topic     string   `json:"topic"`
@@ -150,6 +152,8 @@ type ThemeRow struct {
 	PartLabel *string  `json:"part_label"`
 	Ref       string   `json:"ref"`
 	See       []string `json:"see"`
+	Sermons   int      `json:"sermons"`
+	Verses    int      `json:"verses"`
 }
 
 // Themes answers the topics whose links overlap span: grouped by theme
@@ -162,10 +166,17 @@ func Themes(ctx context.Context, db *pgxpool.Pool, span passage.Range) ([]ThemeR
 			       l.source_id, l.theme_id, l.part_n, l.ref_osis, upper(l.span) - lower(l.span) AS w
 			FROM theme_links l
 			WHERE l.span && $1::int4range
-			ORDER BY l.source_id, l.theme_id, l.part_n, upper(l.span) - lower(l.span), l.ref_osis)
-		SELECT b.source_id, b.theme_id, t.label, b.part_n, p.label, b.ref_osis, t.see
+			ORDER BY l.source_id, l.theme_id, l.part_n, upper(l.span) - lower(l.span), l.ref_osis),
+		n AS (
+			SELECT k.source_id, k.theme_id,
+			       (SELECT count(DISTINCT (p.source_id, p.sermon_id))
+			        FROM theme_links l JOIN sermon_passages p ON p.role = 'text' AND p.span && l.span
+			        WHERE l.source_id = k.source_id AND l.theme_id = k.theme_id) AS sermons
+			FROM (SELECT DISTINCT source_id, theme_id FROM b) k)
+		SELECT b.source_id, b.theme_id, t.label, b.part_n, p.label, b.ref_osis, t.see, n.sermons, coalesce(t.verses, 0)
 		FROM b
 		JOIN themes t ON t.source_id = b.source_id AND t.id = b.theme_id
+		JOIN n ON n.source_id = b.source_id AND n.theme_id = b.theme_id
 		LEFT JOIN theme_parts p ON p.theme_source_id = b.source_id AND p.theme_id = b.theme_id AND p.n = b.part_n
 		ORDER BY b.source_id, b.w, t.label, b.theme_id, b.part_n NULLS FIRST`, span.PG())
 	if err != nil {
@@ -174,7 +185,7 @@ func Themes(ctx context.Context, db *pgxpool.Pool, span passage.Range) ([]ThemeR
 	out, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (ThemeRow, error) {
 		var t ThemeRow
 		var part *int32
-		err := r.Scan(&t.Source, &t.Topic, &t.Label, &part, &t.PartLabel, &t.Ref, &t.See)
+		err := r.Scan(&t.Source, &t.Topic, &t.Label, &part, &t.PartLabel, &t.Ref, &t.See, &t.Sermons, &t.Verses)
 		if part != nil {
 			n := int(*part)
 			t.Part = &n
@@ -188,6 +199,114 @@ func Themes(ctx context.Context, db *pgxpool.Pool, span passage.Range) ([]ThemeR
 		out = []ThemeRow{}
 	}
 	return out, err
+}
+
+// ThemeMaxVerses is the widest topic the theme tier uses: a topic whose
+// links cover more verses than this is left out. The probe that set it
+// (Lampas docs/sources/sermon-index.md, section 4) found Nave's whole-subject
+// topics (JESUS, THE CHRIST 4,821 verses, GOD 4,051, SIN 916) put 2,735
+// sermons on Romans 5 and the topics of 300 verses or fewer still 799; the
+// topics of Romans 5:8 under 300 put 170, a set a reader can look through.
+const ThemeMaxVerses = 300
+
+// ThemeQuery is the theme tier's question: the sermons whose preaching text
+// shares a topic with Span. Sources limits the sermon sources when not empty
+// and Themes the topics, each "<theme source>:<topic>", when not empty.
+type ThemeQuery struct {
+	Span          passage.Range
+	Sources       []string
+	Themes        []string
+	Limit, Offset int
+}
+
+// ThemeRef is the topic (and the numbered part of it, when the link names
+// one) a theme-tier row came in by.
+type ThemeRef struct {
+	Source    string  `json:"source"`
+	Topic     string  `json:"topic"`
+	Label     string  `json:"label"`
+	Part      *int    `json:"part"`
+	PartLabel *string `json:"part_label"`
+}
+
+// ThemeSermonRow is a row of the theme tier: a sermon row (Ref its
+// preaching text that met the topic, Role always "text") and the topic.
+type ThemeSermonRow struct {
+	SermonRow
+	Theme ThemeRef `json:"theme"`
+}
+
+// themeTier is each sermon's one theme match; it takes $1 the span, $2
+// whether to filter by sermon source, $3 the sources, $4 whether to filter by
+// topic, $5 the topics ("source:topic") and $6 the cap. A match is a
+// preaching text that overlaps a link of a topic that also links the span
+// and is at most $6 verses. A sermon with a passage overlapping the span is
+// a passage row and is not matched. Each sermon keeps its narrowest topic
+// (then the theme source and topic), and of that topic the narrowest link
+// its text meets (then the part).
+const themeTier = `
+	WITH topics AS (
+		SELECT t.source_id, t.id, t.label, t.verses
+		FROM themes t
+		WHERE t.verses <= $6
+		  AND (NOT $4::bool OR t.source_id || ':' || t.id = ANY($5::text[]))
+		  AND EXISTS (SELECT 1 FROM theme_links l WHERE l.source_id = t.source_id AND l.theme_id = t.id AND l.span && $1::int4range))
+	SELECT DISTINCT ON (p.source_id, p.sermon_id)
+	       p.source_id, p.sermon_id, p.ref_osis, lower(p.span) AS lo, upper(p.span) AS hi,
+	       t.source_id AS theme_source, t.id AS theme_id, t.label, t.verses, l.part_n, pt.label AS part_label
+	FROM sermon_passages p
+	JOIN theme_links l ON l.span && p.span
+	JOIN topics t ON t.source_id = l.source_id AND t.id = l.theme_id
+	LEFT JOIN theme_parts pt ON pt.theme_source_id = l.source_id AND pt.theme_id = l.theme_id AND pt.n = l.part_n
+	WHERE p.role = 'text' AND (NOT $2::bool OR p.source_id = ANY($3::text[]))
+	  AND NOT EXISTS (SELECT 1 FROM sermon_passages q
+	                  WHERE q.source_id = p.source_id AND q.sermon_id = p.sermon_id AND q.span && $1::int4range)
+	ORDER BY p.source_id, p.sermon_id, t.verses, t.source_id, t.id, upper(l.span) - lower(l.span), l.part_n NULLS FIRST, p.ref_osis`
+
+// ThemeSermons answers the theme tier for q: how many sermons, and the page
+// of them Limit and Offset name, ordered by the topic's size ascending, then
+// the sermon's source and id (a number as a number). Rows is never nil.
+func ThemeSermons(ctx context.Context, db *pgxpool.Pool, q ThemeQuery) (int, []ThemeSermonRow, error) {
+	srcs, themes := q.Sources, q.Themes
+	if srcs == nil {
+		srcs = []string{}
+	}
+	if themes == nil {
+		themes = []string{}
+	}
+	args := []any{q.Span.PG(), len(q.Sources) > 0, srcs, len(q.Themes) > 0, themes, ThemeMaxVerses}
+	var total int
+	if err := db.QueryRow(ctx, `SELECT count(*) FROM (`+themeTier+`) b`, args...).Scan(&total); err != nil {
+		return 0, nil, err
+	}
+	rows, err := db.Query(ctx, `
+		WITH b AS (`+themeTier+`)
+		SELECT s.source_id, s.id, s.title, s.preacher, s.date, s.url, s.alt_url, s.kind, b.ref_osis, b.lo, b.hi,
+		       b.theme_source, b.theme_id, b.label, b.part_n, b.part_label
+		FROM b JOIN sermons s ON s.source_id = b.source_id AND s.id = b.sermon_id
+		ORDER BY b.verses, s.source_id, `+fmt.Sprintf(naturalID, "s.id")+`
+		LIMIT $7 OFFSET $8`, append(args, q.Limit, q.Offset)...)
+	if err != nil {
+		return 0, nil, err
+	}
+	out, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (ThemeSermonRow, error) {
+		var s ThemeSermonRow
+		var lo, hi int
+		var part *int32
+		err := r.Scan(&s.Source, &s.ID, &s.Title, &s.Preacher, &s.Date, &s.URL, &s.AltURL, &s.Kind, &s.Ref, &lo, &hi,
+			&s.Theme.Source, &s.Theme.Topic, &s.Theme.Label, &part, &s.Theme.PartLabel)
+		s.Role = "text"
+		s.Width = Verses(lo, hi-1)
+		if part != nil {
+			n := int(*part)
+			s.Theme.Part = &n
+		}
+		return s, err
+	})
+	if out == nil {
+		out = []ThemeSermonRow{}
+	}
+	return total, out, err
 }
 
 // SearchLimit is the most rows /v1/search answers.
@@ -242,23 +361,5 @@ func Search(ctx context.Context, db *pgxpool.Pool, q string) ([]Hit, error) {
 }
 
 // Verses counts the verses from the ordinal lo to the ordinal hi, both
-// inclusive, by the book table (so Rom.5.12-Rom.6.4 is 14: Romans 5 ends
-// at verse 21). An ordinal outside the table counts as its difference.
-func Verses(lo, hi int) int {
-	books := passage.Books()
-	b, c, v := lo/1000000, lo/1000%1000, lo%1000
-	eb, ec, ev := hi/1000000, hi/1000%1000, hi%1000
-	valid := func(b, c int) bool { return b >= 1 && b <= len(books) && c >= 1 && c <= len(books[b-1].Last) }
-	if hi < lo || !valid(b, c) || !valid(eb, ec) {
-		return int(math.Abs(float64(hi-lo))) + 1
-	}
-	n := 0
-	for b != eb || c != ec {
-		n += books[b-1].Last[c-1] - v + 1
-		c, v = c+1, 1
-		if c > len(books[b-1].Last) {
-			b, c = b+1, 1
-		}
-	}
-	return n + ev - v + 1
-}
+// inclusive (passage.Verses).
+func Verses(lo, hi int) int { return passage.Verses(lo, hi) }

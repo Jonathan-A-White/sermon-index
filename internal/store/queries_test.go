@@ -330,3 +330,150 @@ func TestVerses(t *testing.T) {
 		}
 	}
 }
+
+// themeSource writes a theme source in a temp directory: three topics that
+// all link Rom.5.8, of 2, 34 and over 1,000 verses.
+func themeSource(t *testing.T, id string) string {
+	t.Helper()
+	dir := filepath.Join(t.TempDir(), id)
+	if err := os.Mkdir(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(filepath.Join(themesDemo, "source.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	files := map[string]string{
+		"source.toml": strings.Replace(string(b), `id = "themes-demo"`, `id = "`+id+`"`, 1),
+		"topics.jsonl": `{"id": "narrow", "label": "Narrow", "parts": [{"n": 1, "label": "Cross"}, {"n": 2, "label": "Love"}]}` + "\n" +
+			`{"id": "mid", "label": "Middle"}` + "\n" +
+			`{"id": "wide", "label": "Wide"}` + "\n",
+		"links.jsonl": `{"topic": "narrow", "part": 2, "ref": "Rom.5.8"}` + "\n" +
+			`{"topic": "narrow", "part": 1, "ref": "Isa.53.5"}` + "\n" +
+			`{"topic": "mid", "ref": "Rom.5.8"}` + "\n" +
+			`{"topic": "mid", "ref": "Luke.15"}` + "\n" +
+			`{"topic": "mid", "ref": "John.6.37"}` + "\n" +
+			`{"topic": "wide", "ref": "Rom.5.8"}` + "\n" +
+			`{"topic": "wide", "ref": "Isa"}` + "\n",
+	}
+	for name, content := range files {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return dir
+}
+
+func tierSources(t *testing.T) (string, string) {
+	a := sermonSource(t, "a",
+		`{"id": "1", "title": "On the verse", "ref": "Rom.5.8", "url": "https://example.org/1"}`,
+		`{"id": "2", "title": "Stripes", "ref": "Isa.53.5", "url": "https://example.org/2"}`,
+		`{"id": "3", "title": "Prodigal", "ref": "Luke.15.17", "url": "https://example.org/3"}`,
+		`{"id": "4", "title": "Come", "ref": "John.6.37", "url": "https://example.org/4"}`,
+		`{"id": "5", "title": "Hear", "ref": "Isa.1.1", "url": "https://example.org/5"}`,
+		`{"id": "6", "title": "Only cites", "ref": "John.1.1", "url": "https://example.org/6", "cited": ["Isa.53.5", "Luke.15"]}`,
+		`{"id": "9", "title": "Nine", "ref": "John.6.37", "url": "https://example.org/9"}`,
+		`{"id": "10", "title": "Ten", "ref": "John.6.37", "url": "https://example.org/10"}`,
+	)
+	return a, themeSource(t, "tx")
+}
+
+func themeKeys(rows []store.ThemeSermonRow) []string {
+	var out []string
+	for _, r := range rows {
+		part := ""
+		if r.Theme.Part != nil {
+			part = " (" + itoa(*r.Theme.Part) + " " + *r.Theme.PartLabel + ")"
+		}
+		out = append(out, r.Source+"/"+r.ID+" "+r.Role+" "+r.Ref+" via "+r.Theme.Source+":"+r.Theme.Topic+" "+r.Theme.Label+part)
+	}
+	return out
+}
+
+// The theme tier: sermons whose preaching text meets a link of a topic that
+// also links the ref, the topic at most 300 verses, each sermon once with
+// its narrowest topic, the passage rows left out.
+func TestThemeSermons(t *testing.T) {
+	a, tx := tierSources(t)
+	db := loaded(t, a, tx)
+	ctx := context.Background()
+	q := store.ThemeQuery{Span: ref(t, "Rom.5.8"), Limit: 50}
+
+	total, rows, err := store.ThemeSermons(ctx, db, q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{
+		"a/2 text Isa.53.5 via tx:narrow Narrow (1 Cross)",
+		"a/3 text Luke.15.17 via tx:mid Middle",
+		"a/4 text John.6.37 via tx:mid Middle",
+		"a/9 text John.6.37 via tx:mid Middle",
+		"a/10 text John.6.37 via tx:mid Middle",
+	}
+	if got := themeKeys(rows); total != 5 || !reflect.DeepEqual(got, want) {
+		t.Errorf("rom.5.8: total %d\n got %q\nwant %q", total, got, want)
+	}
+	if rows[0].Width != 1 || rows[0].Title != "Stripes" || rows[0].URL == "" {
+		t.Errorf("the row is a sermon row: %+v", rows[0])
+	}
+
+	// A topic past the cap is never used, and Verses counts what a topic covers.
+	if store.ThemeMaxVerses != 300 {
+		t.Errorf("ThemeMaxVerses = %d, want 300", store.ThemeMaxVerses)
+	}
+
+	q.Themes = []string{"tx:mid"}
+	total, rows, _ = store.ThemeSermons(ctx, db, q)
+	if want := []string{"a/3 text Luke.15.17 via tx:mid Middle", "a/4 text John.6.37 via tx:mid Middle", "a/9 text John.6.37 via tx:mid Middle", "a/10 text John.6.37 via tx:mid Middle"}; total != 4 || !reflect.DeepEqual(themeKeys(rows), want) {
+		t.Errorf("theme=tx:mid: %d %q", total, themeKeys(rows))
+	}
+	q.Themes = []string{"tx:wide"}
+	if total, rows, _ = store.ThemeSermons(ctx, db, q); total != 0 || len(rows) != 0 || rows == nil {
+		t.Errorf("theme=tx:wide is past the cap: %d %v", total, rows)
+	}
+	q.Themes = nil
+
+	q.Limit, q.Offset = 2, 1
+	total, rows, _ = store.ThemeSermons(ctx, db, q)
+	if want := []string{"a/3 text Luke.15.17 via tx:mid Middle", "a/4 text John.6.37 via tx:mid Middle"}; total != 5 || !reflect.DeepEqual(themeKeys(rows), want) {
+		t.Errorf("limit 2 offset 1: %d %q", total, themeKeys(rows))
+	}
+	q.Limit, q.Offset = 50, 0
+	q.Sources = []string{"nosuch"}
+	if total, rows, _ = store.ThemeSermons(ctx, db, q); total != 0 || len(rows) != 0 {
+		t.Errorf("source=nosuch: %d %v", total, rows)
+	}
+
+	// A ref no topic links answers nothing, and never nil.
+	q = store.ThemeQuery{Span: ref(t, "Jude"), Limit: 50}
+	if total, rows, _ = store.ThemeSermons(ctx, db, q); total != 0 || rows == nil || len(rows) != 0 {
+		t.Errorf("Jude: %d %v", total, rows)
+	}
+}
+
+// /v1/themes's rows carry the sermons on each topic by preaching text and
+// the topic's verses (all of it, past the cap too).
+func TestThemesCarrySermonsAndVerses(t *testing.T) {
+	a, tx := tierSources(t)
+	db := loaded(t, a, tx)
+	rows, err := store.Themes(context.Background(), db, ref(t, "Rom.5.8"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	isa := ref(t, "Isa")
+	want := map[string][2]int{
+		"narrow": {2, 2},
+		"mid":    {5, 34},
+		"wide":   {3, 1 + store.Verses(isa.Lo, isa.Hi)},
+	}
+	for _, r := range rows {
+		w := want[r.Topic]
+		if r.Sermons != w[0] || r.Verses != w[1] {
+			t.Errorf("%s: %d sermons, %d verses; want %v", r.Topic, r.Sermons, r.Verses, w)
+		}
+		delete(want, r.Topic)
+	}
+	if len(want) != 0 {
+		t.Errorf("topics not answered: %v", want)
+	}
+}
