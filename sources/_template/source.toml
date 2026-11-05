@@ -48,6 +48,22 @@ added = 2026-11-05
 # source that is free of licence doubt and of the quality the app vouches for.
 on_by_default = false
 
+# Optional: what `sermons check --urls N` does for a host, by host name (lower
+# case, no scheme, path or port). Leave the table out when the host answers
+# 404 to an address it does not have and asks for no delay: a HEAD that says
+# 200 is then proof enough.
+#   title_in_page  true: the host answers 200 to ANY address (ccel.org does:
+#                  it is a built-in rule), so a 200 proves nothing; the page
+#                  is fetched with GET and the row's title (or its
+#                  `expect_title`) must be in its text.
+#   delay_ms       wait this long before each request to the host after the
+#                  first (a host whose robots.txt or terms ask for a delay).
+# A rule needs at least one of the two. A rule here is laid over the
+# built-in ones, a key at a time.
+[host_rules."example.org"]
+title_in_page = true
+delay_ms = 1000
+
 # ---------------------------------------------------------------------------
 # rows.jsonl, field by field (JSON has no comments, so they are here). One
 # JSON object a line; a blank line is skipped; an unknown field is a fault.
@@ -73,6 +89,15 @@ on_by_default = false
 #               They are indexed as 'cited', below the preaching text.
 #   notes       optional. Anything a later reader of the file should know
 #               (where the ref came from when the source did not tag it).
+#   series      optional. true for a series, or a whole book: a row whose ref
+#               spans more than 3 chapters (`sermons check` warns of one that
+#               is not marked). The row is kept and found by its title, but it
+#               has no passage, so no passage ever matches it. Give it the
+#               narrowest text (its first), or split the series into rows. Left
+#               out when false (`"series": false` is a fault).
+#   expect_title  optional. What `--urls` requires in the page at `url`, where
+#               the page prints another title than the catalogue's `title`; the
+#               page is then fetched with GET. Left out when the title is the page's.
 #
 # A theme source (kind = "themes") has no rows.jsonl; it has topics.jsonl
 #   {"id": "atonement", "label": "Atonement", "parts": [{"n": 1, "label": "Doctrine of"}], "see": ["reconciliation"]}
