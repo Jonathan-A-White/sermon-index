@@ -169,6 +169,16 @@ The tool writes `rows.jsonl` and `REPORT.md` (the same bytes for the same input)
 
 `source.toml` is by hand and follows the three already here: `on_by_default = false`; `licence_note` begins with the Governor's line ("From the Governor's own Logos library at his word ..."); no Logos text is quoted anywhere; the `licence` is his own words, since there is no terms page to quote. Then load, add the source to a test beside `TestLoadLogosArchives` (`internal/sources/load_test.go`) with its counts, and write the README row and the CHANGELOG line.
 
+### The book-archive form (a book of sermons, not an archive with an index section)
+
+Most of his sermon *books* have no index section, and the Mayor's parser falls back to the book's contents list (`bin/logos-sermons-parse.mjs`, `fallbackRecord`). The index file's lines then carry no date and no series, and add `cited` (the passages the entry cites, as `bible.*`), `offset`, `textFromArticle`, `multipart` and `length`; the id is an offset, `2~14522`, and the `url` is `https://ref.ly/logosres/LLS:<resource>?off=<offset>` (**unverified**: no one has tapped one yet). The same tool reads it; what differs:
+
+- **One source from several books**: give `--in` more than once (the rows follow the files in order). Row ids are `<resource>.<article id with the ~ made a ->`, `MYSRMNOTES01.2-14522`, because the format refuses a `~` and two books can share an offset. `spurgeon-sermon-notes-logos` is two books, `wesley-logos` four, `moody-logos` four.
+- **`--dedupe-titles`** drops a line whose title is the title of a row of an *earlier* `--in` file (lower case; a leading Roman numeral or "Sermon N" taken off; apostrophes and marks ignored): Wesley's *Works* repeat his *Sermons on Several Occasions*, so that book goes first. Titles that repeat inside one file are all kept. `REPORT.md` has the counts before and after for each file and each row dropped (117 of 140 Works entries for `wesley-logos`).
+- **`cited`** is the file's `cited` list after the rest of `bibleRefs`, minus the `ref`; a trailing `+` or `++` ("and the verses after") is read as the verse. A line with no ref of its own keeps its cited passages as `cited` (they load as cited passages) and **none is taken to be the preaching text**; it has no passage match, like any row with no ref.
+- **A title "Chapter I: Gen. 19:15"** is titled by its passage with the book written out ("Genesis 19:15"; `Phil.` is Philippians or Philemon by the row's own reference), or by the heading after the colon ("Chapter I: “Love that Passeth Knowledge”"); the "Chapter I." goes into the notes. A title with no "Chapter N: " in front is left as it is.
+- **`multipart`**: the contents list splits the entry in parts, and the entry itself may be only a heading (Moody's "The Overcoming Life", 20 characters); the row is kept, the link opens the book at that offset, and the ids are listed in `REPORT.md`.
+
 What the import does not do: read a passage from a **title** (Skip Heitzig's "Exodus 3-4" rows carry no Logos reference, so they have no passage; about 117 rows), and tell a sermon from a heading of the archive (the book and series headings are rows).
 
 ## The shapes already here
@@ -177,7 +187,7 @@ What the import does not do: read a passage from a **title** (Skip Heitzig's "Ex
 | --- | --- | --- | --- |
 | `spurgeon-ccel` | CCEL's ThML: the preaching text tagged | `tools/ccel-spurgeon` | the tool, its REPORT, and `host_rules` (CCEL's built-in title rule) |
 | `henry-sermons` | Scans' OCR, a contents page | by hand | its REPORT: rows the OCR could not place, the unsure ones |
-| `greg-laurie-logos`, `jd-greear-logos`, `skip-heitzig-logos` | The Governor's Logos archives: an index file in the vault | `tools/logos-import` | [A Logos archive](#a-logos-archive-data-only), and each source's REPORT |
+| `greg-laurie-logos`, `jd-greear-logos`, `skip-heitzig-logos`, `spurgeon-sermon-notes-logos`, `wesley-logos`, `whitefield-logos`, `moody-logos` | The Governor's Logos archives and sermon books: an index file in the vault | `tools/logos-import` | [A Logos archive](#a-logos-archive-data-only), and each source's REPORT |
 | `themes-tcr1934`, `themes-torrey` | CrossWire SWORD modules | `tools/sword-themes` | [sources.md, "Theme sources"](sources.md#theme-sources); a theme source is a different recipe (topics and links) and is not covered here |
 
 The next three candidates, with their terms quoted, are in the closing comment of the story that wrote this page (mw-hxztgfo.8) and in [candidates.md](candidates.md).
