@@ -767,3 +767,207 @@ func TestRunRecordsPreacherAndRefsFromTitle(t *testing.T) {
 		t.Errorf("rows.jsonl:\n%s", rows)
 	}
 }
+
+// Batch 4a: front matter and tables of contents are not sermons.
+func TestNonSermonFrontMatter(t *testing.T) {
+	for _, title := range []string{
+		"Preface", "The Preface", "Author’s Preface", "Translator’s Preface",
+		"The Epistle to the Reader", "Epistle to the Reader", "To the Reader", "To the Christian Reader",
+		"General Editors’ Introduction", "Foreword",
+		"Contents", "Table of Contents",
+		"The Contents of the Ensuing Treatise of Contentment",
+		"The Contents of the Last Sermon, on Exodus, 14:13",
+		"The Contents of the Foregoing Sermons",
+		"An Exact Alphabetical Table of the Foregoing Treatise of Contentment",
+		"An Exact Alphabetical Table of the Last Sermon on Exodus 13:14",
+		"The Table of the Chief Heads Contained in This Book",
+	} {
+		if NonSermon(title) == "" {
+			t.Errorf("NonSermon(%q) is empty, want a reason", title)
+		}
+	}
+	for _, title := range []string{
+		"Sermon I", "Sermon II. Ver. 2", "The Saints Dutie in Times of Extremitie",
+		"Chapter I: The First Beatitude", "The Epistle of James", "A Preface to Preaching",
+		"Contentment", "The Table of the Lord",
+		"The First Sermon (July the 6th, 1645)",
+	} {
+		if why := NonSermon(title); why != "" {
+			t.Errorf("NonSermon(%q) = %q, want none", title, why)
+		}
+	}
+}
+
+// Burroughs, The Rare Jewel: two contents lines and two alphabetical tables
+// are dropped and counted; "Sermon I" has no ref and no titled row covers
+// it, so it stays.
+func TestBurroughsFrontMatterDropped(t *testing.T) {
+	rows, rep := BuildRows(readFile(t, "testdata/burroughs-a-sermons.jsonl"))
+	if rep.Input != 7 || len(rows) != 3 || len(rep.NonSermon) != 4 || len(rep.Dropped) != 0 {
+		t.Fatalf("lines %d, rows %d, non-sermons %d (%v), dropped %v; want 7, 3, 4", rep.Input, len(rows), len(rep.NonSermon), rep.NonSermon, rep.Dropped)
+	}
+	for _, id := range []string{"WRKSBURROUGHS01.1-15584", "WRKSBURROUGHS01.1-61480", "WRKSBURROUGHS01.1-478132"} {
+		if byID(rows, id) == nil {
+			t.Errorf("%s is not a row", id)
+		}
+	}
+	if r := byID(rows, "WRKSBURROUGHS01.1-15584"); r == nil || r.Ref != nil || r.Title != "Sermon I" {
+		t.Errorf("Sermon I: %+v", r)
+	}
+	md := rep.Markdown("burroughs-test-logos", []string{"burroughs-a-sermons.jsonl"})
+	for _, want := range []string{"Non-sermon lines dropped (4)", "The Contents of the Ensuing Treatise of Contentment", "An Exact Alphabetical Table of the Last Sermon on Exodus 13:14", "lines read:                          7", "rows written:                        3"} {
+		if !strings.Contains(md, want) {
+			t.Errorf("REPORT.md lacks %q:\n%s", want, md)
+		}
+	}
+}
+
+// Keach and Kuyper: the table of heads, the Epistle to the Reader and the
+// Author's Preface (which has a ref of its own, the text of the whole book)
+// are front matter.
+func TestKeachAndKuyperFrontMatterDropped(t *testing.T) {
+	for _, c := range []struct {
+		file     string
+		rows     int
+		dropped  string
+		firstRow string
+	}{
+		{"testdata/keach-a-sermons.jsonl", 2, "The Table of the Chief Heads Contained in This Book", "Sermon I"},
+		{"testdata/keach-b-sermons.jsonl", 1, "The Epistle to the Reader", "Sermon I"},
+		{"testdata/kuyper-sermons.jsonl", 2, "Author’s Preface", "Sermon 1—The Need of the Hour: A Church that Is Both Organism and Institution"},
+	} {
+		rows, rep := BuildRows(readFile(t, c.file))
+		if len(rows) != c.rows || len(rep.NonSermon) != 1 || !strings.Contains(rep.NonSermon[0], c.dropped) || rows[0].Title != c.firstRow {
+			t.Errorf("%s: rows %d, non-sermons %v, first %q", c.file, len(rows), rep.NonSermon, rows[0].Title)
+		}
+	}
+}
+
+// A "Sermon I" row with no title of its own is dropped when a row titled
+// "Sermon I: ..." in the same file covers it; alone it stays.
+func TestBareSermonNumberCoveredByATitledRow(t *testing.T) {
+	mk := func(id, title string) Input {
+		return Input{ID: id, Title: title, Preacher: "P", URL: "https://ref.ly/logosres/LLS:X?off=" + id}
+	}
+	in := []Input{
+		mk("1~10", "Sermon I"),
+		mk("1~20", "Sermon I: The Fatherhood of God"),
+		mk("1~30", "Sermon II"),
+		mk("1~40", "Sermon III"),
+		mk("1~50", "Sermon 3: Faith"),
+		mk("1~60", "Sermon 4"),
+	}
+	rows, rep := BuildRows(in)
+	var ids []string
+	for _, r := range rows {
+		ids = append(ids, r.ID)
+	}
+	// "Sermon III" is covered by "Sermon 3: Faith": the number is compared, not its form.
+	if got := strings.Join(ids, " "); got != "X.1-20 X.1-30 X.1-50 X.1-60" {
+		t.Fatalf("rows %s", got)
+	}
+	if len(rep.NonSermon) != 2 || !strings.Contains(rep.NonSermon[0], "X.1-10") || !strings.Contains(rep.NonSermon[0], "Sermon I") || !strings.Contains(rep.NonSermon[1], "X.1-40") {
+		t.Errorf("non-sermons: %v", rep.NonSermon)
+	}
+}
+
+func TestTitleDate(t *testing.T) {
+	for _, c := range []struct{ title, want string }{
+		{"The First Sermon (July the 6th, 1645)", "1645-07-06"},
+		{"The Second Sermon (July the 20th, 1645)", "1645-07-20"},
+		{"The Third Sermon (August the 10th, 1645)", "1645-08-10"},
+		{"The Fourth Sermon (August the 23d, 1645)", "1645-08-23"},
+		{"The Fifth Sermon (September the 1st, 1645)", "1645-09-01"},
+		{"The Sixth Sermon (October the 2nd, 1645)", "1645-10-02"},
+		{"A Sermon (April 4, 1742)", "1742-04-04"},
+		{"A Sermon (Feb. the 3d, 1645)", "1645-02-03"},
+		{"A Sermon (February the 31st, 1645)", ""},
+		{"Sermon I", ""},
+		{"A Sermon Preached on Sunday, April 4, 1742, Before the University", ""},
+		{"Sermon 12 (1645)", ""},
+	} {
+		if got := TitleDate(c.title); got != c.want {
+			t.Errorf("TitleDate(%q) = %q, want %q", c.title, got, c.want)
+		}
+	}
+}
+
+// Burroughs, The Spots of the Godly: the date in the title is the row's date
+// when the index gives none; an index date is not overridden.
+func TestDateInTheTitleBecomesTheRowsDate(t *testing.T) {
+	in := readFile(t, "testdata/burroughs-b-sermons.jsonl")
+	rows, rep := BuildRows(in)
+	if len(rows) != 3 || rep.Dated != 3 || rep.DatedFromTitle != 3 || len(rep.NoDate) != 0 {
+		t.Fatalf("rows %d, dated %d, from the title %d, no date %v", len(rows), rep.Dated, rep.DatedFromTitle, rep.NoDate)
+	}
+	r := byID(rows, "WRKSBURROUGHS07.1-1510")
+	if r == nil || str(r.Date) != "1645-07-06" || r.Title != "The First Sermon (July the 6th, 1645)" || !strings.Contains(str(r.Notes), "date is read from the title") {
+		t.Fatalf("First Sermon: %+v", r)
+	}
+	if r := byID(rows, "WRKSBURROUGHS07.1-109402"); r == nil || str(r.Date) != "1645-08-23" {
+		t.Errorf("Fourth Sermon: %+v", r)
+	}
+	if !strings.Contains(rep.Summary(), "dates read from the title:") {
+		t.Errorf("summary:\n%s", rep.Summary())
+	}
+	d := "1646-01-02"
+	in[0].Date = &d
+	rows, rep = BuildRows(in)
+	if r := byID(rows, "WRKSBURROUGHS07.1-1510"); r == nil || str(r.Date) != d || rep.DatedFromTitle != 2 {
+		t.Errorf("an index date wins: %+v, from the title %d", r, rep.DatedFromTitle)
+	}
+}
+
+// Maclaren, Broadus, Shedd: "Chapter N: " is taken off a title and kept in
+// the notes; "Sermon N:" titles are left as they are.
+func TestChapterPrefixStripped(t *testing.T) {
+	for _, c := range []struct{ file, id, title, note string }{
+		{"testdata/maclaren-sermons.jsonl", "BTTDSTHRSRMNS.1-4253", "The First Beatitude", "Chapter I."},
+		{"testdata/maclaren-sermons.jsonl", "BTTDSTHRSRMNS.1-110326", "Teacher or Saviour?", "Chapter VIII."},
+		{"testdata/broadus-sermons.jsonl", "JABSERMADDR.1-8364", "Worship", "Chapter I."},
+		{"testdata/broadus-sermons.jsonl", "JABSERMADDR.1-316930", "Ministerial Education", "Chapter XIII."},
+		{"testdata/shedd-a-sermons.jsonl", "SRMNATMAN.1-43544", "The Future State a Self-Conscious State", "Chapter 1."},
+		{"testdata/shedd-b-sermons.jsonl", "SRMSPRTMAN.1-13890", "Sermon I: Religious Meditation", ""},
+	} {
+		rows, rep := BuildRows(readFile(t, c.file))
+		r := byID(rows, c.id)
+		if r == nil || r.Title != c.title || (c.note != "" && !strings.Contains(str(r.Notes), c.note)) || strings.Contains(r.Title, "Chapter") {
+			t.Errorf("%s %s: %+v", c.file, c.id, r)
+		}
+		if c.note == "" && rep.Retitled != 0 {
+			t.Errorf("%s: retitled %d", c.file, rep.Retitled)
+		}
+	}
+}
+
+// All the batch 4a fixtures make rows the checker accepts.
+func TestBatch4aRowsPassTheChecker(t *testing.T) {
+	var files []File
+	for _, n := range []string{"burroughs-a", "burroughs-b", "burroughs-c", "keach-a", "keach-b", "kuyper", "maclaren", "broadus", "shedd-a", "shedd-b"} {
+		files = append(files, File{Name: n, Inputs: readFile(t, "testdata/"+n+"-sermons.jsonl")})
+	}
+	rows, _ := BuildSource(files, false)
+	out := t.TempDir()
+	if err := writeRows(filepath.Join(out, "rows.jsonl"), rows); err != nil {
+		t.Fatal(err)
+	}
+	toml := "id = \"" + filepath.Base(out) + "\"\nname = \"t\"\nkind = \"sermons\"\nlicence = \"x\"\ncredit = \"x\"\nhomepage = \"https://example.org\"\nterms_url = \"https://example.org\"\nadded = 2026-11-06\non_by_default = false\n"
+	if err := os.WriteFile(filepath.Join(out, "source.toml"), []byte(toml), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if faults, warnings := sources.CheckReport(out); len(faults) != 0 || len(warnings) != 0 {
+		t.Fatalf("faults %v, warnings %v", sources.Faults(faults), sources.Faults(warnings))
+	}
+}
+
+// Maclaren: no row has a text, but each cites a passage; the report says so
+// and does not claim the index gives no passage at all.
+func TestRefLessReportWithCitedPassages(t *testing.T) {
+	_, rep := BuildRows(readFile(t, "testdata/maclaren-sermons.jsonl"))
+	md := rep.Markdown("maclaren-test-logos", []string{"maclaren-sermons.jsonl"})
+	for _, want := range []string{"None of the 3 rows has a Scripture ref", "names no text for any of them", "the 3 that cite passages"} {
+		if !strings.Contains(md, want) {
+			t.Errorf("REPORT.md lacks %q:\n%s", want, md)
+		}
+	}
+}

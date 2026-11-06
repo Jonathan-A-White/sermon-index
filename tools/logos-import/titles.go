@@ -1,8 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Jonathan-A-White/sermon-index/internal/passage"
 )
@@ -87,4 +90,79 @@ func ReadableTitle(title, ref string) (readable, note string) {
 		return rest, note
 	}
 	return found[0].Name + " " + tail, note
+}
+
+// romanValue reads a Roman numeral (lower case) as a number, or 0.
+func romanValue(s string) int {
+	if !isRoman(s) {
+		return 0
+	}
+	vals := map[byte]int{'i': 1, 'v': 5, 'x': 10, 'l': 50, 'c': 100, 'd': 500, 'm': 1000}
+	total := 0
+	for i := 0; i < len(s); i++ {
+		v := vals[s[i]]
+		if i+1 < len(s) && vals[s[i+1]] > v {
+			total -= v
+		} else {
+			total += v
+		}
+	}
+	return total
+}
+
+// SermonNumber reads a title that begins "Sermon N" (N a number or a Roman
+// numeral): its number, and whether the title is that alone with no title of
+// its own after it ("Sermon I", "Sermon 3:"). ok is false for any other title.
+func SermonNumber(title string) (n int, bare, ok bool) {
+	s := strings.NewReplacer("’", "", "‘", "", "'", "").Replace(strings.ToLower(title))
+	m := sermonPrefixRE.FindStringSubmatch(s)
+	if m == nil {
+		return 0, false, false
+	}
+	if m[1][0] >= '0' && m[1][0] <= '9' {
+		v, err := strconv.Atoi(m[1])
+		if err != nil || v == 0 {
+			return 0, false, false
+		}
+		n = v
+	} else if n = romanValue(m[1]); n == 0 {
+		return 0, false, false
+	}
+	return n, strings.TrimSpace(notAlnumRE.ReplaceAllString(s[len(m[0]):], " ")) == "", true
+}
+
+var (
+	titleDateRE = regexp.MustCompile(`\(\s*([A-Za-z]+)\.?\s+(?:the\s+)?(\d{1,2})(?:st|nd|rd|th|d)?,?\s+(\d{4})\s*\)`)
+	monthNames  = []string{"january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"}
+)
+
+// TitleDate reads a date a title carries in brackets, "(July the 6th, 1645)"
+// or "(August the 23d, 1645)" or "(April 4, 1742)", as YYYY-MM-DD; "" when
+// the title has none or the day is not one the month has. A date outside
+// brackets ("Sunday, April 4, 1742, Before ...") is not read.
+func TitleDate(title string) string {
+	m := titleDateRE.FindStringSubmatch(title)
+	if m == nil {
+		return ""
+	}
+	word := strings.ToLower(m[1])
+	if word == "sept" {
+		word = "september"
+	}
+	month := 0
+	for i, name := range monthNames {
+		if name == word || (len(word) == 3 && strings.HasPrefix(name, word)) {
+			month = i + 1
+			break
+		}
+	}
+	day, _ := strconv.Atoi(m[2])
+	if month == 0 || day == 0 {
+		return ""
+	}
+	date := fmt.Sprintf("%s-%02d-%02d", m[3], month, day)
+	if _, err := time.Parse("2006-01-02", date); err != nil {
+		return ""
+	}
+	return date
 }

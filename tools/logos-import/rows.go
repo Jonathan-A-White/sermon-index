@@ -72,15 +72,16 @@ func ReadInput(r io.Reader) ([]Input, error) {
 // Report is what a run found: the counts the tool prints and the lists
 // REPORT.md carries. Every list is in input order.
 type Report struct {
-	Input     int // lines read
-	Rows      int // rows written
-	WithRef   int // rows with a ref
-	FromText  int // rows whose ref was read from the label, not from a Logos reference
-	FromTitle int // rows whose ref was read from the title (no Logos reference, no label that reads)
-	Cited     int // rows with cited references
-	Dated     int // rows with a full or partial date of their own
-	YearOnly  int // rows whose date is the year the archive files them under
-	Series    int // rows marked series (a ref over more than 3 chapters)
+	Input          int // lines read
+	Rows           int // rows written
+	WithRef        int // rows with a ref
+	FromText       int // rows whose ref was read from the label, not from a Logos reference
+	FromTitle      int // rows whose ref was read from the title (no Logos reference, no label that reads)
+	Cited          int // rows with cited references
+	Dated          int // rows with a full or partial date of their own
+	YearOnly       int // rows whose date is the year the archive files them under
+	DatedFromTitle int // rows whose own date was read from a date in the title (a subset of Dated)
+	Series         int // rows marked series (a ref over more than 3 chapters)
 
 	Preacher      string      // --preacher, if given
 	RefsFromTitle bool        // --refs-from-title
@@ -188,6 +189,16 @@ func BuildSource(files []File, dedupeTitles bool) ([]sources.Row, *Report) {
 			where = " of " + file.Name
 		}
 		var thisFile [][2]string // NormTitle, id of this file's rows
+		// The sermon numbers that have a titled row in this file ("Sermon I:
+		// Religious Meditation" covers a bare "Sermon I"), and the id of it.
+		titled := map[int]string{}
+		for _, x := range file.Inputs {
+			if n, bare, ok := SermonNumber(strings.TrimSpace(x.Title)); ok && !bare && NonSermon(x.Title) == "" {
+				if _, seen := titled[n]; !seen {
+					titled[n] = rowID(x)
+				}
+			}
+		}
 		for i, x := range file.Inputs {
 			line := i + 1
 			id := rowID(x)
@@ -230,6 +241,12 @@ func BuildSource(files []File, dedupeTitles bool) ([]sources.Row, *Report) {
 			if why := NonSermon(title); why != "" {
 				rep.NonSermon = append(rep.NonSermon, nonSermonNote(id, title, why))
 				continue
+			}
+			if n, bare, ok := SermonNumber(title); ok && bare {
+				if cover, covered := titled[n]; covered {
+					rep.NonSermon = append(rep.NonSermon, nonSermonNote(id, title, "a sermon number with no title of its own, covered by the titled row "+cover))
+					continue
+				}
 			}
 			fc.Before++
 			norm := NormTitle(title)
@@ -375,6 +392,16 @@ func BuildSource(files []File, dedupeTitles bool) ([]sources.Row, *Report) {
 			case x.Date != nil && validDate(*x.Date):
 				r.Date = ptr(*x.Date)
 				rep.Dated++
+			case TitleDate(title) != "":
+				r.Date = ptr(TitleDate(title))
+				rep.Dated++
+				rep.DatedFromTitle++
+				const why = "The date is read from the title; the archive's index has none."
+				if r.Notes != nil {
+					r.Notes = ptr(*r.Notes + " " + why)
+				} else {
+					r.Notes = ptr(why)
+				}
 			case x.Year != nil && *x.Year >= 1000 && *x.Year <= 9999:
 				r.Date = ptr(strconv.Itoa(*x.Year))
 				rep.YearOnly++
@@ -454,6 +481,9 @@ func (r *Report) Summary() string {
 	fmt.Fprintf(&b, "rows with no ref:                    %d\n", len(r.NoRef))
 	fmt.Fprintf(&b, "series rows (ref over >%d chapters):  %d\n", sources.WideChapters, r.Series)
 	fmt.Fprintf(&b, "rows with their own date:            %d\n", r.Dated)
+	if r.DatedFromTitle > 0 {
+		fmt.Fprintf(&b, "  of them dates read from the title: %d\n", r.DatedFromTitle)
+	}
 	fmt.Fprintf(&b, "rows dated by the year alone:        %d\n", r.YearOnly)
 	fmt.Fprintf(&b, "references the book table refused:   %d\n", len(r.Refused))
 	fmt.Fprintf(&b, "Logos and the label disagree:        %d\n", len(r.Disagree))
@@ -535,7 +565,11 @@ func (r *Report) Markdown(id string, inNames []string) string {
 		b.WriteString(strings.Join(r.NoRef, ", ") + "\n")
 	}
 	if r.Rows > 0 && r.WithRef == 0 {
-		fmt.Fprintf(&b, "\n## No row has a Scripture ref\n\nNone of the %d rows has a Scripture ref (the archive's index gives titles, and no passage; any dates and series it has are kept): none can show on a verse, and all are found by title, preacher and source. A row the index dates by no day is listed here.\n\n", r.Rows)
+		given := "the archive's index gives titles, and no passage; any dates and series it has are kept"
+		if r.Cited > 0 {
+			given = fmt.Sprintf("the archive's index names no text for any of them; any dates and series it has are kept, and the %d that cite passages cite them without taking one as the text", r.Cited)
+		}
+		fmt.Fprintf(&b, "\n## No row has a Scripture ref\n\nNone of the %d rows has a Scripture ref (%s): none can show on a verse, and all are found by title, preacher and source. A row the index dates by no day is listed here.\n\n", r.Rows, given)
 		fmt.Fprintf(&b, "### Rows with no date of their own (%d)\n\n", len(r.NoDate))
 		if len(r.NoDate) == 0 {
 			b.WriteString("None.\n")

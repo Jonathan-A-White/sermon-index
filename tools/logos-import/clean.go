@@ -78,8 +78,8 @@ func RefsInTitle(title string) []string {
 }
 
 // NonSermon says why a line of an archive's index is not a sermon (a table,
-// an index, the translator's introduction, a book's argument), or "" when it
-// may be one. Titles are compared as NormTitle reads them: lower case, a
+// an index, the translator's introduction, a book's argument, a preface or an
+// epistle to the reader, a list of contents), or "" when it may be one. Titles are compared as NormTitle reads them: lower case, a
 // leading Roman numeral off, marks ignored.
 func NonSermon(title string) string {
 	n := NormTitle(title)
@@ -95,8 +95,17 @@ func NonSermon(title string) string {
 		return "prolegomena"
 	case "argument", "the argument":
 		return "the argument of the work"
+	case "preface", "the preface", "authors preface", "translators preface", "general editors introduction",
+		"foreword", "to the reader", "to the christian reader",
+		"epistle to the reader", "the epistle to the reader":
+		return "front matter"
+	case "contents", "table of contents":
+		return "a table of contents"
 	}
 	switch {
+	case strings.HasPrefix(n, "the contents of ") || strings.HasPrefix(n, "an exact alphabetical table") ||
+		strings.HasPrefix(n, "the table of the chief heads"):
+		return "a table of contents"
 	case strings.HasPrefix(n, "argument ") || strings.HasPrefix(n, "the argument "):
 		return "the argument of the work"
 	case strings.HasSuffix(n, " index of texts") || n == "index of texts" || strings.HasPrefix(n, "index of "):
