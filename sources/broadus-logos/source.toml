@@ -1,0 +1,40 @@
+# John Albert Broadus's Sermons and Addresses (JABSERMADDR) in the Governor's Logos library, 21 rows,
+# made by
+#
+#   go run ./tools/logos-import --in <vault>/plans/sermons-2026-11-05/sermons-and-addresses-sermons.jsonl --id broadus-logos --out sources/broadus-logos
+#
+# from the index file the Mayor made of each book on 2026-11-06 (the parser's
+# book-archive form). The index keeps facts only: a title, the passage, the cited
+# passages and the ref.ly address. No sentence of a sermon, and no Logos text, is
+# written anywhere.
+#
+# What the tool counted (REPORT.md lists what it could not place): 21 lines read, 21 rows, none dropped. "Chapter I: Worship" is titled "Worship" (21 titles; the
+# number is in the notes). The book holds addresses as well as sermons (on education, a memorial, a
+# funeral sermon); the index does not tell them apart, so all 21 are rows. The index names no preaching
+# text for any, so none has a `ref`; 15 cite passages (REPORT.md).
+# The link (https://ref.ly/logosres/LLS:<resource>?off=<offset>) opens the book at
+# the sermon in Logos for an owner of the book and for no one else. It is
+# UNVERIFIED: no one has tapped one yet (sermons check --urls was not run on it).
+
+
+id = "broadus-logos"
+name = "John A. Broadus's Sermons and Addresses (his Logos library)"
+kind = "sermons"
+
+# No terms page was read or quoted: the Governor's library is his own, and the
+# words below are his, given to the Mayor in the Postern general channel on
+# 2026-11-06 (about 14:52Z), quoted verbatim, with his word "links" for what
+# this index holds.
+licence = """
+index these sermons so that you can add it to your sermon index with links"""
+
+licence_note = """
+From the Governor's own Logos library at his word (2026-11-06, mw-qtu3zvz); the index keeps titles, passages and ref.ly links only; a link opens the sermon only for a Logos owner of the archive. Same footing as the Logos Atlas index (mw-zbjgn3r.9).
+Faithlife's terms bind the books the links open, not these rows; no terms page was read."""
+
+credit = "John Albert Broadus, Sermons and Addresses, in Logos (Faithlife)"
+homepage = "https://www.logos.com/"
+# Faithlife's terms of service, named for the reader; they were not read or quoted for this source.
+terms_url = "https://faithlife.com/terms"
+added = 2026-11-06
+on_by_default = false

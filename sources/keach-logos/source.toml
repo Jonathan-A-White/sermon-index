@@ -1,0 +1,41 @@
+# Benjamin Keach's two books in the Governor's Logos library, 17 rows: The Display of Glorious Grace,
+# or The Covenant of Peace Opened in Fourteen Sermons (BPTSTCVNTTHLGY03, 14) and The Ax Laid to the
+# Root, Parts I and II (BPTSTCVNTTHLGYAX, 3), made by
+#
+#   go run ./tools/logos-import --in <vault>/plans/sermons-2026-11-05/the-display-of-glorious-grace-or-the-covenant-of-peace-opened-in-fourteen-sermons-sermons.jsonl --in <vault>/plans/sermons-2026-11-05/the-ax-laid-to-the-root-parts-i-ii-sermons.jsonl --id keach-logos --out sources/keach-logos
+#
+# from the index file the Mayor made of each book on 2026-11-06 (the parser's
+# book-archive form). The index keeps facts only: a title, the passage, the cited
+# passages and the ref.ly address. No sentence of a sermon, and no Logos text, is
+# written anywhere.
+#
+# What the tool counted (REPORT.md lists what it could not place): 19 lines read, 17 rows, none dropped as unusable. Two lines are front matter, the Table of the
+# Chief Heads and the Epistle to the Reader, and are dropped (REPORT.md names each). All 17 rows have a
+# preaching text. The rows are titled only "Sermon I" and so on, and fourteen of them preach on
+# Isaiah 54:10; the source and the passage tell them apart.
+# The link (https://ref.ly/logosres/LLS:<resource>?off=<offset>) opens the book at
+# the sermon in Logos for an owner of the book and for no one else. It is
+# UNVERIFIED: no one has tapped one yet (sermons check --urls was not run on it).
+
+
+id = "keach-logos"
+name = "Benjamin Keach's sermons (his Logos library)"
+kind = "sermons"
+
+# No terms page was read or quoted: the Governor's library is his own, and the
+# words below are his, given to the Mayor in the Postern general channel on
+# 2026-11-06 (about 14:52Z), quoted verbatim, with his word "links" for what
+# this index holds.
+licence = """
+index these sermons so that you can add it to your sermon index with links"""
+
+licence_note = """
+From the Governor's own Logos library at his word (2026-11-06, mw-qtu3zvz); the index keeps titles, passages and ref.ly links only; a link opens the sermon only for a Logos owner of the archive. Same footing as the Logos Atlas index (mw-zbjgn3r.9).
+Faithlife's terms bind the books the links open, not these rows; no terms page was read."""
+
+credit = "Benjamin Keach, The Display of Glorious Grace, or The Covenant of Peace Opened in Fourteen Sermons; The Ax Laid to the Root, Parts I and II, in Logos (Faithlife)"
+homepage = "https://www.logos.com/"
+# Faithlife's terms of service, named for the reader; they were not read or quoted for this source.
+terms_url = "https://faithlife.com/terms"
+added = 2026-11-06
+on_by_default = false

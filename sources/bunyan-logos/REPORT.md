@@ -60,7 +60,7 @@ WJB_BYNLST.1-1758
 
 ## No row has a Scripture ref
 
-None of the 1 rows has a Scripture ref (the archive's index gives titles, and no passage; any dates and series it has are kept): none can show on a verse, and all are found by title, preacher and source. A row the index dates by no day is listed here.
+None of the 1 rows has a Scripture ref (the archive's index names no text for any of them; any dates and series it has are kept, and the 1 that cite passages cite them without taking one as the text): none can show on a verse, and all are found by title, preacher and source. A row the index dates by no day is listed here.
 
 ### Rows with no date of their own (1)
 
