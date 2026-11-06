@@ -113,7 +113,7 @@ var tokenRE = regexp.MustCompile(`^(\d+)(?::(\d+))?(?:-(\d+)(?::(\d+))?)?$`)
 // table. A piece with no book takes the one before it; a bare number after a
 // comma, where the piece before had a verse, is a verse of the same chapter.
 func LabelToOSIS(label string) ([]string, error) {
-	s := strings.NewReplacer("–", "-", "—", "-", " ", " ").Replace(strings.TrimSpace(label))
+	s := strings.NewReplacer("–", "-", "—", "-", " ", " ").Replace(strings.TrimSpace(CleanLabel(label)))
 	fail := func(why string) ([]string, error) { return nil, fmt.Errorf("%q: %s", label, why) }
 	if s == "" {
 		return fail("empty")

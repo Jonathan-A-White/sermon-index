@@ -101,6 +101,13 @@ func TestLabelToOSIS(t *testing.T) {
 		{"Acts 2:47; Revelation 4–5:14", []string{"Acts.2.47", "Rev.4-Rev.5.14"}},
 		{"Job 1:1–2:13; Revelation 12:1–17", []string{"Job.1.1-Job.2.13", "Rev.12.1-Rev.12.17"}},
 		{"Titus 2; Proverbs 31", []string{"Titus.2", "Prov.31"}},
+		// A stray comma after the book, and an OCR l for a 1 in a number.
+		{"Matthew, 5:20", []string{"Matt.5.20"}},
+		{"John, 13:7", []string{"John.13.7"}},
+		{"1 Kings, 18:2l", []string{"1Kgs.18.21"}},
+		{"Exodus, 20:8", []string{"Exod.20.8"}},
+		{"Psalm l9:1", []string{"Ps.19.1"}},
+		{"Acts 1:12–15; 2:1, l7", []string{"Acts.1.12-Acts.1.15", "Acts.2.1", "Acts.2.17"}},
 	}
 	for _, c := range cases {
 		got, err := LabelToOSIS(c.in)

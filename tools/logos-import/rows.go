@@ -72,26 +72,31 @@ func ReadInput(r io.Reader) ([]Input, error) {
 // Report is what a run found: the counts the tool prints and the lists
 // REPORT.md carries. Every list is in input order.
 type Report struct {
-	Input    int // lines read
-	Rows     int // rows written
-	WithRef  int // rows with a ref
-	FromText int // rows whose ref was read from the label, not from a Logos reference
-	Cited    int // rows with cited references
-	Dated    int // rows with a full or partial date of their own
-	YearOnly int // rows whose date is the year the archive files them under
-	Series   int // rows marked series (a ref over more than 3 chapters)
+	Input     int // lines read
+	Rows      int // rows written
+	WithRef   int // rows with a ref
+	FromText  int // rows whose ref was read from the label, not from a Logos reference
+	FromTitle int // rows whose ref was read from the title (no Logos reference, no label that reads)
+	Cited     int // rows with cited references
+	Dated     int // rows with a full or partial date of their own
+	YearOnly  int // rows whose date is the year the archive files them under
+	Series    int // rows marked series (a ref over more than 3 chapters)
 
-	Dedupe     bool        // titles of an earlier input were dropped
-	Files      []FileCount // one for each input, in order
-	Duplicates []string    // "ID: "title" repeats ID", rows dropped for a title already in an earlier input
-	Retitled   int         // rows whose title was made readable
-	Multipart  []string    // ids of entries the contents list splits into parts
+	Preacher      string      // --preacher, if given
+	RefsFromTitle bool        // --refs-from-title
+	Dedupe        bool        // titles of an earlier input were dropped
+	Files         []FileCount // one for each input, in order
+	Duplicates    []string    // "ID: "title" repeats ID", rows dropped for a title already in an earlier input
+	Retitled      int         // rows whose title was made readable
+	Multipart     []string    // ids of entries the contents list splits into parts
 
-	Dropped  []string // "ID: why", lines not written
-	NoRef    []string // ids of rows written with no ref
-	Refused  []string // "ID: why", references the book table refused
-	Disagree []string // "ID: Logos says X, the label says Y"
-	Wide     []string // "ID ref (N chapters)"
+	Dropped   []string // "ID: why", lines not written
+	NonSermon []string // "ID: "title" (why)", lines that are not sermons (a table, an index, an introduction): not written
+	NoRef     []string // ids of rows written with no ref
+	NoDate    []string // ids of rows written with no date of their own (the year alone, or none)
+	Refused   []string // "ID: why", references the book table refused
+	Disagree  []string // "ID: Logos says X, the label says Y"
+	Wide      []string // "ID ref (N chapters)"
 }
 
 // FileCount is what one input file gave: its lines, the rows it would give
@@ -106,6 +111,10 @@ type FileCount struct {
 type File struct {
 	Name   string
 	Inputs []Input
+	// RefsFromTitle: a line with no Logos reference and no label that reads
+	// takes its ref from the passages its title names (Augustine's).
+	RefsFromTitle bool
+	Preacher      string // if set, the preacher of every row of this input (the index names the book's editor)
 }
 
 var (
@@ -218,6 +227,10 @@ func BuildSource(files []File, dedupeTitles bool) ([]sources.Row, *Report) {
 				rep.Dropped = append(rep.Dropped, fmt.Sprintf("%s: id repeats %s (line %d%s)", id, at, line, where))
 				continue
 			}
+			if why := NonSermon(title); why != "" {
+				rep.NonSermon = append(rep.NonSermon, nonSermonNote(id, title, why))
+				continue
+			}
 			fc.Before++
 			norm := NormTitle(title)
 			if dedupeTitles && norm != "" {
@@ -231,7 +244,9 @@ func BuildSource(files []File, dedupeTitles bool) ([]sources.Row, *Report) {
 			thisFile = append(thisFile, [2]string{norm, id})
 
 			r := sources.Row{ID: id, Title: title, URL: strings.TrimSpace(x.URL), Kind: ptr(sources.RowLink)}
-			if p := strings.TrimSpace(x.Preacher); p != "" {
+			if p := strings.TrimSpace(x.Preacher); file.Preacher != "" {
+				r.Preacher = ptr(file.Preacher)
+			} else if p != "" {
 				r.Preacher = ptr(p)
 			}
 
@@ -252,6 +267,20 @@ func BuildSource(files []File, dedupeTitles bool) ([]sources.Row, *Report) {
 			if label != "" {
 				fromLabel, labelErr = LabelToOSIS(label)
 			}
+			// Neither a Logos reference nor a label that reads: the title may
+			// carry the passage (Augustine's "On the Words of the Gospel,
+			// Mark 8:1–9, Where ..."). The first is the text, the rest cited.
+			var fromTitle []string
+			readFromTitle := false
+			if file.RefsFromTitle && len(osis) == 0 && (label == "" || labelErr != nil) {
+				if refs := RefsInTitle(title); len(refs) > 0 {
+					osis, fromTitle = refs[:1], refs[1:]
+					notes = append(notes, "The ref is read from the title; the archive's index has no Logos reference for it.")
+					rep.FromTitle++
+					readFromTitle = true
+					labelErr = nil
+				}
+			}
 			if len(osis) == 0 && label != "" {
 				if labelErr != nil {
 					problems = append(problems, labelErr.Error())
@@ -262,7 +291,7 @@ func BuildSource(files []File, dedupeTitles bool) ([]sources.Row, *Report) {
 					notes = append(notes, fmt.Sprintf("The ref is read from the label %q; the archive's index has no Logos reference for it.", label))
 					rep.FromText++
 				}
-			} else if len(osis) > 0 && labelErr == nil && label != "" && !sameRefs(osis, fromLabel) {
+			} else if !readFromTitle && len(osis) > 0 && labelErr == nil && label != "" && !sameRefs(osis, fromLabel) {
 				rep.Disagree = append(rep.Disagree, fmt.Sprintf("%s: Logos says %s, the label %q says %s", id, strings.Join(osis, "; "), label, strings.Join(fromLabel, "; ")))
 			}
 			// A book archive also lists the passages a sermon cites. They
@@ -283,7 +312,7 @@ func BuildSource(files []File, dedupeTitles bool) ([]sources.Row, *Report) {
 			var cited []string
 			if len(osis) > 0 {
 				r.Ref = ptr(osis[0])
-				for _, o := range append(append([]string(nil), osis[1:]...), citedMore...) {
+				for _, o := range append(append(append([]string(nil), osis[1:]...), fromTitle...), citedMore...) {
 					if o != osis[0] {
 						cited = appendOnce(cited, o)
 					}
@@ -349,6 +378,9 @@ func BuildSource(files []File, dedupeTitles bool) ([]sources.Row, *Report) {
 			case x.Year != nil && *x.Year >= 1000 && *x.Year <= 9999:
 				r.Date = ptr(strconv.Itoa(*x.Year))
 				rep.YearOnly++
+				rep.NoDate = append(rep.NoDate, id)
+			default:
+				rep.NoDate = append(rep.NoDate, id)
 			}
 			rows = append(rows, r)
 			fc.After++
@@ -410,8 +442,14 @@ func (r *Report) Summary() string {
 	fmt.Fprintf(&b, "lines read:                          %d\n", r.Input)
 	fmt.Fprintf(&b, "rows written:                        %d\n", r.Rows)
 	fmt.Fprintf(&b, "lines dropped:                       %d\n", len(r.Dropped))
+	if len(r.NonSermon) > 0 {
+		fmt.Fprintf(&b, "non-sermon lines dropped:            %d\n", len(r.NonSermon))
+	}
 	fmt.Fprintf(&b, "rows with a ref:                     %d\n", r.WithRef)
 	fmt.Fprintf(&b, "  of them read from the label:       %d\n", r.FromText)
+	if r.FromTitle > 0 {
+		fmt.Fprintf(&b, "  of them read from the title:       %d\n", r.FromTitle)
+	}
 	fmt.Fprintf(&b, "  of them with cited references:     %d\n", r.Cited)
 	fmt.Fprintf(&b, "rows with no ref:                    %d\n", len(r.NoRef))
 	fmt.Fprintf(&b, "series rows (ref over >%d chapters):  %d\n", sources.WideChapters, r.Series)
@@ -444,6 +482,12 @@ func (r *Report) Markdown(id string, inNames []string) string {
 	if r.Dedupe {
 		cmd += " --dedupe-titles"
 	}
+	if r.RefsFromTitle {
+		cmd += " --refs-from-title"
+	}
+	if r.Preacher != "" {
+		cmd += fmt.Sprintf(" --preacher %q", r.Preacher)
+	}
 	fmt.Fprintf(&b, "Written by `%s --id %s --out sources/%s`; do not edit by hand. Only ids, titles, references and addresses are listed.\n\n", cmd, id, id)
 	b.WriteString("## Counts\n\n```\n" + r.Summary() + "```\n\n")
 	if len(r.Files) > 1 {
@@ -470,6 +514,9 @@ func (r *Report) Markdown(id string, inNames []string) string {
 		b.WriteString("\n")
 	}
 	list("Lines dropped", "A line with neither a ref nor a title, or with no id, no title, no address or an id already used, is not a row.", r.Dropped)
+	if len(r.NonSermon) > 0 {
+		list("Non-sermon lines dropped", "The archive's index lists them with the sermons, but they are a table, an index of Scripture, an introduction or a book's argument (prolegomena), not a sermon: not written, and not counted in \"rows before\".", r.NonSermon)
+	}
 	if r.Dedupe {
 		list("Duplicates dropped", "The title is the title of a row of an earlier input (the first input is the one kept).", r.Duplicates)
 	}
@@ -486,6 +533,15 @@ func (r *Report) Markdown(id string, inNames []string) string {
 		b.WriteString("None.\n")
 	} else {
 		b.WriteString(strings.Join(r.NoRef, ", ") + "\n")
+	}
+	if r.Rows > 0 && r.WithRef == 0 {
+		fmt.Fprintf(&b, "\n## No row has a Scripture ref\n\nNone of the %d rows has a Scripture ref (the archive's index gives titles, dates and series, and no passage): none can show on a verse, and all are found by title, preacher and source. The archive's own dates are kept; a row the index dates by no day is listed here.\n\n", r.Rows)
+		fmt.Fprintf(&b, "### Rows with no date of their own (%d)\n\n", len(r.NoDate))
+		if len(r.NoDate) == 0 {
+			b.WriteString("None.\n")
+		} else {
+			b.WriteString(strings.Join(r.NoDate, ", ") + "\n")
+		}
 	}
 	return b.String()
 }

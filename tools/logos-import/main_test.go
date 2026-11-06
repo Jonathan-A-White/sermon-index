@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -161,7 +162,7 @@ func TestRunWritesTheSameBytesTwice(t *testing.T) {
 	out := t.TempDir()
 	var log bytes.Buffer
 	for i := 0; i < 2; i++ {
-		if err := run([]string{"testdata/sample-sermons.jsonl"}, "sample-logos", out, "", false, &log); err != nil {
+		if err := run([]string{"testdata/sample-sermons.jsonl"}, "sample-logos", out, "", false, "", false, &log); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -191,7 +192,7 @@ func TestRunWritesTheSameBytesTwice(t *testing.T) {
 	// A second run over the same input writes the same bytes.
 	b := &bytes.Buffer{}
 	out2 := t.TempDir()
-	if err := run([]string{"testdata/sample-sermons.jsonl"}, "sample-logos", out2, "", false, b); err != nil {
+	if err := run([]string{"testdata/sample-sermons.jsonl"}, "sample-logos", out2, "", false, "", false, b); err != nil {
 		t.Fatal(err)
 	}
 	a2, _ := os.ReadFile(filepath.Join(out2, "rows.jsonl"))
@@ -428,7 +429,7 @@ func TestRunManyInputs(t *testing.T) {
 	out := t.TempDir()
 	var log bytes.Buffer
 	ins := []string{"testdata/wesley-a-sermons.jsonl", "testdata/wesley-b-sermons.jsonl"}
-	if err := run(ins, "wesley-test-logos", out, "", true, &log); err != nil {
+	if err := run(ins, "wesley-test-logos", out, "", true, "", false, &log); err != nil {
 		t.Fatal(err)
 	}
 	a, _ := os.ReadFile(filepath.Join(out, "rows.jsonl"))
@@ -446,12 +447,323 @@ func TestRunManyInputs(t *testing.T) {
 	}
 	// Same bytes again.
 	out2 := t.TempDir()
-	if err := run(ins, "wesley-test-logos", out2, "", true, &bytes.Buffer{}); err != nil {
+	if err := run(ins, "wesley-test-logos", out2, "", true, "", false, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
 	a2, _ := os.ReadFile(filepath.Join(out2, "rows.jsonl"))
 	rep2, _ := os.ReadFile(filepath.Join(out2, "REPORT.md"))
 	if !bytes.Equal(a, a2) || !bytes.Equal(rep, rep2) {
 		t.Error("two runs wrote different bytes")
+	}
+}
+
+// Batch 3: Augustine, Chrysostom, Piper, Bunyan, Charles Wesley, Jimmy Evans.
+
+func TestCleanLabel(t *testing.T) {
+	for _, c := range []struct{ in, want string }{
+		{"Matthew, 5:20", "Matthew 5:20"},
+		{"1 Kings, 18:2l", "1 Kings 18:21"},
+		{"Song of Solomon, 2:1", "Song of Solomon 2:1"},
+		{"Acts 1:12–15; John, 3:16", "Acts 1:12–15; John 3:16"},
+		{"Psalm l9:1", "Psalm 19:1"},
+		{"Acts 2:1, 7–13", "Acts 2:1, 7–13"},
+		{"Philip. 3:13", "Philip. 3:13"},
+		{"Genesis 19:15", "Genesis 19:15"},
+		{"All Hallows", "All Hallows"},
+	} {
+		if got := CleanLabel(c.in); got != c.want {
+			t.Errorf("CleanLabel(%q) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}
+
+func TestRefsInTitle(t *testing.T) {
+	for _, c := range []struct {
+		title string
+		want  []string
+	}{
+		// Augustine's ref is in the tail of the title.
+		{"Sermon 95: On the Words of the Gospel, Mark 8:1–9, Where the Miracle of the Seven Loaves Is Related", []string{"Mark.8.1-Mark.8.9"}},
+		{"On the Words of the Gospel, Mark 8:1–9, Where the Miracle of the Seven Loaves Is Related", []string{"Mark.8.1-Mark.8.9"}},
+		// More than one: the first is the text, the rest are cited.
+		{"Sermon 96: On the Words of the Gospel, Mark 8:34: If Anyone Wishes to Follow Me, Etc., and on the Words of 1 John 2:15: Whoever Loves the World", []string{"Mark.8.34", "1John.2.15"}},
+		{"Sermon 108: On the Words of the Gospel, Luke 12:35–36: Let Your Loins be Girt, Etc., and on the Words of Psalm 34:12–15: Who Is the One", []string{"Luke.12.35-Luke.12.36", "Ps.34.12-Ps.34.15"}},
+		// Luke’s Gospel, 13:6–17; John’s Gospel 5:24–29; a whole chapter.
+		{"Sermon 110: On the Words of Luke’s Gospel, 13:6–17, Where It Speaks of the Fig Tree", []string{"Luke.13.6-Luke.13.17"}},
+		{"Sermon 127: On the Words of John’s Gospel 5:24–29: Amen, Amen", []string{"John.5.24-John.5.29"}},
+		{"Sermon 136: On the Same Reading from the Gospel of John, Chapter 9: The Giving of Sight", []string{"John.9"}},
+		{"Sermon 139A: On the Gospel according to John 11, on the Raising of Lazarus from the Dead", []string{"John.11"}},
+		{"Sermon 125: Again on John 5:2–18: On the Five Arcades", []string{"John.5.2-John.5.18"}},
+		{"Exodus 3–4", []string{"Exod.3-Exod.4"}},
+		{"Sermon 145: On the Words of John’s Gospel 16:24: Until Now, and on the Words of Luke 10:17, 20: Lord, Behold", []string{"John.16.24", "Luke.10.17", "Luke.10.20"}},
+		// A title with no passage in it, and a number that is not one.
+		{"Sermon 94A: On the Martyrdom of John the Baptist and on the Persecution", nil},
+		{"Sermon 112: Preached in the Restored Basilica, on Those Invited to the Dinner", nil},
+		{"Sermon 113A: Preached at Hippo, on Sunday, 25 September, on the Gospel", nil},
+		{"Sermon 111: On the Passage of the Gospel, Especially on the Words: Are They Few Who Are Saved? 13:23", nil},
+		{"Homily XXVII", nil},
+	} {
+		if got := RefsInTitle(c.title); !reflect.DeepEqual(got, c.want) {
+			t.Errorf("RefsInTitle(%q) = %v, want %v", c.title, got, c.want)
+		}
+	}
+}
+
+func TestNonSermon(t *testing.T) {
+	for _, title := range []string{
+		"Chronological Table",
+		"New Testament",
+		"Argument",
+		"The Argument",
+		"Argument, and Summary of the Epistle",
+		"Argument of the Epistle",
+		"Homilies on the Gospel of John: Index of Texts",
+		"Homilies on the Epistle to the Hebrews: Index of Texts",
+		"Index of Texts",
+		"St. Chrysostom as a Homilist",
+		"I. The Place of Chrysostom in the History of Exegesis",
+		"II. Extent and Character of Chrysostom’s Exegetical Labors",
+		"Introductory Discourse",
+		"Prolegomena",
+	} {
+		if NonSermon(title) == "" {
+			t.Errorf("NonSermon(%q) is empty, want a reason", title)
+		}
+	}
+	for _, title := range []string{
+		"Homily I", "Chapter II", "Sermon 94A: On the Martyrdom of John the Baptist",
+		"Take Care How You Listen! (Part 1)", "Mr. Bunyan’s Last Sermon", "A Sermon on Ephesians 5:14",
+		"Sermon 112A: On the Two Sons from the Gospel", "Salvation by Faith", "Arguing with God",
+		"The New Testament Church", "Session 1—“The Blessed Marriage”",
+	} {
+		if why := NonSermon(title); why != "" {
+			t.Errorf("NonSermon(%q) = %q, want none", title, why)
+		}
+	}
+}
+
+// Augustine: a ref in the title's tail becomes the row's ref (the archive's
+// index has no Logos reference for it), the rest of the passages in the
+// title are cited, and the Chronological Table and the Scripture index at
+// the end of the book are not sermons.
+func TestAugustineRefsFromTheTitleAndNonSermonsDropped(t *testing.T) {
+	rows, rep := BuildSource([]File{{Inputs: readFile(t, "testdata/augustine-sermons.jsonl"), RefsFromTitle: true}}, false)
+	if len(rows) != 8 || rep.Rows != 8 || len(rep.NonSermon) != 2 || len(rep.Dropped) != 0 {
+		t.Fatalf("rows %d, non-sermons %v, dropped %v; want 8, two, none", len(rows), rep.NonSermon, rep.Dropped)
+	}
+	for _, id := range []string{"AGSTNSRMNS04.1-1278985", "AGSTNSRMNS04.2-1288444"} {
+		if byID(rows, id) != nil {
+			t.Errorf("%s is not a sermon but is a row", id)
+		}
+	}
+	if !strings.Contains(strings.Join(rep.NonSermon, "\n"), "Chronological Table") || !strings.Contains(strings.Join(rep.NonSermon, "\n"), "New Testament") {
+		t.Errorf("the report names the lines dropped: %v", rep.NonSermon)
+	}
+
+	r := byID(rows, "AGSTNSRMNS04.1-279517")
+	if r == nil || str(r.Ref) != "Mark.8.1-Mark.8.9" || !strings.HasPrefix(r.Title, "Sermon 95: On the Words of the Gospel, Mark 8:1") ||
+		str(r.Preacher) != "Augustine of Hippo" || len(r.Cited) != 12 || r.Cited[0] != "Ps.119.164" || contains(r.Cited, "Mark.8.1-Mark.8.9") {
+		// The cited list is the fixture's own, with Mark 8:1-9 not repeated.
+		t.Fatalf("Sermon 95: %+v", r)
+	}
+	if !strings.Contains(str(r.Notes), "read from the title") {
+		t.Errorf("Sermon 95 notes: %q", str(r.Notes))
+	}
+	// Two passages in the title: the first is the text, the second cited.
+	r = byID(rows, "AGSTNSRMNS04.1-291646")
+	if r == nil || str(r.Ref) != "Mark.8.34" || !contains(r.Cited, "1John.2.15") {
+		t.Fatalf("Sermon 96: %+v", r)
+	}
+	// Luke’s Gospel, 13:6–17 and a John chapter.
+	if r := byID(rows, "AGSTNSRMNS04.1-541813"); r == nil || str(r.Ref) != "Luke.13.6-Luke.13.17" {
+		t.Errorf("Sermon 110: %+v", r)
+	}
+	if r := byID(rows, "AGSTNSRMNS04.1-1156065"); r == nil || str(r.Ref) != "John.11" {
+		t.Errorf("Sermon 139A: %+v", r)
+	}
+	// No passage in the title: no ref, what Logos cites stays cited.
+	r = byID(rows, "AGSTNSRMNS04.1-270629")
+	if r == nil || r.Ref != nil || len(r.Cited) == 0 {
+		t.Errorf("Sermon 94A: %+v", r)
+	}
+	if rep.FromTitle != 7 {
+		t.Errorf("refs read from a title: %d, want 7", rep.FromTitle)
+	}
+	// A ref read from the title is not also refused as a label ("no book");
+	// only a cited book outside the sixty-six is refused.
+	for _, x := range rep.Refused {
+		if strings.Contains(x, "no book") {
+			t.Errorf("refused as a label: %s", x)
+		}
+	}
+}
+
+func contains(list []string, s string) bool {
+	for _, x := range list {
+		if x == s {
+			return true
+		}
+	}
+	return false
+}
+
+// Chrysostom: five volumes make one source; Schaff's prolegomena, the
+// Arguments and the Indexes of Texts are not homilies; the preacher the book
+// names (the editor) is replaced by --preacher.
+func TestChrysostomVolumesDropNonSermons(t *testing.T) {
+	files := []File{
+		{Name: "vol-10", Inputs: readFile(t, "testdata/chrysostom-b-sermons.jsonl"), Preacher: "John Chrysostom"},
+		{Name: "vol-11", Inputs: readFile(t, "testdata/chrysostom-d-sermons.jsonl"), Preacher: "John Chrysostom"},
+		{Name: "vol-13", Inputs: readFile(t, "testdata/chrysostom-a-sermons.jsonl"), Preacher: "John Chrysostom"},
+		{Name: "vol-14", Inputs: readFile(t, "testdata/chrysostom-c-sermons.jsonl"), Preacher: "John Chrysostom"},
+	}
+	rows, rep := BuildSource(files, false)
+	// 3+2+4+3 lines; dropped: the place of Chrysostom, The Argument,
+	// St. Chrysostom as a Homilist, Introductory Discourse, Argument and
+	// Summary, Index of Texts.
+	if rep.Input != 12 || len(rows) != 6 || len(rep.NonSermon) != 6 {
+		t.Fatalf("lines %d, rows %d, non-sermons %d (%v); want 12, 6, 6", rep.Input, len(rows), len(rep.NonSermon), rep.NonSermon)
+	}
+	for _, r := range rows {
+		if str(r.Preacher) != "John Chrysostom" {
+			t.Errorf("%s: preacher %q", r.ID, str(r.Preacher))
+		}
+		if !strings.HasPrefix(r.Title, "Homily") && !strings.HasPrefix(r.Title, "Chapter") {
+			t.Errorf("%s: %q is not a homily", r.ID, r.Title)
+		}
+	}
+	if r := byID(rows, "6.60.10.3-267160"); r == nil || str(r.Ref) != "Matt.1.1" {
+		t.Errorf("Homily II: %+v", r)
+	}
+	// The per-input counts leave the non-sermons out of "before".
+	if rep.Files[2].Lines != 4 || rep.Files[2].Before != 2 || rep.Files[2].After != 2 {
+		t.Errorf("vol 13 counts: %+v", rep.Files[2])
+	}
+	md := rep.Markdown("chrysostom-test-logos", []string{"a", "b"})
+	for _, want := range []string{"Non-sermon lines dropped (6)", "Index of Texts", "The Argument", "Introductory Discourse"} {
+		if !strings.Contains(md, want) {
+			t.Errorf("REPORT.md lacks %q:\n%s", want, md)
+		}
+	}
+}
+
+// Charles Wesley: a comma after the book and an OCR l for a 1 are cleaned
+// from the label; with no Logos reference the cleaned label is the ref.
+func TestCharlesWesleyRefsCleaned(t *testing.T) {
+	in := readFile(t, "testdata/charles-wesley-a-sermons.jsonl")
+	rows, rep := BuildRows(in)
+	if len(rows) != 5 {
+		t.Fatalf("rows %d, want 5", len(rows))
+	}
+	if r := byID(rows, "SERMSCWESLEY.1-104394"); r == nil || str(r.Ref) != "Matt.5.20" {
+		t.Errorf("Matthew, 5:20: %+v", r)
+	}
+	if len(rep.Disagree) != 0 {
+		t.Errorf("a cleaned label agrees with Logos: %v", rep.Disagree)
+	}
+	// The same line with Logos's reference taken out: the label alone gives it.
+	for i := range in {
+		in[i].BibleRefs = nil
+	}
+	rows, rep = BuildRows(in)
+	if r := byID(rows, "SERMSCWESLEY.1-104394"); r == nil || str(r.Ref) != "Matt.5.20" {
+		t.Errorf("Matthew, 5:20 from the label: %+v", r)
+	}
+	r := byID(rows, "SERMSCWESLEY.1-247025")
+	if r == nil || str(r.Ref) != "1Kgs.18.21" {
+		t.Fatalf("1 Kings, 18:2l from the label: %+v", r)
+	}
+	if rep.FromText < 2 {
+		t.Errorf("rows read from the label: %d", rep.FromText)
+	}
+}
+
+func TestPiperAndBunyanKeepTheirCitedPassages(t *testing.T) {
+	rows, rep := BuildRows(readFile(t, "testdata/piper-sermons.jsonl"))
+	if len(rows) != 2 || len(rep.NonSermon) != 0 || rep.WithRef != 0 {
+		t.Fatalf("Piper rows %d, non-sermons %v, with ref %d", len(rows), rep.NonSermon, rep.WithRef)
+	}
+	if r := byID(rows, "86BDFD4BE2316756AFB52F8937D86322.1-4922"); r == nil || r.Ref != nil || str(r.Preacher) != "John Piper" || !contains(r.Cited, "Luke.8.4-Luke.8.18") {
+		t.Errorf("Take Care How You Listen (Part 1): %+v", r)
+	}
+	rows, rep = BuildRows(readFile(t, "testdata/bunyan-sermons.jsonl"))
+	if len(rows) != 1 || len(rep.Multipart) != 1 || strings.Join(rows[0].Cited, " ") != "John.1.13" {
+		t.Errorf("Bunyan: %+v %v", rows, rep.Multipart)
+	}
+}
+
+// Jimmy Evans: an index-section archive with dates and series and no
+// Scripture reference at all.
+func TestRefLessSource(t *testing.T) {
+	rows, rep := BuildRows(readFile(t, "testdata/jimmy-evans-sermons.jsonl"))
+	if len(rows) != 4 || rep.WithRef != 0 || len(rep.NoRef) != 4 || rep.Dated != 2 || rep.YearOnly != 2 {
+		t.Fatalf("rows %d, with ref %d, no ref %d, dated %d, year only %d", len(rows), rep.WithRef, len(rep.NoRef), rep.Dated, rep.YearOnly)
+	}
+	r := byID(rows, "SER2004.1.1")
+	if r == nil || r.Ref != nil || str(r.Date) != "2004-06-11" || str(r.Notes) != "Series: Blessed Marriage Seminar, part 1." ||
+		r.URL != "https://ref.ly/logosres/LLS:JIMMYEVANSSA?art=SER2004.1.1" {
+		t.Fatalf("Session 1: %+v", r)
+	}
+	if r := byID(rows, "SER2008.3"); r == nil || str(r.Date) != "2008" || str(r.Notes) != "Series: The Cost of Oil." {
+		t.Errorf("SER2008.3: %+v", r)
+	}
+	md := rep.Markdown("jimmy-evans-test-logos", []string{"jimmy-evans-sermons.jsonl"})
+	for _, want := range []string{"rows written:                        4", "None of the 4 rows has a Scripture ref", "Rows with no date of their own (2)", "SER2008.3, SER2010.6"} {
+		if !strings.Contains(md, want) {
+			t.Errorf("REPORT.md lacks %q:\n%s", want, md)
+		}
+	}
+	// And the checker accepts them.
+	out := t.TempDir()
+	if err := writeRows(filepath.Join(out, "rows.jsonl"), rows); err != nil {
+		t.Fatal(err)
+	}
+	toml := "id = \"" + filepath.Base(out) + "\"\nname = \"t\"\nkind = \"sermons\"\nlicence = \"x\"\ncredit = \"x\"\nhomepage = \"https://example.org\"\nterms_url = \"https://example.org\"\nadded = 2026-11-06\non_by_default = false\n"
+	if err := os.WriteFile(filepath.Join(out, "source.toml"), []byte(toml), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if faults, warnings := sources.CheckReport(out); len(faults) != 0 || len(warnings) != 0 {
+		t.Fatalf("faults %v, warnings %v", sources.Faults(faults), sources.Faults(warnings))
+	}
+}
+
+func TestBatch3RowsPassTheChecker(t *testing.T) {
+	files := []File{
+		{Name: "aug", Inputs: readFile(t, "testdata/augustine-sermons.jsonl"), RefsFromTitle: true},
+		{Name: "chr", Inputs: readFile(t, "testdata/chrysostom-a-sermons.jsonl"), Preacher: "John Chrysostom"},
+		{Name: "pip", Inputs: readFile(t, "testdata/piper-sermons.jsonl")},
+		{Name: "cw", Inputs: readFile(t, "testdata/charles-wesley-a-sermons.jsonl")},
+		{Name: "cw2", Inputs: readFile(t, "testdata/charles-wesley-b-sermons.jsonl")},
+	}
+	rows, _ := BuildSource(files, false)
+	out := t.TempDir()
+	if err := writeRows(filepath.Join(out, "rows.jsonl"), rows); err != nil {
+		t.Fatal(err)
+	}
+	toml := "id = \"" + filepath.Base(out) + "\"\nname = \"t\"\nkind = \"sermons\"\nlicence = \"x\"\ncredit = \"x\"\nhomepage = \"https://example.org\"\nterms_url = \"https://example.org\"\nadded = 2026-11-06\non_by_default = false\n"
+	if err := os.WriteFile(filepath.Join(out, "source.toml"), []byte(toml), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if faults, warnings := sources.CheckReport(out); len(faults) != 0 || len(warnings) != 0 {
+		t.Fatalf("faults %v, warnings %v", sources.Faults(faults), sources.Faults(warnings))
+	}
+}
+
+// run writes the flags that matter into REPORT.md's command, and rows.jsonl
+// follows them.
+func TestRunRecordsPreacherAndRefsFromTitle(t *testing.T) {
+	out := t.TempDir()
+	if err := run([]string{"testdata/augustine-sermons.jsonl"}, "augustine-test-logos", out, "", false, "Augustine", true, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	rep, _ := os.ReadFile(filepath.Join(out, "REPORT.md"))
+	rows, _ := os.ReadFile(filepath.Join(out, "rows.jsonl"))
+	for _, want := range []string{"--refs-from-title", `--preacher "Augustine"`, "Non-sermon lines dropped (2)", "Chronological Table"} {
+		if !strings.Contains(string(rep), want) {
+			t.Errorf("REPORT.md lacks %q:\n%s", want, rep)
+		}
+	}
+	if bytes.Count(rows, []byte(`"preacher":"Augustine"`)) != 8 || !bytes.Contains(rows, []byte(`"ref":"Mark.8.34"`)) {
+		t.Errorf("rows.jsonl:\n%s", rows)
 	}
 }

@@ -43,19 +43,21 @@ func main() {
 	dedupe := flag.Bool("dedupe-titles", false, "drop a line whose title is that of a row of an earlier --in file")
 	id := flag.String("id", "", "the source's id, as in sources/<id>")
 	out := flag.String("out", "", "the source directory to write rows.jsonl and REPORT.md in")
+	preacher := flag.String("preacher", "", "the preacher of every row, where the index names the book's editor or translator instead")
+	refsFromTitle := flag.Bool("refs-from-title", false, "a line with no Logos reference and no label that reads takes its ref from the passages its title names (Augustine's titles)")
 	report := flag.String("report", "", "where to write the report (default <out>/REPORT.md)")
 	flag.Parse()
 	if len(ins) == 0 || *id == "" || *out == "" || flag.NArg() != 0 {
-		fmt.Fprintln(os.Stderr, "usage: logos-import --in <slug>-sermons.jsonl [--in <more>] [--dedupe-titles] --id <source id> --out <source dir> [--report <file>]")
+		fmt.Fprintln(os.Stderr, "usage: logos-import --in <slug>-sermons.jsonl [--in <more>] [--dedupe-titles] [--preacher <name>] [--refs-from-title] --id <source id> --out <source dir> [--report <file>]")
 		os.Exit(2)
 	}
-	if err := run(ins, *id, *out, *report, *dedupe, os.Stdout); err != nil {
+	if err := run(ins, *id, *out, *report, *dedupe, *preacher, *refsFromTitle, os.Stdout); err != nil {
 		fmt.Fprintln(os.Stderr, "logos-import:", err)
 		os.Exit(1)
 	}
 }
 
-func run(ins []string, id, out, reportPath string, dedupe bool, stdout io.Writer) error {
+func run(ins []string, id, out, reportPath string, dedupe bool, preacher string, refsFromTitle bool, stdout io.Writer) error {
 	var files []File
 	var names []string
 	for _, in := range ins {
@@ -70,9 +72,10 @@ func run(ins []string, id, out, reportPath string, dedupe bool, stdout io.Writer
 		}
 		base := filepath.Base(in)
 		names = append(names, base)
-		files = append(files, File{Name: strings.TrimSuffix(base, "-sermons.jsonl"), Inputs: inputs})
+		files = append(files, File{Name: strings.TrimSuffix(base, "-sermons.jsonl"), Inputs: inputs, Preacher: preacher, RefsFromTitle: refsFromTitle})
 	}
 	rows, rep := BuildSource(files, dedupe)
+	rep.Preacher, rep.RefsFromTitle = preacher, refsFromTitle
 	if len(rows) == 0 {
 		return fmt.Errorf("%s: no row to write (%d lines read)", strings.Join(ins, ", "), rep.Input)
 	}
