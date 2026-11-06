@@ -532,6 +532,12 @@ func TestLoadLogosArchives(t *testing.T) {
 		{"bunyan-logos", 1, 0, 0, 1},
 		{"charles-wesley-logos", 14, 12, 0, 2},
 		{"jimmy-evans-logos", 156, 0, 0, 156},
+		{"shedd-logos", 46, 46, 0, 0},
+		{"burroughs-logos", 62, 57, 0, 5},
+		{"keach-logos", 17, 17, 0, 0},
+		{"maclaren-logos", 30, 0, 0, 30},
+		{"kuyper-logos", 7, 0, 0, 7},
+		{"broadus-logos", 21, 0, 0, 21},
 	}
 	ctx := context.Background()
 	db := migrated(t)
@@ -645,5 +651,32 @@ func TestLoadLogosArchives(t *testing.T) {
 	// Jimmy Evans: dated, in a series, on no verse.
 	if n := count(t, db, "select count(*) from sermons s where s.source_id = 'jimmy-evans-logos' and s.id = 'SER2004.1.1' and s.date = '2004-06-11' and s.notes = 'Series: Blessed Marriage Seminar, part 1.' and not exists (select 1 from sermon_passages p where p.source_id = s.source_id and p.sermon_id = s.id)"); n != 1 {
 		t.Errorf("Jimmy Evans SER2004.1.1: %d, want once", n)
+	}
+
+	// Batch 4a: Shedd's chapter 1 of the Natural Man is "The Future State a
+	// Self-Conscious State" under 1 Corinthians 13:12 ("Chapter 1: " taken
+	// off); Burroughs's Spots sermons carry the date of their title; Maclaren's
+	// "Chapter I" is "The First Beatitude" (with no preaching text); no front matter or
+	// table of contents is in the index.
+	rg, err := passage.Parse("1Cor.13.12")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := count(t, db, "select count(*) from sermon_passages p join sermons s on s.source_id = p.source_id and s.id = p.sermon_id where p.role = 'text' and p.source_id = 'shedd-logos' and s.id = 'SRMNATMAN.1-43544' and s.title = 'The Future State a Self-Conscious State' and s.preacher = 'William G. T. Shedd' and p.span && $1::int4range", rg.PG()); n != 1 {
+		t.Errorf("Shedd chapter 1 under 1 Corinthians 13:12: %d, want once", n)
+	}
+	if n := count(t, db, "select count(*) from sermons where source_id = 'burroughs-logos' and id = 'WRKSBURROUGHS07.1-1510' and date = '1645-07-06' and title = 'The First Sermon (July the 6th, 1645)'"); n != 1 {
+		t.Errorf("Burroughs's First Sermon of the Spots (1645-07-06): %d, want once", n)
+	}
+	if n := count(t, db, "select count(*) from sermons where source_id = 'burroughs-logos' and date is not null"); n != 4 {
+		t.Errorf("Burroughs rows with a date: %d, want 4", n)
+	}
+	if n := count(t, db, "select count(*) from sermons s where s.source_id = 'maclaren-logos' and s.id = 'BTTDSTHRSRMNS.1-4253' and s.title = 'The First Beatitude' and not exists (select 1 from sermon_passages p where p.source_id = s.source_id and p.sermon_id = s.id and p.role = 'text')"); n != 1 {
+		t.Errorf("Maclaren's First Beatitude: %d, want once", n)
+	}
+	for _, id := range []string{"shedd-logos", "burroughs-logos", "keach-logos", "maclaren-logos", "kuyper-logos", "broadus-logos"} {
+		if n := count(t, db, "select count(*) from sermons where source_id = $1 and (title ~ '^Chapter [IVXLC0-9]+: ' or title ~* '(^|[^a-z])(preface|epistle to the reader|contents of|alphabetical table|table of the chief heads)')", id); n != 0 {
+			t.Errorf("%s: %d rows that are front matter or keep a Chapter prefix", id, n)
+		}
 	}
 }
