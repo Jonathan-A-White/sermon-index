@@ -1,0 +1,46 @@
+# John Chrysostom's homilies in five volumes of the Nicene and Post-Nicene
+# Fathers, First Series, in the Governor's Logos library, 483 rows: Volume 10,
+# Matthew (6.60.10, 90), Volume 11, Acts and Romans (6.60.11, 87), Volume 12, the
+# Corinthians (6.60.12, 74), Volume 13, Galatians to Philemon (6.60.13, 110) and
+# Volume 14, John and Hebrews (6.60.14, 122), made by
+#
+#   go run ./tools/logos-import --in <vault>/plans/sermons-2026-11-05/nicene-and-post-nicene-fathers-1-10-saint-chrysostom-homilies-on-the-gospel-of-saint-matthew-sermons.jsonl --in <vault>/plans/sermons-2026-11-05/nicene-and-post-nicene-fathers-1-11-saint-chrysostom-homilies-on-the-acts-of-the-apostles-and-the-epistle-to-the-romans-sermons.jsonl --in <vault>/plans/sermons-2026-11-05/nicene-and-post-nicene-fathers-1-12-saint-chrysostom-homilies-on-the-epistles-of-paul-to-the-corinthians-sermons.jsonl --in <vault>/plans/sermons-2026-11-05/nicene-and-post-nicene-fathers-1-13-saint-chrysostom-homilies-on-galatians-ephesians-philippians-colossians-thessalonians-timothy-titus-and-philemon-sermons.jsonl --in <vault>/plans/sermons-2026-11-05/nicene-and-post-nicene-fathers-1-14-saint-chrysostom-homilies-on-the-gospel-of-st-john-and-epistle-to-the-hebrews-sermons.jsonl --preacher "John Chrysostom" --id chrysostom-logos --out sources/chrysostom-logos
+#
+# from the index file the Mayor made of each volume on 2026-11-06 (the parser's
+# book-archive form). The index keeps facts only: a title, the passage, the cited
+# passages and the ref.ly address. No sentence of a sermon, and no Logos text, is
+# written anywhere.
+#
+# What the tool counted (REPORT.md lists what it could not place): 491 lines read,
+# 483 rows. Eight lines are not homilies and are dropped (the editor's prolegomena,
+# the Arguments, the two Indexes of Texts, the Introductory Discourse; REPORT.md
+# names each). The index names Philip Schaff, the editor, as the preacher of every
+# line: --preacher sets John Chrysostom. 479 rows have a preaching text (the `ref`)
+# and 338 cite further passages; 4 have none (REPORT.md). A title is only "Homily
+# II" or "Chapter I" (Galatians): the passage and the row's id tell them apart.
+# The link (https://ref.ly/logosres/LLS:<resource>?off=<offset>) opens the book at
+# the sermon in Logos for an owner of the book and for no one else. It is
+# UNVERIFIED: no one has tapped one yet (sermons check --urls was not run on it).
+
+
+id = "chrysostom-logos"
+name = "John Chrysostom's homilies (his Logos library)"
+kind = "sermons"
+
+# No terms page was read or quoted: the Governor's library is his own, and the
+# words below are his, given to the Mayor in the Postern general channel on
+# 2026-11-06 (about 14:52Z), quoted verbatim, with his word "links" for what
+# this index holds.
+licence = """
+index these sermons so that you can add it to your sermon index with links"""
+
+licence_note = """
+From the Governor's own Logos library at his word (2026-11-06, mw-qtu3zvz); the index keeps titles, passages and ref.ly links only; a link opens the sermon only for a Logos owner of the archive. Same footing as the Logos Atlas index (mw-zbjgn3r.9).
+Faithlife's terms bind the books the links open, not these rows; no terms page was read."""
+
+credit = "John Chrysostom, Homilies, in the Nicene and Post-Nicene Fathers, First Series, Volumes 10 to 14 (ed. Philip Schaff), in Logos (Faithlife)"
+homepage = "https://www.logos.com/"
+# Faithlife's terms of service, named for the reader; they were not read or quoted for this source.
+terms_url = "https://faithlife.com/terms"
+added = 2026-11-06
+on_by_default = false
