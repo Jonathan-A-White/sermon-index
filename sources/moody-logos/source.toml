@@ -1,0 +1,43 @@
+# Dwight Lyman Moody's four sermon books in the Governor's Logos library, 32 rows:
+# Men of the Bible (MENBBLMOODY, 7), The Overcoming Life and Other Sermons
+# (OVRCMNGLFMOODY, 7), The Way to God and How to Find It (WAYGODMOODY, 9) and
+# Twelve Select Sermons (12SELSERMMOODY, 9), made by
+#
+#   go run ./tools/logos-import --in <vault>/plans/sermons-2026-11-05/men-of-the-bible-sermons.jsonl --in <vault>/plans/sermons-2026-11-05/the-overcoming-life-and-other-sermons-sermons.jsonl --in <vault>/plans/sermons-2026-11-05/the-way-to-god-and-how-to-find-it-sermons.jsonl --in <vault>/plans/sermons-2026-11-05/twelve-select-sermons-sermons.jsonl --id moody-logos --out sources/moody-logos
+#
+# from the index file the Mayor made of each book on 2026-11-06 (the parser's
+# book-archive form). The index keeps facts only: a title, the passage, the cited
+# passages and the ref.ly address. No sentence of a sermon, and no Logos text, is
+# written anywhere.
+#
+# What the tool counted (REPORT.md lists what it could not place): 32 lines read,
+# 32 rows, none dropped. 8 have a preaching text (the `ref`) and 17 cite further
+# passages; 24 have none the index could read. "Chapter I: ..." in The Way to God is titled by the heading
+# that follows. 10 contents entries are split in parts by the book, so the link
+# opens the book where the entry begins (often only a heading).
+# The link (https://ref.ly/logosres/LLS:<resource>?off=<offset>) opens the book at
+# the sermon in Logos for an owner of the book and for no one else. It is
+# UNVERIFIED: no one has tapped one yet (sermons check --urls was not run on it).
+
+
+id = "moody-logos"
+name = "D. L. Moody's sermons (his Logos library)"
+kind = "sermons"
+
+# No terms page was read or quoted: the Governor's library is his own, and the
+# words below are his, given to the Mayor in the Postern general channel on
+# 2026-11-06 (about 14:52Z), quoted verbatim, with his word "links" for what
+# this index holds.
+licence = """
+index these sermons so that you can add it to your sermon index with links"""
+
+licence_note = """
+From the Governor's own Logos library at his word (2026-11-06, mw-qtu3zvz); the index keeps titles, passages and ref.ly links only; a link opens the sermon only for a Logos owner of the archive. Same footing as the Logos Atlas index (mw-zbjgn3r.9).
+Faithlife's terms bind the books the links open, not these rows; no terms page was read."""
+
+credit = "Dwight Lyman Moody, Men of the Bible; The Overcoming Life and Other Sermons; The Way to God and How to Find It; Twelve Select Sermons, in Logos (Faithlife)"
+homepage = "https://www.logos.com/"
+# Faithlife's terms of service, named for the reader; they were not read or quoted for this source.
+terms_url = "https://faithlife.com/terms"
+added = 2026-11-06
+on_by_default = false

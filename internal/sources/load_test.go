@@ -507,9 +507,12 @@ func TestLoadASeriesRowKeepsTheRowAndNoPassage(t *testing.T) {
 	}
 }
 
-// The Governor's three Logos sermon archives (tools/logos-import) load with
-// the rows the index listed: 1,196, 248 and 334. A `series` row has no
-// passage, so the preaching texts are the rows with a ref less the series.
+// The Governor's Logos sermon archives (tools/logos-import) load with the
+// rows the index listed: 1,196, 248 and 334 for the three archives with an
+// index section, and for batch 2's books (Spurgeon's My Sermon Notes 264,
+// Wesley 164 once the Works' repeats of Sermons on Several Occasions are
+// out, Whitefield 59, Moody 32). A `series` row has no passage, so the
+// preaching texts are the rows with a ref less the series.
 func TestLoadLogosArchives(t *testing.T) {
 	archives := []struct {
 		id            string
@@ -519,6 +522,10 @@ func TestLoadLogosArchives(t *testing.T) {
 		{"greg-laurie-logos", 1196, 1066, 25, 105},
 		{"jd-greear-logos", 248, 206, 3, 39},
 		{"skip-heitzig-logos", 334, 157, 1, 176},
+		{"spurgeon-sermon-notes-logos", 264, 264, 0, 0},
+		{"wesley-logos", 164, 137, 0, 27},
+		{"whitefield-logos", 59, 47, 0, 12},
+		{"moody-logos", 32, 8, 0, 24},
 	}
 	ctx := context.Background()
 	db := migrated(t)
@@ -540,10 +547,10 @@ func TestLoadLogosArchives(t *testing.T) {
 		if n := count(t, db, "select count(*) from sermon_passages where role = 'text' and source_id = $1", a.id); n != a.texts {
 			t.Errorf("%s: %d preaching texts, want %d", a.id, n, a.texts)
 		}
-		if n := q("and not exists (select 1 from sermon_passages p where p.source_id = s.source_id and p.sermon_id = s.id)"); n != a.series+a.noRef {
-			t.Errorf("%s: %d rows without a passage, want %d (series %d, no ref %d)", a.id, n, a.series+a.noRef, a.series, a.noRef)
+		if n := q("and not exists (select 1 from sermon_passages p where p.source_id = s.source_id and p.sermon_id = s.id and p.role = 'text')"); n != a.series+a.noRef {
+			t.Errorf("%s: %d rows without a preaching text, want %d (series %d, no ref %d)", a.id, n, a.series+a.noRef, a.series, a.noRef)
 		}
-		if n := q("and (kind <> 'link' or url !~ '^https://ref.ly/logosres/LLS:[A-Z]+\\?art=' or notes ~ 'Logos text')"); n != 0 {
+		if n := q("and (kind <> 'link' or url !~ '^https://ref.ly/logosres/LLS:[A-Za-z0-9.]+\\?(art|off)=' or notes ~ 'Logos text')"); n != 0 {
 			t.Errorf("%s: %d rows that are not a link to a ref.ly address", a.id, n)
 		}
 		if n := q("and preacher is null"); n != 0 {
@@ -570,5 +577,34 @@ func TestLoadLogosArchives(t *testing.T) {
 	}
 	if n := count(t, db, "select count(*) from sermon_passages p where p.role = 'text' and p.source_id like '%-logos' and p.sermon_id in ('YEAR.2000.8', 'YEAR.2006.30', 'YEAR.2010.2') and p.span && $1::int4range", rom58.PG()); n != 3 {
 		t.Errorf("YEAR.2000.8, YEAR.2006.30 and YEAR.2010.2 on Romans 5:8: %d, want 3", n)
+	}
+
+	// Batch 2 (the book-archive form): Spurgeon's chapter "Chapter I: Gen.
+	// 19:15" is "Genesis 19:15" under Genesis 19:15; Wesley's "Salvation by
+	// Faith" is there once (the Works' copy is a repeat, dropped); his
+	// "God's Love to Fallen Man" is under Romans 5:15; Moody's "Where Art
+	// Thou?" is under Genesis 3:9. Each is a link to its offset in the book.
+	for _, c := range []struct {
+		source, id, title, ref string
+	}{
+		{"spurgeon-sermon-notes-logos", "MYSRMNOTES01.2-14522", "Genesis 19:15", "Gen.19.15"},
+		{"wesley-logos", "36.0.11.2-1735602", "Sermon 59: God’s Love to Fallen Man", "Rom.5.15"},
+		{"moody-logos", "12SELSERMMOODY.1-771", "“Where Art Thou?”", "Gen.3.9"},
+	} {
+		rg, err := passage.Parse(c.ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if n := count(t, db, "select count(*) from sermon_passages p join sermons s on s.source_id = p.source_id and s.id = p.sermon_id where p.role = 'text' and p.source_id = $1 and s.id = $2 and s.title = $3 and s.kind = 'link' and s.url like 'https://ref.ly/logosres/LLS:%?off=%' and p.span && $4::int4range", c.source, c.id, c.title, rg.PG()); n != 1 {
+			t.Errorf("%s %s %q under %s: %d, want once", c.source, c.id, c.title, c.ref, n)
+		}
+	}
+	if n := count(t, db, "select count(*) from sermons where source_id = 'wesley-logos' and title like '%Salvation by Faith'"); n != 1 {
+		t.Errorf("Wesley's Salvation by Faith is in the index %d times, want once", n)
+	}
+	// No two rows of Wesley's index have the same title once a Roman numeral
+	// or "Sermon N" is off, bar the ones Sermons on Several Occasions has twice.
+	if n := count(t, db, "select count(*) from sermons where source_id = 'wesley-logos' and id like 'WORKSWESLEY%' and title ~ '^Sermon [IVXLC]+: (Salvation by Faith|The Almost Christian|Satan.s Devices)'"); n != 0 {
+		t.Errorf("%d Works rows that repeat Sermons on Several Occasions are in the index", n)
 	}
 }
