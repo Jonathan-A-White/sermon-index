@@ -1,0 +1,44 @@
+# J. D. Greear's sermon archive in the Governor's Logos library, 248 rows: one
+# row a sermon of the archive's own index (resource JDGRRSRMNRCHV), made by
+#
+#   go run ./tools/logos-import --in <vault>/plans/sermons-2026-11-05/j-d-greear-sermons.jsonl --id jd-greear-logos --out sources/jd-greear-logos
+#
+# from the index file the Mayor made of the archive on 2026-11-06 (the archive's
+# "Sermons by Date", "by Series" and "by Reference" index sections). The index
+# keeps facts only: a title, the passage, the series and part, a date, and the
+# ref.ly address of the sermon in Logos. No sentence of a sermon, and no
+# Logos text, is written anywhere.
+#
+# What the tool counted (2026-11-06; REPORT.md lists what it could not place):
+#   248 lines read, 248 rows, none dropped; ids CH<n> and PT<n>.<m>.
+#   209 rows have a preaching text: all from Logos's own reference. 18 cite
+#   further passages. 3 rows are `series` (a text over more than 3 chapters).
+#   39 rows have no passage (PT<n>.<m> rows give a title and no passage;
+#   so do some Christmas, anniversary and topic sermons).
+#   212 rows have their date (2009 to 2015); 36 have none. 211 rows carry a part
+#   in the notes.
+#
+# The url (https://ref.ly/logosres/LLS:JDGRRSRMNRCHV?art=<id>) opens the sermon in
+# Logos for an owner of the archive and for no one else.
+
+id = "jd-greear-logos"
+name = "J. D. Greear's sermons (his Logos archive)"
+kind = "sermons"
+
+# No terms page was read or quoted: the Governor's library is his own, and the
+# words below are his, given to the Mayor in the Postern general channel on
+# 2026-11-06 (about 14:52Z), quoted verbatim, with his word "links" for what
+# this index holds.
+licence = """
+index these sermons so that you can add it to your sermon index with links"""
+
+licence_note = """
+From the Governor's own Logos library at his word (2026-11-06, mw-qtu3zvz); the index keeps titles, passages and ref.ly links only; a link opens the sermon only for a Logos owner of the archive. Same footing as the Logos Atlas index (mw-zbjgn3r.9).
+Faithlife's terms bind the sermons the links open, not these rows; no terms page was read."""
+
+credit = "J. D. Greear Sermon Archive, in Logos (Faithlife)"
+homepage = "https://www.logos.com/"
+# Faithlife's terms of service, named for the reader; they were not read or quoted for this source.
+terms_url = "https://faithlife.com/terms"
+added = 2026-11-06
+on_by_default = false

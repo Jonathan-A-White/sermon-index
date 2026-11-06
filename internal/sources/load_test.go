@@ -506,3 +506,69 @@ func TestLoadASeriesRowKeepsTheRowAndNoPassage(t *testing.T) {
 		t.Errorf("the series row has %d passages again, want 0", n)
 	}
 }
+
+// The Governor's three Logos sermon archives (tools/logos-import) load with
+// the rows the index listed: 1,196, 248 and 334. A `series` row has no
+// passage, so the preaching texts are the rows with a ref less the series.
+func TestLoadLogosArchives(t *testing.T) {
+	archives := []struct {
+		id            string
+		rows, texts   int
+		series, noRef int
+	}{
+		{"greg-laurie-logos", 1196, 1066, 25, 105},
+		{"jd-greear-logos", 248, 206, 3, 39},
+		{"skip-heitzig-logos", 334, 157, 1, 176},
+	}
+	ctx := context.Background()
+	db := migrated(t)
+	for _, a := range archives {
+		dir := "../../sources/" + a.id
+		faults, warnings := CheckReport(dir)
+		if len(faults) != 0 || len(warnings) != 0 {
+			t.Fatalf("%s: faults %v, warnings %v", a.id, Faults(faults), Faults(warnings))
+		}
+		if _, err := Load(ctx, db, dir); err != nil {
+			t.Fatal(err)
+		}
+		q := func(where string, args ...any) int {
+			return count(t, db, "select count(*) from sermons s where s.source_id = '"+a.id+"' "+where, args...)
+		}
+		if n := q(""); n != a.rows {
+			t.Errorf("%s: %d rows, want %d", a.id, n, a.rows)
+		}
+		if n := count(t, db, "select count(*) from sermon_passages where role = 'text' and source_id = $1", a.id); n != a.texts {
+			t.Errorf("%s: %d preaching texts, want %d", a.id, n, a.texts)
+		}
+		if n := q("and not exists (select 1 from sermon_passages p where p.source_id = s.source_id and p.sermon_id = s.id)"); n != a.series+a.noRef {
+			t.Errorf("%s: %d rows without a passage, want %d (series %d, no ref %d)", a.id, n, a.series+a.noRef, a.series, a.noRef)
+		}
+		if n := q("and (kind <> 'link' or url !~ '^https://ref.ly/logosres/LLS:[A-Z]+\\?art=' or notes ~ 'Logos text')"); n != 0 {
+			t.Errorf("%s: %d rows that are not a link to a ref.ly address", a.id, n)
+		}
+		if n := q("and preacher is null"); n != 0 {
+			t.Errorf("%s: %d rows with no preacher", a.id, n)
+		}
+	}
+
+	// Greg Laurie's "Who Is Man" (YEAR.1996.6) is under Genesis 1.
+	gen1, err := passage.Parse("Gen.1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := count(t, db, "select count(*) from sermon_passages p join sermons s on s.source_id = p.source_id and s.id = p.sermon_id where p.role = 'text' and p.source_id = 'greg-laurie-logos' and s.id = 'YEAR.1996.6' and s.title = 'Who Is Man' and p.span && $1::int4range", gen1.PG()); n != 1 {
+		t.Errorf("Who Is Man is under Genesis 1 %d times, want once", n)
+	}
+	// Romans 5:8: Greg Laurie preached on Romans 5 three times (YEAR.2000.8,
+	// YEAR.2006.30, YEAR.2010.2); no other archive has a text there.
+	rom58, err := passage.Parse("Rom.5.8")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := count(t, db, "select count(distinct (p.source_id, p.sermon_id)) from sermon_passages p where p.role = 'text' and p.source_id like '%-logos' and p.span && $1::int4range", rom58.PG()); n != 3 {
+		t.Errorf("%d Logos rows on Romans 5:8, want 3", n)
+	}
+	if n := count(t, db, "select count(*) from sermon_passages p where p.role = 'text' and p.source_id like '%-logos' and p.sermon_id in ('YEAR.2000.8', 'YEAR.2006.30', 'YEAR.2010.2') and p.span && $1::int4range", rom58.PG()); n != 3 {
+		t.Errorf("YEAR.2000.8, YEAR.2006.30 and YEAR.2010.2 on Romans 5:8: %d, want 3", n)
+	}
+}

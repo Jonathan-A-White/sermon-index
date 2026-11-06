@@ -1,0 +1,47 @@
+# Skip Heitzig's sermon archive in the Governor's Logos library, 334 rows: one
+# row a sermon of the archive's own index (resource SKPHTZGSRMN), made by
+#
+#   go run ./tools/logos-import --in <vault>/plans/sermons-2026-11-05/skip-heitzig-sermons.jsonl --id skip-heitzig-logos --out sources/skip-heitzig-logos
+#
+# from the index file the Mayor made of the archive on 2026-11-06 (the archive's
+# "Sermons by Date", "by Series" and "by Reference" index sections). The index
+# keeps facts only: a title, the passage, the series and part, a date, and the
+# ref.ly address of the sermon in Logos. No sentence of a sermon, and no
+# Logos text, is written anywhere.
+#
+# What the tool counted (2026-11-06; REPORT.md lists what it could not place):
+#   334 lines read, 334 rows, none dropped; ids by book (EX.1, MT.12) and by
+#   series (SERIES6.3).
+#   158 rows have a preaching text: all from Logos's own reference. 8 cite
+#   further passages. 1 row is `series` (a text over more than 3 chapters).
+#   176 rows have no passage: the index gives Logos references for the
+#   thematic series and none for the verse-by-verse studies, whose titles
+#   name the passage ("Exodus 3-4") but whose ref fields are empty (reading a
+#   passage from a title is not done here). 13 of the 176 are the archive's
+#   own book and series headings (EX, LEV, MT, SERIES1 ...), kept as the 334
+#   rows the index lists. No row has a date (the index gives none). Part numbers are in the notes.
+#
+# The url (https://ref.ly/logosres/LLS:SKPHTZGSRMN?art=<id>) opens the sermon in
+# Logos for an owner of the archive and for no one else.
+
+id = "skip-heitzig-logos"
+name = "Skip Heitzig's sermons (his Logos archive)"
+kind = "sermons"
+
+# No terms page was read or quoted: the Governor's library is his own, and the
+# words below are his, given to the Mayor in the Postern general channel on
+# 2026-11-06 (about 14:52Z), quoted verbatim, with his word "links" for what
+# this index holds.
+licence = """
+index these sermons so that you can add it to your sermon index with links"""
+
+licence_note = """
+From the Governor's own Logos library at his word (2026-11-06, mw-qtu3zvz); the index keeps titles, passages and ref.ly links only; a link opens the sermon only for a Logos owner of the archive. Same footing as the Logos Atlas index (mw-zbjgn3r.9).
+Faithlife's terms bind the sermons the links open, not these rows; no terms page was read."""
+
+credit = "Skip Heitzig Sermon Archive, in Logos (Faithlife)"
+homepage = "https://www.logos.com/"
+# Faithlife's terms of service, named for the reader; they were not read or quoted for this source.
+terms_url = "https://faithlife.com/terms"
+added = 2026-11-06
+on_by_default = false

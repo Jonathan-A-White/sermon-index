@@ -1,0 +1,47 @@
+# Greg Laurie's sermon archive in the Governor's Logos library, 1,196 rows: one
+# row a sermon of the archive's own index (resource GRGLRSRMNRCH), made by
+#
+#   go run ./tools/logos-import --in <vault>/plans/sermons-2026-11-05/greg-laurie-sermons.jsonl --id greg-laurie-logos --out sources/greg-laurie-logos
+#
+# from the index file the Mayor made of the archive on 2026-11-06 (the archive's
+# "Sermons by Date", "by Series" and "by Reference" index sections). The index
+# keeps facts only: a title, the passage, the series and part, a date, and the
+# ref.ly address of the sermon in Logos. No sentence of a sermon, and no
+# Logos text, is written anywhere.
+#
+# What the tool counted (2026-11-06; REPORT.md lists what it could not place):
+#   1,196 lines read, 1,196 rows, none dropped; ids YEAR.<year>.<n>.
+#   1,091 rows have a preaching text (the `ref`): 1,077 from Logos's own
+#   reference, 14 from the label ("Jonah", "Judges": a whole book, no chapter)
+#   because Logos gave none. 41 rows cite further passages. 25 rows are `series`
+#   (a text over more than 3 chapters, mostly whole books): kept, found by title,
+#   matched by no passage. 105 rows have no passage (a crusade, a testimony, a
+#   topic).
+#   632 rows have their own date; the other 564 carry the year the archive files
+#   them under (1992 to 2013) as their date, at year precision. 218 rows are in a
+#   series or a part, in the notes.
+#
+# The url (https://ref.ly/logosres/LLS:GRGLRSRMNRCH?art=<id>) opens the sermon in
+# Logos for an owner of the archive and for no one else.
+
+id = "greg-laurie-logos"
+name = "Greg Laurie's sermons (his Logos archive)"
+kind = "sermons"
+
+# No terms page was read or quoted: the Governor's library is his own, and the
+# words below are his, given to the Mayor in the Postern general channel on
+# 2026-11-06 (about 14:52Z), quoted verbatim, with his word "links" for what
+# this index holds.
+licence = """
+index these sermons so that you can add it to your sermon index with links"""
+
+licence_note = """
+From the Governor's own Logos library at his word (2026-11-06, mw-qtu3zvz); the index keeps titles, passages and ref.ly links only; a link opens the sermon only for a Logos owner of the archive. Same footing as the Logos Atlas index (mw-zbjgn3r.9).
+Faithlife's terms bind the sermons the links open, not these rows; no terms page was read."""
+
+credit = "Greg Laurie Sermon Archive (Harvest Ministries), in Logos (Faithlife)"
+homepage = "https://www.logos.com/"
+# Faithlife's terms of service, named for the reader; they were not read or quoted for this source.
+terms_url = "https://faithlife.com/terms"
+added = 2026-11-06
+on_by_default = false
