@@ -3,6 +3,13 @@
 //
 //	go run ./tools/logos-import --in <slug>-sermons.jsonl --id <source id> --out sources/<source id>
 //
+// A source made of several books gives --in more than once (the rows follow
+// the files in order); --dedupe-titles then drops a line whose title is the
+// title of a row of an earlier file (Wesley's Works repeat his Sermons on
+// Several Occasions). A book archive's index (the parser's fallback form:
+// ids like 2~14522, cited passages, no date) is read as well as an index
+// section's.
+//
 // The input is the index the Mayor made of an archive (the vault's
 // plans/sermons-2026-11-05/<slug>-sermons.jsonl, one sermon a line: id,
 // title, preacher, date, year, ref, bibleRefs, series, part, url). The tool
@@ -21,37 +28,53 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
+// stringList is a flag given more than once.
+type stringList []string
+
+func (l *stringList) String() string     { return strings.Join(*l, ",") }
+func (l *stringList) Set(v string) error { *l = append(*l, v); return nil }
+
 func main() {
-	in := flag.String("in", "", "the archive's index file, <slug>-sermons.jsonl")
+	var ins stringList
+	flag.Var(&ins, "in", "an archive's index file, <slug>-sermons.jsonl (more than once: one source from several books, in order)")
+	dedupe := flag.Bool("dedupe-titles", false, "drop a line whose title is that of a row of an earlier --in file")
 	id := flag.String("id", "", "the source's id, as in sources/<id>")
 	out := flag.String("out", "", "the source directory to write rows.jsonl and REPORT.md in")
 	report := flag.String("report", "", "where to write the report (default <out>/REPORT.md)")
 	flag.Parse()
-	if *in == "" || *id == "" || *out == "" || flag.NArg() != 0 {
-		fmt.Fprintln(os.Stderr, "usage: logos-import --in <slug>-sermons.jsonl --id <source id> --out <source dir> [--report <file>]")
+	if len(ins) == 0 || *id == "" || *out == "" || flag.NArg() != 0 {
+		fmt.Fprintln(os.Stderr, "usage: logos-import --in <slug>-sermons.jsonl [--in <more>] [--dedupe-titles] --id <source id> --out <source dir> [--report <file>]")
 		os.Exit(2)
 	}
-	if err := run(*in, *id, *out, *report, os.Stdout); err != nil {
+	if err := run(ins, *id, *out, *report, *dedupe, os.Stdout); err != nil {
 		fmt.Fprintln(os.Stderr, "logos-import:", err)
 		os.Exit(1)
 	}
 }
 
-func run(in, id, out, reportPath string, stdout io.Writer) error {
-	f, err := os.Open(in)
-	if err != nil {
-		return err
+func run(ins []string, id, out, reportPath string, dedupe bool, stdout io.Writer) error {
+	var files []File
+	var names []string
+	for _, in := range ins {
+		f, err := os.Open(in)
+		if err != nil {
+			return err
+		}
+		inputs, err := ReadInput(f)
+		f.Close()
+		if err != nil {
+			return fmt.Errorf("%s: %w", in, err)
+		}
+		base := filepath.Base(in)
+		names = append(names, base)
+		files = append(files, File{Name: strings.TrimSuffix(base, "-sermons.jsonl"), Inputs: inputs})
 	}
-	inputs, err := ReadInput(f)
-	f.Close()
-	if err != nil {
-		return fmt.Errorf("%s: %w", in, err)
-	}
-	rows, rep := BuildRows(inputs)
+	rows, rep := BuildSource(files, dedupe)
 	if len(rows) == 0 {
-		return fmt.Errorf("%s: no row to write (%d lines read)", in, len(inputs))
+		return fmt.Errorf("%s: no row to write (%d lines read)", strings.Join(ins, ", "), rep.Input)
 	}
 	if err := os.MkdirAll(out, 0o755); err != nil {
 		return err
@@ -62,7 +85,7 @@ func run(in, id, out, reportPath string, stdout io.Writer) error {
 	if reportPath == "" {
 		reportPath = filepath.Join(out, "REPORT.md")
 	}
-	if err := os.WriteFile(reportPath, []byte(rep.Markdown(id, filepath.Base(in))), 0o644); err != nil {
+	if err := os.WriteFile(reportPath, []byte(rep.Markdown(id, names)), 0o644); err != nil {
 		return err
 	}
 	fmt.Fprintf(stdout, "%s\n", id)

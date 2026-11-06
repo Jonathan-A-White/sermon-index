@@ -35,7 +35,8 @@ func logosBook(n int) (string, bool) {
 // table. Logos writes a whole chapter as book.chapter.
 func LogosToOSIS(s string) (string, error) {
 	fail := func(why string) (string, error) { return "", fmt.Errorf("%q: %s", s, why) }
-	rest, ok := strings.CutPrefix(s, "bible.")
+	// A trailing + or ++ ("bible.83.3.5++") is Logos's "and the verses after".
+	rest, ok := strings.CutPrefix(strings.TrimRight(s, "+"), "bible.")
 	if !ok {
 		return fail("not a Logos bible reference")
 	}
