@@ -188,6 +188,13 @@ Batch 3 (Augustine, Chrysostom, Piper, Bunyan, Charles Wesley, Jimmy Evans) need
 - **`--preacher "<name>"`** sets the preacher of every row: the Chrysostom volumes name their editor, Philip Schaff, on every line.
 - **A source with no Scripture ref at all** (Jimmy Evans: dates and series, no passage) is written like any other; `REPORT.md` then says that none of its rows has a ref and lists the rows the index dates by the year alone.
 
+Batch 4a (Shedd, Burroughs, Keach, Maclaren, Kuyper, Broadus) needed two more, again inert on an earlier source:
+
+- **Front matter and tables of contents are dropped** with the other non-sermon lines (`NonSermon`): "Preface", "Author’s Preface", "Translator’s Preface", "To the Reader", "The Epistle to the Reader", "Foreword", "Contents", a title that begins "The Contents of ...", "An Exact Alphabetical Table ..." or "The Table of the Chief Heads ...". A row that is only "Sermon N" (no title of its own) is dropped too when the same file has a row "Sermon N: ..." (the number is compared, so "Sermon III" is covered by "Sermon 3: Faith"); alone, a bare "Sermon I" is a sermon and stays (Burroughs's *Rare Jewel* and Keach's rows are titled so). Each drop is named in `REPORT.md`.
+- **A date in brackets in the title** is the row's date when the index gives none: Burroughs's "The First Sermon (July the 6th, 1645)" is 1645-07-06 (`TitleDate`: "Month the 6th/23d, YYYY" or "Month 4, YYYY", a day the month has); the title is left as it is, the notes say where the date came from and `REPORT.md` counts them. A date outside brackets is not read.
+
+The "Chapter N: " the contents list puts in front of a title (Shedd's first book, Maclaren, Broadus) is taken off and kept in the notes, as for the sermon books above.
+
 What the import does not do: read a passage from a **title** unless `--refs-from-title` is given (Skip Heitzig's "Exodus 3-4" rows carry no Logos reference, so they have no passage; about 117 rows), and tell a sermon from a heading of the archive beyond the `NonSermon` list (the book and series headings are rows).
 
 ## The shapes already here
@@ -196,7 +203,7 @@ What the import does not do: read a passage from a **title** unless `--refs-from
 | --- | --- | --- | --- |
 | `spurgeon-ccel` | CCEL's ThML: the preaching text tagged | `tools/ccel-spurgeon` | the tool, its REPORT, and `host_rules` (CCEL's built-in title rule) |
 | `henry-sermons` | Scans' OCR, a contents page | by hand | its REPORT: rows the OCR could not place, the unsure ones |
-| `greg-laurie-logos`, `jd-greear-logos`, `skip-heitzig-logos`, `spurgeon-sermon-notes-logos`, `wesley-logos`, `whitefield-logos`, `moody-logos`, `augustine-logos`, `chrysostom-logos`, `piper-logos`, `bunyan-logos`, `charles-wesley-logos`, `jimmy-evans-logos` | The Governor's Logos archives and sermon books: an index file in the vault | `tools/logos-import` | [A Logos archive](#a-logos-archive-data-only), and each source's REPORT |
+| `greg-laurie-logos`, `jd-greear-logos`, `skip-heitzig-logos`, `spurgeon-sermon-notes-logos`, `wesley-logos`, `whitefield-logos`, `moody-logos`, `augustine-logos`, `chrysostom-logos`, `piper-logos`, `bunyan-logos`, `charles-wesley-logos`, `jimmy-evans-logos`, `shedd-logos`, `burroughs-logos`, `keach-logos`, `maclaren-logos`, `kuyper-logos`, `broadus-logos` | The Governor's Logos archives and sermon books: an index file in the vault | `tools/logos-import` | [A Logos archive](#a-logos-archive-data-only), and each source's REPORT |
 | `themes-tcr1934`, `themes-torrey` | CrossWire SWORD modules | `tools/sword-themes` | [sources.md, "Theme sources"](sources.md#theme-sources); a theme source is a different recipe (topics and links) and is not covered here |
 
 The next three candidates, with their terms quoted, are in the closing comment of the story that wrote this page (mw-hxztgfo.8) and in [candidates.md](candidates.md).
