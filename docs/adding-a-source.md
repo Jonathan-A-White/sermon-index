@@ -14,7 +14,8 @@ Adding a preacher or a collection is a **data add**: a new directory under `sour
 - [6. Credit, and what Lampas will carry](#6-credit-and-what-lampas-will-carry)
 - [Outside this repo](#outside-this-repo)
 - [A worked example: Truth For Life](#a-worked-example-truth-for-life)
-- [The three shapes already here](#the-three-shapes-already-here)
+- [A Logos archive: data only](#a-logos-archive-data-only)
+- [The shapes already here](#the-shapes-already-here)
 
 <!-- /toc -->
 
@@ -148,12 +149,35 @@ Sitemap: https://www.truthforlife.org/sitemap.xml
 
 **Where it stops: the terms it could not read.** The Policies page speaks of what may be done with the sermons (play, copy unaltered and free, link to a file with a link back, quote under fair use) and of the written content of the site. **It does not say whether a small index of titles, passages and addresses may be kept, nor whether a script may read the passage pages**; the `robots.txt` allows the latter, the terms say nothing. The syndication terms (`/syndicate/instructions/`, "the Content Use Terms and Conditions" an account must agree to) were seen as search excerpts only and not read. By the table in step 2, silence on an index of facts with a business behind it is a stop: the Builder who takes this story writes the quoted words on the bead and asks the Governor, with the recommendation that a link-only index (the title the site prints, the passage, the address, with the credit "Truth For Life. Used with Permission. www.truthforlife.org" where the app shows it) is what the Policies page's own words invite, and that the Governor, or someone for him, could ask the ministry to say so in writing.
 
-## The three shapes already here
+## A Logos archive: data only
+
+The Governor's Logos sermon archives (a resource in his library that is a collection of one preacher's sermons) are the fourth shape, and the one where a later archive needs no code. The Mayor makes an **index file** of the archive in the vault (`plans/sermons-2026-11-05/<slug>-sermons.jsonl`, with a `<slug>-report.md`): a line a sermon with `id` (Logos's article id), `title`, `preacher`, `date`, `year`, `ref` and `refs` (the label as Logos prints it), `bibleRefs` (Logos's data-reference), `series`, `part` and `url` (the `ref.ly` link). The files are only on the Laptop, so a story that imports one runs there. Then:
+
+```
+go run ./tools/logos-import --in <vault>/plans/sermons-2026-11-05/<slug>-sermons.jsonl --id <id> --out sources/<id>
+cp sources/greg-laurie-logos/source.toml sources/<id>/source.toml   # then edit id, name, credit, the comment, the counts
+go run ./cmd/sermons check sources/<id>
+```
+
+The tool writes `rows.jsonl` and `REPORT.md` (the same bytes for the same input) and prints the counts. Per line:
+
+- `ref` is the first of `bibleRefs` as OSIS; the rest are `cited`. **Logos's book numbers are its own**: `bible.<book>.<chapter>[.<verse>]`, a whole chapter written `book.chapter` (`bible.1.1` is Genesis **1**, not Genesis 1:1), a range `bible.19.51.1-19.51.19` or `bible.1.1-1.3`. Books 1 to 39 are the Old Testament in the usual order and 61 (Matthew) to 87 (Revelation) the New; 40 to 60 are not among the sixty-six and are refused. The table is `logosBook` in `tools/logos-import/osis.go`, tested for all 66; the import also reads the label and says in the report where Logos and the label disagree (one row of 1,458 so far).
+- A line with no Logos reference takes `ref` from the label (`Jonah`, `Romans 5:1-11`), noted in `notes`. A reference the book table refuses (a verse past the chapter) is left out and listed; the row stays.
+- A text over more than 3 chapters (a whole book) is a `series` row, as the checker asks.
+- `kind` is `link`, `url` the `ref.ly` link, `notes` the series and part (`Series: X, part 2.`), `date` the sermon's own date, else the year the archive files it under.
+- **Dropped, and listed in `REPORT.md` with the reason:** a line with neither a ref nor a title, and one with no id, no title, no address or an id already used.
+
+`source.toml` is by hand and follows the three already here: `on_by_default = false`; `licence_note` begins with the Governor's line ("From the Governor's own Logos library at his word ..."); no Logos text is quoted anywhere; the `licence` is his own words, since there is no terms page to quote. Then load, add the source to a test beside `TestLoadLogosArchives` (`internal/sources/load_test.go`) with its counts, and write the README row and the CHANGELOG line.
+
+What the import does not do: read a passage from a **title** (Skip Heitzig's "Exodus 3-4" rows carry no Logos reference, so they have no passage; about 117 rows), and tell a sermon from a heading of the archive (the book and series headings are rows).
+
+## The shapes already here
 
 | Source | Catalogue | Written by | Look at |
 | --- | --- | --- | --- |
 | `spurgeon-ccel` | CCEL's ThML: the preaching text tagged | `tools/ccel-spurgeon` | the tool, its REPORT, and `host_rules` (CCEL's built-in title rule) |
 | `henry-sermons` | Scans' OCR, a contents page | by hand | its REPORT: rows the OCR could not place, the unsure ones |
+| `greg-laurie-logos`, `jd-greear-logos`, `skip-heitzig-logos` | The Governor's Logos archives: an index file in the vault | `tools/logos-import` | [A Logos archive](#a-logos-archive-data-only), and each source's REPORT |
 | `themes-tcr1934`, `themes-torrey` | CrossWire SWORD modules | `tools/sword-themes` | [sources.md, "Theme sources"](sources.md#theme-sources); a theme source is a different recipe (topics and links) and is not covered here |
 
 The next three candidates, with their terms quoted, are in the closing comment of the story that wrote this page (mw-hxztgfo.8) and in [candidates.md](candidates.md).
