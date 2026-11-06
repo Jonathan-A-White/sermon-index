@@ -526,6 +526,12 @@ func TestLoadLogosArchives(t *testing.T) {
 		{"wesley-logos", 164, 137, 0, 27},
 		{"whitefield-logos", 59, 47, 0, 12},
 		{"moody-logos", 32, 8, 0, 24},
+		{"augustine-logos", 70, 60, 0, 10},
+		{"chrysostom-logos", 483, 479, 0, 4},
+		{"piper-logos", 5, 0, 0, 5},
+		{"bunyan-logos", 1, 0, 0, 1},
+		{"charles-wesley-logos", 14, 12, 0, 2},
+		{"jimmy-evans-logos", 156, 0, 0, 156},
 	}
 	ctx := context.Background()
 	db := migrated(t)
@@ -550,7 +556,7 @@ func TestLoadLogosArchives(t *testing.T) {
 		if n := q("and not exists (select 1 from sermon_passages p where p.source_id = s.source_id and p.sermon_id = s.id and p.role = 'text')"); n != a.series+a.noRef {
 			t.Errorf("%s: %d rows without a preaching text, want %d (series %d, no ref %d)", a.id, n, a.series+a.noRef, a.series, a.noRef)
 		}
-		if n := q("and (kind <> 'link' or url !~ '^https://ref.ly/logosres/LLS:[A-Za-z0-9.]+\\?(art|off)=' or notes ~ 'Logos text')"); n != 0 {
+		if n := q("and (kind <> 'link' or url !~ '^https://ref.ly/logosres/LLS:[A-Za-z0-9._]+\\?(art|off)=' or notes ~ 'Logos text')"); n != 0 {
 			t.Errorf("%s: %d rows that are not a link to a ref.ly address", a.id, n)
 		}
 		if n := q("and preacher is null"); n != 0 {
@@ -606,5 +612,38 @@ func TestLoadLogosArchives(t *testing.T) {
 	// or "Sermon N" is off, bar the ones Sermons on Several Occasions has twice.
 	if n := count(t, db, "select count(*) from sermons where source_id = 'wesley-logos' and id like 'WORKSWESLEY%' and title ~ '^Sermon [IVXLC]+: (Salvation by Faith|The Almost Christian|Satan.s Devices)'"); n != 0 {
 		t.Errorf("%d Works rows that repeat Sermons on Several Occasions are in the index", n)
+	}
+
+	// Batch 3: Augustine's Sermon 95 is under Mark 8:1-9, read from the tail
+	// of its title; a Chrysostom homily is under the verse it preaches on, by
+	// John Chrysostom (the index names the editor); Charles Wesley's Sermon XII
+	// is under 1 Kings 18:21, whose label the book prints "1 Kings, 18:2l".
+	for _, c := range []struct {
+		source, id, title, ref, preacher string
+	}{
+		{"augustine-logos", "AGSTNSRMNS04.1-279517", "Sermon 95: On the Words of the Gospel, Mark 8:1–9, Where the Miracle of the Seven Loaves Is Related", "Mark.8.1-Mark.8.9", "Augustine of Hippo"},
+		{"chrysostom-logos", "6.60.10.3-267160", "Homily II", "Matt.1.1", "John Chrysostom"},
+		{"charles-wesley-logos", "SERMSCWESLEY.1-247025", "Sermon XII", "1Kgs.18.21", "Charles Wesley"},
+	} {
+		rg, err := passage.Parse(c.ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if n := count(t, db, "select count(*) from sermon_passages p join sermons s on s.source_id = p.source_id and s.id = p.sermon_id where p.role = 'text' and p.source_id = $1 and s.id = $2 and s.title = $3 and s.preacher = $4 and s.url like 'https://ref.ly/logosres/LLS:%?off=%' and p.span && $5::int4range", c.source, c.id, c.title, c.preacher, rg.PG()); n != 1 {
+			t.Errorf("%s %s %q under %s: %d, want once", c.source, c.id, c.title, c.ref, n)
+		}
+	}
+	// Chrysostom's non-sermon lines (the Indexes of Texts cite a thousand
+	// passages each) are not in the index, and Augustine's Chronological
+	// Table is not.
+	if n := count(t, db, "select count(*) from sermons where source_id = 'chrysostom-logos' and (title like '%Index of Texts%' or title like '%Argument%' or title like '%Homilist%')"); n != 0 {
+		t.Errorf("%d Chrysostom rows that are not homilies", n)
+	}
+	if n := count(t, db, "select count(*) from sermons where source_id = 'augustine-logos' and title in ('Chronological Table', 'New Testament')"); n != 0 {
+		t.Errorf("%d Augustine rows that are not sermons", n)
+	}
+	// Jimmy Evans: dated, in a series, on no verse.
+	if n := count(t, db, "select count(*) from sermons s where s.source_id = 'jimmy-evans-logos' and s.id = 'SER2004.1.1' and s.date = '2004-06-11' and s.notes = 'Series: Blessed Marriage Seminar, part 1.' and not exists (select 1 from sermon_passages p where p.source_id = s.source_id and p.sermon_id = s.id)"); n != 1 {
+		t.Errorf("Jimmy Evans SER2004.1.1: %d, want once", n)
 	}
 }
