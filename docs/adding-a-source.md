@@ -180,7 +180,15 @@ Most of his sermon *books* have no index section, and the Mayor's parser falls b
 - **A title "Chapter I: Gen. 19:15"** is titled by its passage with the book written out ("Genesis 19:15"; `Phil.` is Philippians or Philemon by the row's own reference), or by the heading after the colon ("Chapter I: “Love that Passeth Knowledge”"); the "Chapter I." goes into the notes. A title with no "Chapter N: " in front is left as it is.
 - **`multipart`**: the contents list splits the entry in parts, and the entry itself may be only a heading (Moody's "The Overcoming Life", 20 characters); the row is kept, the link opens the book at that offset, and the ids are listed in `REPORT.md`.
 
-What the import does not do: read a passage from a **title** (Skip Heitzig's "Exodus 3-4" rows carry no Logos reference, so they have no passage; about 117 rows), and tell a sermon from a heading of the archive (the book and series headings are rows).
+Batch 3 (Augustine, Chrysostom, Piper, Bunyan, Charles Wesley, Jimmy Evans) needed three more things, all in the same tool, none on by default so an earlier source writes the same bytes:
+
+- **Non-sermon lines are dropped**, always, and counted in `REPORT.md` ("Non-sermon lines dropped"): a title that is, after a leading Roman numeral or "Sermon N" is off, "Chronological Table", "New Testament", "Argument" or "The Argument" (or one that begins so), "Index of Texts" at the end (or "Index of ..." at the start), "Introductory Discourse", "Prolegomena", or one of the two Schaff essays and "St. Chrysostom as a Homilist" of the Chrysostom volumes. The list is `NonSermon` in `tools/logos-import/clean.go`; it goes by the title alone, so a new archive's introduction under another name needs a line there. They are not counted in a file's "rows before".
+- **A reference is cleaned before it is read**: a comma after the book ("Matthew, 5:20") and an OCR `l` for `1` in a number ("1 Kings, 18:2l" is 18:21) (`CleanLabel`).
+- **`--refs-from-title`** reads the passage from the title where the line has no Logos reference and no label that reads: Augustine's titles ("Sermon 95: On the Words of the Gospel, Mark 8:1–9, Where ...", "Luke’s Gospel, 13:6–17", "John, Chapter 9") carry the passage. The first passage is the `ref`, the others `cited`; the row's notes say so and `REPORT.md` counts them. Use it only where titles name the text: Skip Heitzig's "Exodus 3-4" would be read too, and the tool would not stop it from reading a title that names a passage it is not on.
+- **`--preacher "<name>"`** sets the preacher of every row: the Chrysostom volumes name their editor, Philip Schaff, on every line.
+- **A source with no Scripture ref at all** (Jimmy Evans: dates and series, no passage) is written like any other; `REPORT.md` then says that none of its rows has a ref and lists the rows the index dates by the year alone.
+
+What the import does not do: read a passage from a **title** unless `--refs-from-title` is given (Skip Heitzig's "Exodus 3-4" rows carry no Logos reference, so they have no passage; about 117 rows), and tell a sermon from a heading of the archive beyond the `NonSermon` list (the book and series headings are rows).
 
 ## The shapes already here
 
@@ -188,7 +196,7 @@ What the import does not do: read a passage from a **title** (Skip Heitzig's "Ex
 | --- | --- | --- | --- |
 | `spurgeon-ccel` | CCEL's ThML: the preaching text tagged | `tools/ccel-spurgeon` | the tool, its REPORT, and `host_rules` (CCEL's built-in title rule) |
 | `henry-sermons` | Scans' OCR, a contents page | by hand | its REPORT: rows the OCR could not place, the unsure ones |
-| `greg-laurie-logos`, `jd-greear-logos`, `skip-heitzig-logos`, `spurgeon-sermon-notes-logos`, `wesley-logos`, `whitefield-logos`, `moody-logos` | The Governor's Logos archives and sermon books: an index file in the vault | `tools/logos-import` | [A Logos archive](#a-logos-archive-data-only), and each source's REPORT |
+| `greg-laurie-logos`, `jd-greear-logos`, `skip-heitzig-logos`, `spurgeon-sermon-notes-logos`, `wesley-logos`, `whitefield-logos`, `moody-logos`, `augustine-logos`, `chrysostom-logos`, `piper-logos`, `bunyan-logos`, `charles-wesley-logos`, `jimmy-evans-logos` | The Governor's Logos archives and sermon books: an index file in the vault | `tools/logos-import` | [A Logos archive](#a-logos-archive-data-only), and each source's REPORT |
 | `themes-tcr1934`, `themes-torrey` | CrossWire SWORD modules | `tools/sword-themes` | [sources.md, "Theme sources"](sources.md#theme-sources); a theme source is a different recipe (topics and links) and is not covered here |
 
 The next three candidates, with their terms quoted, are in the closing comment of the story that wrote this page (mw-hxztgfo.8) and in [candidates.md](candidates.md).
