@@ -535,7 +535,7 @@ func (r *Report) Markdown(id string, inNames []string) string {
 		b.WriteString(strings.Join(r.NoRef, ", ") + "\n")
 	}
 	if r.Rows > 0 && r.WithRef == 0 {
-		fmt.Fprintf(&b, "\n## No row has a Scripture ref\n\nNone of the %d rows has a Scripture ref (the archive's index gives titles, dates and series, and no passage): none can show on a verse, and all are found by title, preacher and source. The archive's own dates are kept; a row the index dates by no day is listed here.\n\n", r.Rows)
+		fmt.Fprintf(&b, "\n## No row has a Scripture ref\n\nNone of the %d rows has a Scripture ref (the archive's index gives titles, and no passage; any dates and series it has are kept): none can show on a verse, and all are found by title, preacher and source. A row the index dates by no day is listed here.\n\n", r.Rows)
 		fmt.Fprintf(&b, "### Rows with no date of their own (%d)\n\n", len(r.NoDate))
 		if len(r.NoDate) == 0 {
 			b.WriteString("None.\n")

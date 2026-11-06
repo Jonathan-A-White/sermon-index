@@ -53,7 +53,7 @@ SER2004.1.1, SER2004.1.2, SER2004.1.3, SER2004.2.1, SER2004.2.2, SER2004.2.3, SE
 
 ## No row has a Scripture ref
 
-None of the 156 rows has a Scripture ref (the archive's index gives titles, dates and series, and no passage): none can show on a verse, and all are found by title, preacher and source. The archive's own dates are kept; a row the index dates by no day is listed here.
+None of the 156 rows has a Scripture ref (the archive's index gives titles, and no passage; any dates and series it has are kept): none can show on a verse, and all are found by title, preacher and source. A row the index dates by no day is listed here.
 
 ### Rows with no date of their own (2)
 
