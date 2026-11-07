@@ -547,6 +547,10 @@ func TestLoadLogosArchives(t *testing.T) {
 		{"eyton-logos", 17, 0, 0, 17},
 		{"chapin-logos", 8, 0, 0, 8},
 		{"watson-logos", 8, 8, 0, 0},
+		{"pope-logos", 17, 0, 0, 17},
+		{"smale-logos", 6, 0, 0, 6},
+		{"wi-evans-logos", 10, 1, 0, 9},
+		{"calvin-pt-logos", 13, 13, 0, 0},
 	}
 	ctx := context.Background()
 	db := migrated(t)
@@ -736,5 +740,30 @@ func TestLoadLogosArchives(t *testing.T) {
 	}
 	if n := count(t, db, "select count(*) from sermon_passages p join sermons s on s.source_id = p.source_id and s.id = p.sermon_id where p.role = 'text' and p.source_id = 'sedgwick-logos' and s.id = 'NTRDNGRHRSS.1-4734' and s.title = 'The Nature and Danger of Heresies' and s.preacher = 'Obadiah Sedgwick' and p.span = $1::int4range", rg.PG()); n != 1 {
 		t.Errorf("Sedgwick's Heresies exactly Revelation 12:15-16: %d, want once", n)
+	}
+
+	// Batch 5b: Calvin's Portuguese sermons are on Genesis 25 to 27 from their
+	// titles (the third, "Gênesis 25.21,22", is the two verses as one range),
+	// with the Portuguese title kept; Evans's fourth chapter is on 1
+	// Corinthians 14, "Chapter 4: " off its title; Pope and Smale have no text.
+	rg, err = passage.Parse("Gen.25.21-Gen.25.22")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := count(t, db, "select count(*) from sermon_passages p join sermons s on s.source_id = p.source_id and s.id = p.sermon_id where p.role = 'text' and p.source_id = 'calvin-pt-logos' and s.id = 'SRMSSBRLRPRV.1-96169' and s.title = 'III. Terceiro Sermão: Gênesis 25.21,22' and s.preacher = 'John Calvin' and p.span = $1::int4range", rg.PG()); n != 1 {
+		t.Errorf("Calvin's third sermon exactly Genesis 25:21-22: %d, want once", n)
+	}
+	if n := count(t, db, "select count(*) from sermons where source_id = 'calvin-pt-logos' and (title ~* 'pref[aá]cio' or title ~* 'cal[uú]nias')"); n != 0 {
+		t.Errorf("Calvin: %d rows for the preface or the appendix", n)
+	}
+	rg, err = passage.Parse("1Cor.14")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := count(t, db, "select count(*) from sermon_passages p join sermons s on s.source_id = p.source_id and s.id = p.sermon_id where p.role = 'text' and p.source_id = 'wi-evans-logos' and s.title = 'Speaking in Tongues' and p.span = $1::int4range", rg.PG()); n != 1 {
+		t.Errorf("Evans's Speaking in Tongues under 1 Corinthians 14: %d, want once", n)
+	}
+	if n := count(t, db, "select count(*) from sermons where source_id in ('wi-evans-logos', 'smale-logos') and title ~ '^Chapter '"); n != 0 {
+		t.Errorf("Evans and Smale: %d titles that keep \"Chapter N: \"", n)
 	}
 }
