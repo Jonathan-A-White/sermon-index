@@ -7,7 +7,7 @@ GO ?= go
 # The build's version, as /v1/health answers it.
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 
-.PHONY: build test lint clean install-laptop smoke
+.PHONY: build test lint clean install-laptop smoke henry-leaves
 
 build:
 	$(GO) build -ldflags "-X main.version=$(VERSION)" -o bin/sermons ./cmd/sermons
@@ -24,6 +24,14 @@ install-laptop:
 
 smoke:
 	sh scripts/smoke.sh
+
+# Fetch the Archive's OCR of the two Matthew Henry scans (about 150 MB, into the
+# git-ignored .archive-cache/) and check that every henry-sermons url opens the
+# leaf that prints its sermon's head. `make test` runs the check when the OCR is
+# already cached and skips it when it is not.
+henry-leaves:
+	sh scripts/fetch-henry-ocr.sh
+	$(GO) test ./internal/sources -run 'TestHenryLeaf' -count=1 -v
 
 clean:
 	$(RM) bin/sermons

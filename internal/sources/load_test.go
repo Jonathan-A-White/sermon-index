@@ -1,11 +1,19 @@
 package sources
 
 import (
+	"bufio"
 	"context"
+	"encoding/json"
+	"encoding/xml"
 	"errors"
+	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
+	"sort"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -422,8 +430,8 @@ func TestLoadWritesATopicsVerses(t *testing.T) {
 }
 
 // The hand-made Matthew Henry source loads with the counts REPORT.md gives:
-// 52 rows (7 read from the 1847 Complete Works, 45 from the 1830
-// Miscellaneous Works), 46 of them with a preaching text, and Matthew 16:26
+// 51 rows (7 read from the 1847 Complete Works, 44 from the 1830
+// Miscellaneous Works), 45 of them with a preaching text, and Matthew 16:26
 // answers the six sermons of The Worth of the Soul. Every url is a reader
 // page of one of the two Archive items, never a page of Philip Henry's.
 func TestLoadHenrySermons(t *testing.T) {
@@ -436,16 +444,16 @@ func TestLoadHenrySermons(t *testing.T) {
 	if _, err := Load(ctx, db, dir); err != nil {
 		t.Fatal(err)
 	}
-	if n := count(t, db, "select count(*) from sermons where source_id = 'henry-sermons'"); n != 52 {
-		t.Errorf("%d rows, want 52", n)
+	if n := count(t, db, "select count(*) from sermons where source_id = 'henry-sermons'"); n != 51 {
+		t.Errorf("%d rows, want 51", n)
 	}
 	if n := count(t, db, "select count(*) from sermons where source_id = 'henry-sermons' and preacher <> 'Matthew Henry'"); n != 0 {
 		t.Errorf("%d rows by someone else than Matthew Henry", n)
 	}
-	if n := count(t, db, "select count(*) from sermon_passages where role = 'text' and sermon_id in (select id from sermons where source_id = 'henry-sermons')"); n != 46 {
-		t.Errorf("%d preaching texts, want 46", n)
+	if n := count(t, db, "select count(*) from sermon_passages where role = 'text' and sermon_id in (select id from sermons where source_id = 'henry-sermons')"); n != 45 {
+		t.Errorf("%d preaching texts, want 45", n)
 	}
-	for item, want := range map[string]int{"miscellaneouswor00henr": 45, "completeworksofr0001revm": 7} {
+	for item, want := range map[string]int{"miscellaneouswor00henr": 44, "completeworksofr0001revm": 7} {
 		prefix := "https://archive.org/details/" + item + "/page/n"
 		if n := count(t, db, "select count(*) from sermons where source_id = 'henry-sermons' and url like $1", prefix+"%"); n != want {
 			t.Errorf("%d rows at %s, want %d", n, item, want)
@@ -880,5 +888,277 @@ func TestLoadLogosArchives(t *testing.T) {
 	}
 	if n := count(t, db, "select count(*) from sermons s where source_id like 'sermon-starters-volume-%-logos' and not exists (select 1 from sermon_passages p where p.source_id = s.source_id and p.sermon_id = s.id and p.role = 'text')"); n != 0 {
 		t.Errorf("%d Sermon Starters rows with no preaching text, want none", n)
+	}
+}
+
+// The Archive leaf of every Matthew Henry row.
+//
+// A hand-made url https://archive.org/details/<item>/page/n<N> names a
+// leaf of a scan, and the first version of the source had most of its urls
+// wrong (the Worth of the Soul, Sermon I, opened in the middle of Sermon II):
+// N is not the page name in the OCR file and not the printed page. REPORT.md
+// holds a table, one line a row, of the leaf found by reading the Archive's
+// own OCR, its printed page and the phrases of the sermon's head the OCR
+// prints on it. TestHenryLeafTable keeps the table and rows.jsonl in step and
+// always runs; TestHenryLeavesHoldTheirHeads reads the OCR itself and runs
+// when the OCR is cached (sh scripts/fetch-henry-ocr.sh, or make henry-leaves).
+
+const henryDir = "../../sources/henry-sermons"
+
+type henryLeaf struct {
+	item  string
+	n     int
+	heads []string
+}
+
+var henryRowLine = regexp.MustCompile("^\\| `([a-z0-9-]+)` \\| `([a-z0-9]+)` \\| ([0-9]+) \\| ([0-9]+) \\| (.+) \\|$")
+
+// henryTable reads REPORT.md: the leaf table, and the ids of the rows it says
+// were left out because the scan cannot place them.
+func henryTable(t *testing.T) (leaves map[string]henryLeaf, notPlaced []string) {
+	t.Helper()
+	f, err := os.Open(filepath.Join(henryDir, "REPORT.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	leaves = map[string]henryLeaf{}
+	inNotPlaced := false
+	sc := bufio.NewScanner(f)
+	sc.Buffer(make([]byte, 1<<20), 1<<20)
+	for sc.Scan() {
+		line := sc.Text()
+		if strings.HasPrefix(line, "## ") {
+			inNotPlaced = strings.HasPrefix(line, "## Rows left out because the scan cannot place them")
+			continue
+		}
+		if inNotPlaced && strings.HasPrefix(line, "- `") {
+			if end := strings.Index(line[3:], "`"); end > 0 {
+				notPlaced = append(notPlaced, line[3:3+end])
+			}
+			continue
+		}
+		m := henryRowLine.FindStringSubmatch(line)
+		if m == nil {
+			continue
+		}
+		n, _ := strconv.Atoi(m[3])
+		var heads []string
+		for _, h := range strings.Split(m[5], ";") {
+			if h = strings.TrimSpace(h); h != "" {
+				heads = append(heads, h)
+			}
+		}
+		if _, dup := leaves[m[1]]; dup {
+			t.Errorf("REPORT.md: row %s twice in the leaf table", m[1])
+		}
+		leaves[m[1]] = henryLeaf{item: m[2], n: n, heads: heads}
+	}
+	if err := sc.Err(); err != nil {
+		t.Fatal(err)
+	}
+	return leaves, notPlaced
+}
+
+// henryRows reads rows.jsonl: id to url.
+func henryRows(t *testing.T) map[string]string {
+	t.Helper()
+	b, err := os.ReadFile(filepath.Join(henryDir, "rows.jsonl"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows := map[string]string{}
+	for _, line := range strings.Split(strings.TrimSpace(string(b)), "\n") {
+		var r struct{ ID, URL string }
+		if err := json.Unmarshal([]byte(line), &r); err != nil {
+			t.Fatalf("rows.jsonl: %v: %s", err, line)
+		}
+		rows[r.ID] = r.URL
+	}
+	return rows
+}
+
+var henryURL = regexp.MustCompile(`^https://archive\.org/details/([a-z0-9]+)/page/n([0-9]+)$`)
+
+// TestHenryLeafTable: the table in REPORT.md and rows.jsonl name the same rows
+// and the same leaves, and a row REPORT.md says could not be placed is not in
+// the index. It needs no OCR.
+func TestHenryLeafTable(t *testing.T) {
+	leaves, notPlaced := henryTable(t)
+	rows := henryRows(t)
+	for id, url := range rows {
+		l, ok := leaves[id]
+		if !ok {
+			t.Errorf("row %s has no line in the leaf table of REPORT.md", id)
+			continue
+		}
+		if want := fmt.Sprintf("https://archive.org/details/%s/page/n%d", l.item, l.n); url != want {
+			t.Errorf("row %s: url %s, but REPORT.md puts it at %s", id, url, want)
+		}
+		if len(l.heads) == 0 {
+			t.Errorf("row %s: no head phrase in REPORT.md", id)
+		}
+	}
+	for id := range leaves {
+		if _, ok := rows[id]; !ok {
+			t.Errorf("REPORT.md has a leaf for %s, which is not a row", id)
+		}
+	}
+	if len(notPlaced) == 0 {
+		t.Error("REPORT.md names no row left out because the scan cannot place it (funeral-sermon-4)")
+	}
+	for _, id := range notPlaced {
+		if _, ok := rows[id]; ok {
+			t.Errorf("row %s is in the index but REPORT.md says its leaf is not in the scan", id)
+		}
+	}
+}
+
+// norm lower-cases s and turns every run of anything but letters and digits
+// into one space, with a space at each end, so a phrase is found by Contains
+// on whole words and "sermon i" is not found in "SERMON II.".
+func norm(s string) string {
+	var b strings.Builder
+	b.WriteByte(' ')
+	space := true
+	for _, r := range strings.ToLower(s) {
+		if r >= 'a' && r <= 'z' || r >= '0' && r <= '9' {
+			b.WriteRune(r)
+			space = false
+		} else if !space {
+			b.WriteByte(' ')
+			space = true
+		}
+	}
+	if !space {
+		b.WriteByte(' ')
+	}
+	return b.String()
+}
+
+// djvuLeaves streams the Archive's _djvu.xml and returns the text of the
+// leaves in want, by the 0-based index of the OBJECT, which is the reader's n,
+// and the number of leaves the file holds.
+func djvuLeaves(path string, want map[int]bool) (map[int]string, int, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer f.Close()
+	dec := xml.NewDecoder(bufio.NewReaderSize(f, 1<<20))
+	dec.Strict = false
+	out := map[int]string{}
+	n, inWord := -1, false
+	var cur strings.Builder
+	flush := func() {
+		if n >= 0 && want[n] {
+			out[n] = cur.String()
+		}
+		cur.Reset()
+	}
+	for {
+		tok, err := dec.Token()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, 0, err
+		}
+		switch e := tok.(type) {
+		case xml.StartElement:
+			switch e.Name.Local {
+			case "OBJECT":
+				flush()
+				n++
+			case "WORD":
+				inWord = true
+			}
+		case xml.EndElement:
+			if e.Name.Local == "WORD" {
+				inWord = false
+				cur.WriteByte(' ')
+			}
+		case xml.CharData:
+			if inWord {
+				cur.Write(e)
+			}
+		}
+	}
+	flush()
+	return out, n + 1, nil
+}
+
+// TestHenryLeavesHoldTheirHeads: the OCR of the leaf each row's url opens prints
+// that sermon's head. Skipped, with the command that fills it, when the OCR is
+// not cached.
+func TestHenryLeavesHoldTheirHeads(t *testing.T) {
+	leaves, _ := henryTable(t)
+	rows := henryRows(t)
+	cache := os.Getenv("SERMON_INDEX_ARCHIVE_CACHE")
+	if cache == "" {
+		cache = "../../.archive-cache"
+	}
+	byItem := map[string]map[int]bool{}
+	for id := range rows {
+		m := henryURL.FindStringSubmatch(rows[id])
+		if m == nil {
+			t.Fatalf("row %s: url %s is not an Archive reader page", id, rows[id])
+		}
+		n, _ := strconv.Atoi(m[2])
+		if byItem[m[1]] == nil {
+			byItem[m[1]] = map[int]bool{}
+		}
+		byItem[m[1]][n] = true
+		if n > 0 {
+			byItem[m[1]][n-1] = true // the leaf before: the head must not stand there too
+		}
+	}
+	text := map[string]map[int]string{}
+	for item, want := range byItem {
+		path := filepath.Join(cache, item+"_djvu.xml")
+		if _, err := os.Stat(path); err != nil {
+			t.Skipf("the Archive's OCR is not cached (%s): run  sh scripts/fetch-henry-ocr.sh  (or  make henry-leaves)", path)
+		}
+		got, total, err := djvuLeaves(path, want)
+		if err != nil {
+			t.Fatalf("%s: %v", path, err)
+		}
+		for n := range want {
+			if n >= total {
+				t.Errorf("%s has %d leaves, a row asks for n%d", item, total, n)
+			}
+		}
+		text[item] = got
+	}
+	ids := make([]string, 0, len(rows))
+	for id := range rows {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	for _, id := range ids {
+		m := henryURL.FindStringSubmatch(rows[id])
+		n, _ := strconv.Atoi(m[2])
+		l, ok := leaves[id]
+		if !ok {
+			t.Errorf("row %s has no head phrases in REPORT.md", id)
+			continue
+		}
+		page := norm(text[m[1]][n])
+		for _, h := range l.heads {
+			if !strings.Contains(page, norm(h)) {
+				t.Errorf("row %s: leaf n%d of %s does not print %q", id, n, m[1], h)
+			}
+		}
+		// A head that is also on the leaf before is a running head: the
+		// sermon began earlier.
+		if n > 0 {
+			before, all := norm(text[m[1]][n-1]), true
+			for _, h := range l.heads {
+				all = all && strings.Contains(before, norm(h))
+			}
+			if all {
+				t.Errorf("row %s: leaf n%d of %s prints the head, and so does n%d before it: the sermon begins earlier", id, n, m[1], n-1)
+			}
+		}
 	}
 }
