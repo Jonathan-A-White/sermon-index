@@ -1,0 +1,48 @@
+# Obadiah Sedgwick's six books in the Governor's Logos library, 7 rows: A Thanksgiving Sermon
+# Preached before the Honourable House of Commons at Westminster, April 9, 1644 (THNKSGVNGSRMNWS, 1),
+# An Arke against a Deluge (NARKADELUGE, 1), Elisha, His Lamentation upon the Suddain Translation
+# of Elijah (LSHHSTRNSLTNLJH, 1), England's Preservation (NGLNDSPRJDGMNTS, 2), Haman's Vanity
+# (HMNSVNTYCDVRSRS, 1) and The Nature and Danger of Heresies (NTRDNGRHRSS, 1), made by
+#
+#   go run ./tools/logos-import --in <vault>/plans/sermons-2026-11-05/a-thanksgiving-sermon-preached-before-the-honourable-house-of-commons-at-westminster-april-9-1644-sermons.jsonl --in <vault>/plans/sermons-2026-11-05/an-arke-against-a-deluge-sermons.jsonl --in <vault>/plans/sermons-2026-11-05/elisha-his-lamentation-upon-the-suddain-translation-of-elijah-sermons.jsonl --in <vault>/plans/sermons-2026-11-05/england-s-preservation-sermons.jsonl --in <vault>/plans/sermons-2026-11-05/haman-s-vanity-or-a-sermon-displaying-the-birthlesse-issues-of-church-destroying-adversaries-sermons.jsonl --in <vault>/plans/sermons-2026-11-05/the-nature-and-danger-of-heresies-sermons.jsonl --title-form "ref-in-brackets" --id sedgwick-logos --out sources/sedgwick-logos
+#
+# from the index file the Mayor made of each book on 2026-11-06 (the parser's
+# book-archive form). The index keeps facts only: a title, the passage, the cited
+# passages and the ref.ly address. No sentence of a sermon, and no Logos text, is
+# written anywhere.
+#
+# What the tool counted (REPORT.md lists what it could not place): 7 lines read, 7 rows, none dropped.
+# Four rows have a preaching text and three have none (REPORT.md lists them; the Elisha sermon,
+# Haman's Vanity and England's Preservation, Second Part, are found by title and source and by no
+# verse). The Nature and Danger of Heresies prints its text in its title in the old spelling,
+# "Reyel. 12:15, 16.", where Logos lists 12:15 and 12:16 apart: the tool reads the title, so the
+# row's `ref` is Revelation 12:15-16 and the title is the words alone. Three entries are split in
+# parts by the book's contents list (the link opens where the entry begins). Six of the seven
+# titles begin "A Sermon Preached ..." and tell the sermons apart only by their passage, date and
+# source; the credit names the books.
+# The link (https://ref.ly/logosres/LLS:<resource>?off=<offset>) opens the book at
+# the sermon in Logos for an owner of the book and for no one else. It is
+# UNVERIFIED: no one has tapped one yet (sermons check --urls was not run on it).
+
+
+id = "sedgwick-logos"
+name = "Obadiah Sedgwick's sermons (his Logos library)"
+kind = "sermons"
+
+# No terms page was read or quoted: the Governor's library is his own, and the
+# words below are his, given to the Mayor in the Postern general channel on
+# 2026-11-06 (about 14:52Z), quoted verbatim, with his word "links" for what
+# this index holds.
+licence = """
+index these sermons so that you can add it to your sermon index with links"""
+
+licence_note = """
+From the Governor's own Logos library at his word (2026-11-06, mw-qtu3zvz); the index keeps titles, passages and ref.ly links only; a link opens the sermon only for a Logos owner of the archive. Same footing as the Logos Atlas index (mw-zbjgn3r.9).
+Faithlife's terms bind the books the links open, not these rows; no terms page was read."""
+
+credit = "Obadiah Sedgwick, A Thanksgiving Sermon Preached before the Honourable House of Commons at Westminster, April 9, 1644; An Arke against a Deluge; Elisha, His Lamentation upon the Suddain Translation of Elijah; England's Preservation; Haman's Vanity; The Nature and Danger of Heresies, in Logos (Faithlife)"
+homepage = "https://www.logos.com/"
+# Faithlife's terms of service, named for the reader; they were not read or quoted for this source.
+terms_url = "https://faithlife.com/terms"
+added = 2026-11-06
+on_by_default = false
