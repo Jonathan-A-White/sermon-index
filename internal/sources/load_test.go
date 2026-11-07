@@ -542,6 +542,11 @@ func TestLoadLogosArchives(t *testing.T) {
 		{"princeton-sermons-logos", 16, 16, 0, 0},
 		{"mcpherson-logos", 8, 0, 0, 8},
 		{"strong-logos", 49, 0, 0, 49},
+		{"sedgwick-logos", 7, 4, 0, 3},
+		{"moberly-logos", 15, 15, 0, 0},
+		{"eyton-logos", 17, 0, 0, 17},
+		{"chapin-logos", 8, 0, 0, 8},
+		{"watson-logos", 8, 8, 0, 0},
 	}
 	ctx := context.Background()
 	db := migrated(t)
@@ -709,5 +714,27 @@ func TestLoadLogosArchives(t *testing.T) {
 	}
 	if n := count(t, db, "select count(*) from sermons where source_id = 'strong-logos' and (title ~ '^[IVXLC]+: ' or title ~* '^addresses to successive')"); n != 0 {
 		t.Errorf("Strong: %d titles that keep a number or are the catch-all heading", n)
+	}
+
+	// Batch 5a: Moberly's "Sermon I" is titled with its text; Sedgwick's
+	// Heresies is Revelation 12:15-16 (his title prints it, "Reyel. 12:15,
+	// 16.", and Logos lists the two verses apart), with the words alone for
+	// the title; Eyton and Chapin have no text.
+	rg, err = passage.Parse("Matt.5.3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := count(t, db, "select count(*) from sermon_passages p join sermons s on s.source_id = p.source_id and s.id = p.sermon_id where p.role = 'text' and p.source_id = 'moberly-logos' and s.id = 'SRMNSBTTD.1-113776' and s.title = 'Sermon I: Matthew 5:3' and s.preacher = 'George Moberly' and p.span && $1::int4range", rg.PG()); n != 1 {
+		t.Errorf("Moberly's Sermon I under Matthew 5:3: %d, want once", n)
+	}
+	if n := count(t, db, "select count(*) from sermons where source_id = 'moberly-logos' and title !~ '^Sermon [IVX]+: .+ [0-9]+:?[0-9–]*$'"); n != 0 {
+		t.Errorf("Moberly: %d titles that are not a number and a text", n)
+	}
+	rg, err = passage.Parse("Rev.12.15-Rev.12.16")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := count(t, db, "select count(*) from sermon_passages p join sermons s on s.source_id = p.source_id and s.id = p.sermon_id where p.role = 'text' and p.source_id = 'sedgwick-logos' and s.id = 'NTRDNGRHRSS.1-4734' and s.title = 'The Nature and Danger of Heresies' and s.preacher = 'Obadiah Sedgwick' and p.span = $1::int4range", rg.PG()); n != 1 {
+		t.Errorf("Sedgwick's Heresies exactly Revelation 12:15-16: %d, want once", n)
 	}
 }
