@@ -351,7 +351,7 @@ func BuildSource(files []File, dedupeTitles bool) ([]sources.Row, *Report) {
 				case len(osis) == 0 && label == "":
 					osis, fromTitle = refs[:1], refs[1:]
 					if len(x.Cited) > 0 {
-						if first, err := LogosToOSIS(x.Cited[0]); err == nil && first != refs[0] {
+						if first, err := LogosToOSIS(x.Cited[0]); err == nil && first != refs[0] && !holdsAll(refs[0], []string{first}) {
 							rep.TitleDisagree = append(rep.TitleDisagree, fmt.Sprintf("%s: the title says %s (%q), Logos's first cited reference says %s", id, refs[0], titleLabel, first))
 						}
 					}
@@ -399,7 +399,10 @@ func BuildSource(files []File, dedupeTitles bool) ([]sources.Row, *Report) {
 			if len(osis) > 0 {
 				r.Ref = ptr(osis[0])
 				for _, o := range append(append(append([]string(nil), osis[1:]...), fromTitle...), citedMore...) {
-					if o != osis[0] {
+					// Calvin's index lists the verses of a sermon's text again, one
+					// by one, among the passages it cites: they are the text.
+					inText := file.TitleForm == FormPtRef && readFromTitle && holdsAll(osis[0], []string{o})
+					if o != osis[0] && !inText {
 						cited = appendOnce(cited, o)
 					}
 				}

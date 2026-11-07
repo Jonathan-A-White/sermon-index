@@ -82,7 +82,7 @@ func RefsInTitle(title string) []string {
 // epistle to the reader, a list of contents), or "" when it may be one. Titles are compared as NormTitle reads them: lower case, a
 // leading Roman numeral off, marks ignored.
 func NonSermon(title string) string {
-	n := NormTitle(title)
+	n := NormTitle(foldAccents(title))
 	switch n {
 	case "chronological table":
 		return "a chronological table"
@@ -99,6 +99,10 @@ func NonSermon(title string) string {
 		"foreword", "to the reader", "to the christian reader",
 		"epistle to the reader", "the epistle to the reader":
 		return "front matter"
+	case "prefacio", "prefacio a edicao brasileira":
+		return "front matter"
+	case "resposta a certas calunias e blasfemias":
+		return "an appendix, a reply to slanders, not a sermon"
 	case "contents", "table of contents":
 		return "a table of contents"
 	}

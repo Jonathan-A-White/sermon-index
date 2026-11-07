@@ -3,12 +3,14 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/Jonathan-A-White/sermon-index/internal/passage"
 	"github.com/Jonathan-A-White/sermon-index/internal/sources"
 )
 
@@ -1474,6 +1476,229 @@ func TestBatch5aRunPassesTheChecker(t *testing.T) {
 		}
 		if c.opts.TitleForm == FormRefInBrackets && !bytes.Contains(rows1, []byte(`"ref":"Rev.12.15-Rev.12.16"`)) {
 			t.Errorf("%s: run did not read Revelation 12:15-16", c.in)
+		}
+		out2 := t.TempDir()
+		if err := run([]string{c.in}, filepath.Base(out), out2, "", c.opts, &bytes.Buffer{}); err != nil {
+			t.Fatal(err)
+		}
+		if rows2, _ := os.ReadFile(filepath.Join(out2, "rows.jsonl")); !bytes.Equal(rows1, rows2) {
+			t.Errorf("%s: two runs differ", c.in)
+		}
+		toml := "id = \"" + filepath.Base(out) + "\"\nname = \"t\"\nkind = \"sermons\"\nlicence = \"x\"\ncredit = \"x\"\nhomepage = \"https://example.org\"\nterms_url = \"https://example.org\"\nadded = 2026-11-06\non_by_default = false\n"
+		if err := os.WriteFile(filepath.Join(out, "source.toml"), []byte(toml), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if faults, warnings := sources.CheckReport(out); len(faults) != 0 || len(warnings) != 0 {
+			t.Errorf("%s: faults %v, warnings %v", c.in, sources.Faults(faults), sources.Faults(warnings))
+		}
+	}
+}
+
+// Batch 5b. Calvin's sermons are in Portuguese: the contents list of the book
+// has a front-matter "Prefácio" and, after the thirteenth sermon, an appendix
+// that is a reply to slanders.
+func TestCalvinPtPrefaceAndAppendixDropped(t *testing.T) {
+	for _, c := range []struct{ title, want string }{
+		{"Prefácio", "front matter"},
+		{"Prefácio à Edição Brasileira", "front matter"},
+		{"Resposta a Certas Calúnias e Blasfêmias", "an appendix"},
+		{"I. Primeiro Sermão: Gênesis 25.12–22", ""},
+		{"Preface to the Sermons", ""},
+	} {
+		if got := NonSermon(c.title); !strings.HasPrefix(got, c.want) || (c.want == "") != (got == "") {
+			t.Errorf("NonSermon(%q) = %q, want %q", c.title, got, c.want)
+		}
+	}
+	rows, rep := BuildSource([]File{{Name: "calvin", Inputs: readFile(t, "testdata/calvin-pt-sermons.jsonl"), TitleForm: FormPtRef}}, false)
+	if rep.Input != 15 || len(rows) != 13 || len(rep.NonSermon) != 2 || len(rep.Dropped) != 0 || rep.Rows != 13 {
+		t.Fatalf("lines %d, rows %d, non-sermons %v, dropped %v; want 15, 13, two, none", rep.Input, len(rows), rep.NonSermon, rep.Dropped)
+	}
+	for _, id := range []string{"SRMSSBRLRPRV.1-4439", "SRMSSBRLRPRV.1-520149"} {
+		if byID(rows, id) != nil {
+			t.Errorf("%s was written", id)
+		}
+	}
+	for _, r := range rows {
+		if strings.Contains(r.Title, "Prefácio") || strings.Contains(r.Title, "Calúnias") {
+			t.Errorf("%s: %q", r.ID, r.Title)
+		}
+	}
+}
+
+func TestPtBookNamesCoverTheSixtySixBooks(t *testing.T) {
+	// One Portuguese name (as Almeida prints it) for each of the 66 books, in
+	// the book table's order.
+	names := []string{"Gênesis", "Êxodo", "Levítico", "Números", "Deuteronômio", "Josué", "Juízes", "Rute", "1 Samuel", "2 Samuel", "1 Reis", "2 Reis", "1 Crônicas", "2 Crônicas", "Esdras", "Neemias", "Ester", "Jó", "Salmos", "Provérbios", "Eclesiastes", "Cantares", "Isaías", "Jeremias", "Lamentações", "Ezequiel", "Daniel", "Oseias", "Joel", "Amós", "Obadias", "Jonas", "Miqueias", "Naum", "Habacuque", "Sofonias", "Ageu", "Zacarias", "Malaquias", "Mateus", "Marcos", "Lucas", "João", "Atos", "Romanos", "1 Coríntios", "2 Coríntios", "Gálatas", "Efésios", "Filipenses", "Colossenses", "1 Tessalonicenses", "2 Tessalonicenses", "1 Timóteo", "2 Timóteo", "Tito", "Filemom", "Hebreus", "Tiago", "1 Pedro", "2 Pedro", "1 João", "2 João", "3 João", "Judas", "Apocalipse"}
+	var books []string
+	for _, b := range passage.Books() {
+		books = append(books, b.OSIS)
+	}
+	if len(names) != len(books) {
+		t.Fatalf("%d names for %d books", len(names), len(books))
+	}
+	for i, n := range names {
+		if refs, err := TitleLabelToOSIS(PtLabel(n + " 1")); err != nil || len(refs) != 1 || refs[0] != books[i]+".1" {
+			t.Errorf("%s 1 = %v, %v; want %s.1", n, refs, err, books[i])
+		}
+	}
+}
+
+func TestPtLabel(t *testing.T) {
+	for _, c := range []struct{ in, want string }{
+		{"Gênesis 25.12–22", "Genesis 25:12–22"},
+		{"Gênesis 25.21,22", "Genesis 25:21,22"},
+		{"Gênesis 26.1–5", "Genesis 26:1–5"},
+		{"Salmos 119.1–8; Romanos 8.28", "Psalms 119:1–8; Romans 8:28"},
+		{"1 Coríntios 13", "1 Corinthians 13"},
+		{"Gênesis 25.12–26.3", "Genesis 25:12–26:3"},
+		{"Sermão Primeiro", "Sermão Primeiro"},
+	} {
+		if got := PtLabel(c.in); got != c.want {
+			t.Errorf("PtLabel(%q) = %q, want %q", c.in, got, c.want)
+		}
+	}
+	for _, c := range []struct {
+		in   string
+		want []string
+	}{
+		{"Gênesis 25.12–22", []string{"Gen.25.12-Gen.25.22"}},
+		{"Gênesis 25.21,22", []string{"Gen.25.21-Gen.25.22"}},
+		{"Gênesis 25.12–26.3", []string{"Gen.25.12-Gen.26.3"}},
+	} {
+		got, err := TitleLabelToOSIS(PtLabel(c.in))
+		if err != nil || !reflect.DeepEqual(got, c.want) {
+			t.Errorf("%q = %v, %v; want %v", c.in, got, err, c.want)
+		}
+	}
+}
+
+func TestParseTitlePtRef(t *testing.T) {
+	tp, ok := ParseTitle(FormPtRef, "I. Primeiro Sermão: Gênesis 25.12–22")
+	if !ok || tp.Title != "I. Primeiro Sermão: Gênesis 25.12–22" || tp.Label != "Genesis 25:12–22" {
+		t.Errorf("got %+v, %v: want the title kept whole and the label in English", tp, ok)
+	}
+	for _, bad := range []string{"Prefácio", "Sermão: sem passagem", "Capítulo 3: Resposta"} {
+		if _, ok := ParseTitle(FormPtRef, bad); ok {
+			t.Errorf("%q has no passage but was read", bad)
+		}
+	}
+}
+
+func TestCalvinPtRefsAreParsedFromTheTitles(t *testing.T) {
+	rows, rep := BuildSource([]File{{Name: "calvin", Inputs: readFile(t, "testdata/calvin-pt-sermons.jsonl"), TitleForm: FormPtRef}}, false)
+	if rep.WithRef != 13 || rep.FromTitle != 13 || len(rep.NoRef) != 0 || len(rep.Unparsed) != 0 || len(rep.TitleDisagree) != 0 || len(rep.Refused) != 0 || rep.Series != 0 {
+		t.Fatalf("with ref %d, from the title %d, no ref %v, unparsed %v, disagree %v, refused %v, series %d", rep.WithRef, rep.FromTitle, rep.NoRef, rep.Unparsed, rep.TitleDisagree, rep.Refused, rep.Series)
+	}
+	for id, want := range map[string]struct{ title, ref string }{
+		"SRMSSBRLRPRV.1-18335":  {"I. Primeiro Sermão: Gênesis 25.12–22", "Gen.25.12-Gen.25.22"},
+		"SRMSSBRLRPRV.1-96169":  {"III. Terceiro Sermão: Gênesis 25.21,22", "Gen.25.21-Gen.25.22"},
+		"SRMSSBRLRPRV.1-292198": {"VIII. Oitavo Sermão: Gênesis 26.11–21", "Gen.26.11-Gen.26.21"},
+		"SRMSSBRLRPRV.1-481671": {"XIII. Décimo Terceiro Sermão: Gênesis 27.29–36", "Gen.27.29-Gen.27.36"},
+	} {
+		r := byID(rows, id)
+		if r == nil || r.Title != want.title || str(r.Ref) != want.ref || str(r.Preacher) != "John Calvin" {
+			t.Errorf("%s: %+v, want %q on %s", id, r, want.title, want.ref)
+			continue
+		}
+		for _, c := range r.Cited {
+			if rg, err := passage.Parse(c); err == nil && holdsAll(want.ref, []string{rg.OSIS}) {
+				t.Errorf("%s: %s, a verse of the text %s, is also cited", id, c, want.ref)
+			}
+		}
+		if len(r.Cited) == 0 {
+			t.Errorf("%s cites nothing", id)
+		}
+		if !strings.Contains(str(r.Notes), "read from the title") {
+			t.Errorf("%s notes: %q", id, str(r.Notes))
+		}
+	}
+	// Off unless asked: Logos gives these rows no reference of their own.
+	rows, rep = BuildRows(readFile(t, "testdata/calvin-pt-sermons.jsonl"))
+	if r := byID(rows, "SRMSSBRLRPRV.1-18335"); r == nil || r.Ref != nil || rep.WithRef != 0 {
+		t.Errorf("without the form: %+v, %d with a ref", r, rep.WithRef)
+	}
+}
+
+// W. I. Evans and Smale print "Chapter N: " before every title.
+func TestEvansAndSmaleChapterPrefixStripped(t *testing.T) {
+	for _, c := range []struct{ file, id, title, note string }{
+		{"testdata/wi-evans-sermons.jsonl", "THSRVRMSTFLW.1-506", "This River Must Flow!", "Chapter 1."},
+		{"testdata/wi-evans-sermons.jsonl", "THSRVRMSTFLW.1-43383", "“Diversities of Operations”", "Chapter 5."},
+		{"testdata/wi-evans-sermons.jsonl", "THSRVRMSTFLW.1-106740", "Had I but One Hour to Live", "Chapter 10."},
+		{"testdata/smale-sermons.jsonl", "PNTCSTLBLSSNG.1-38362", "Some Misconceptions of the Gospel", "Chapter 1."},
+		{"testdata/smale-sermons.jsonl", "PNTCSTLBLSSNG.1-134797", "The Secrets of Pentecostal Fullness", "Chapter 6."},
+	} {
+		rows, rep := BuildRows(readFile(t, c.file))
+		r := byID(rows, c.id)
+		if r == nil || r.Title != c.title || !strings.Contains(str(r.Notes), c.note) || rep.Retitled != len(rows) {
+			t.Errorf("%s %s: %+v (retitled %d of %d)", c.file, c.id, r, rep.Retitled, len(rows))
+		}
+	}
+	rows, _ := BuildRows(readFile(t, "testdata/wi-evans-sermons.jsonl"))
+	if r := byID(rows, "THSRVRMSTFLW.1-38321"); r == nil || str(r.Ref) != "1Cor.14" || r.Title != "Speaking in Tongues" {
+		t.Errorf("Evans 4: %+v", r)
+	}
+}
+
+// Pope, Smale and Evans: the counts, and no text for any but Evans's fourth.
+func TestPopeSmaleEvansCounts(t *testing.T) {
+	for _, c := range []struct {
+		name                 string
+		rows, withRef, cited int
+		first, firstTitle    string
+		pr                   string
+	}{
+		{"pope", 17, 0, 16, "WITOTHERDISC.1-2961", "The Inward Witness of Life in the Son", "William Burt Pope"},
+		{"smale", 6, 0, 5, "PNTCSTLBLSSNG.1-38362", "Some Misconceptions of the Gospel", "Joseph Smale"},
+		{"wi-evans", 10, 1, 8, "THSRVRMSTFLW.1-506", "This River Must Flow!", "W. I. Evans"},
+	} {
+		rows, rep := BuildRows(readFile(t, "testdata/"+c.name+"-sermons.jsonl"))
+		if len(rows) != c.rows || rep.WithRef != c.withRef || rep.Cited != c.cited || len(rep.Dropped) != 0 || len(rep.NonSermon) != 0 {
+			t.Errorf("%s: rows %d, with ref %d, cited %d, dropped %v, non-sermons %v", c.name, len(rows), rep.WithRef, rep.Cited, rep.Dropped, rep.NonSermon)
+			continue
+		}
+		if r := byID(rows, c.first); r == nil || r.Title != c.firstTitle || str(r.Preacher) != c.pr {
+			t.Errorf("%s first: %+v", c.name, r)
+		}
+	}
+}
+
+// The batch 5b fixtures make rows the checker accepts, and the same bytes
+// twice; REPORT.md's counts are the lines minus the drops.
+func TestBatch5bRunPassesTheChecker(t *testing.T) {
+	for _, c := range []struct {
+		in           string
+		opts         Options
+		rows, nonSer int
+	}{
+		{"testdata/pope-sermons.jsonl", Options{}, 17, 0},
+		{"testdata/smale-sermons.jsonl", Options{}, 6, 0},
+		{"testdata/wi-evans-sermons.jsonl", Options{}, 10, 0},
+		{"testdata/calvin-pt-sermons.jsonl", Options{TitleForm: FormPtRef}, 13, 2},
+	} {
+		out := t.TempDir()
+		if err := run([]string{c.in}, filepath.Base(out), out, "", c.opts, &bytes.Buffer{}); err != nil {
+			t.Fatal(err)
+		}
+		rows1, _ := os.ReadFile(filepath.Join(out, "rows.jsonl"))
+		if n := bytes.Count(rows1, []byte("\n")); n != c.rows {
+			t.Errorf("%s: %d rows, want %d", c.in, n, c.rows)
+		}
+		md, _ := os.ReadFile(filepath.Join(out, "REPORT.md"))
+		in := readFile(t, c.in)
+		for _, want := range []string{
+			fmt.Sprintf("lines read:                          %d\n", len(in)),
+			fmt.Sprintf("rows written:                        %d\n", c.rows),
+		} {
+			if !bytes.Contains(md, []byte(want)) {
+				t.Errorf("%s: REPORT.md lacks %q", c.in, want)
+			}
+		}
+		if c.nonSer > 0 && !bytes.Contains(md, []byte(fmt.Sprintf("Non-sermon lines dropped (%d)", c.nonSer))) {
+			t.Errorf("%s: REPORT.md does not count %d non-sermon lines", c.in, c.nonSer)
+		}
+		if c.opts.TitleForm != "" && !bytes.Contains(md, []byte("--title-form \"pt-ref\"")) {
+			t.Errorf("%s: REPORT.md does not repeat the command's form", c.in)
 		}
 		out2 := t.TempDir()
 		if err := run([]string{c.in}, filepath.Base(out), out2, "", c.opts, &bytes.Buffer{}); err != nil {

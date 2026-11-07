@@ -168,13 +168,14 @@ func TitleDate(title string) string {
 }
 
 // TitleForms are the forms --title-form reads.
-var TitleForms = []string{FormPreacherYears, FormByPreacherRef, FormNumbered, FormRefInBrackets}
+var TitleForms = []string{FormPreacherYears, FormByPreacherRef, FormNumbered, FormRefInBrackets, FormPtRef}
 
 const (
 	FormPreacherYears = "preacher-years"  // "Basil (329–379): Title" or "Title—Hooker (1586–1647)"
 	FormByPreacherRef = "by-preacher-ref" // "Title—By William Henry Green (John 17:24)"
 	FormNumbered      = "numbered"        // "XXIII: Title"
 	FormRefInBrackets = "ref-in-brackets" // "Title (Reyel. 12:15, 16.)"
+	FormPtRef         = "pt-ref"          // "I. Primeiro Sermão: Gênesis 25.12–22"
 )
 
 func validTitleForm(f string) bool {
@@ -205,6 +206,8 @@ var (
 	byRefRE = regexp.MustCompile(`^(.+)—By\s+([^()]+?)\s+\(([^()]+)\)$`)
 	// "The Nature and Danger of Heresies (Reyel. 12:15, 16.)"
 	refInBracketsRE = regexp.MustCompile(`^(.+?)\s*\(([^()]+)\)\.?$`)
+	// "I. Primeiro Sermão: Gênesis 25.12–22": the passage after the last colon
+	ptRefRE = regexp.MustCompile(`^(.+):\s+([^:]+)$`)
 	// "XXIII: The Claims of the Christian Ministry"
 	numberedRE = regexp.MustCompile(`^([IVXLCDM]+):\s+(.+)$`)
 	// ", Jr." after a name: kept; any other comma between two words of a name is a slip.
@@ -366,6 +369,9 @@ func CleanName(name string) string {
 //   - ref-in-brackets: Sedgwick prints "The Nature and Danger of Heresies
 //     (Reyel. 12:15, 16.)": the title and the preaching text, which must read
 //     as a passage (a date in brackets, "(July the 6th, 1645)", does not).
+//   - pt-ref: Calvin's Portuguese sermons print "I. Primeiro Sermão: Gênesis
+//     25.12–22": the title is kept whole, in Portuguese, and the passage after
+//     the colon is the preaching text (see PtLabel).
 //   - numbered: Strong's collection prints "XXIII: The Claims of ...": the
 //     number is taken off the title.
 func ParseTitle(form, title string) (TitleParts, bool) {
@@ -386,6 +392,13 @@ func ParseTitle(form, title string) (TitleParts, bool) {
 		if m := refInBracketsRE.FindStringSubmatch(title); m != nil {
 			if _, err := TitleLabelToOSIS(m[2]); err == nil {
 				return TitleParts{Title: strings.TrimSpace(m[1]), Label: strings.TrimSpace(m[2])}, true
+			}
+		}
+	case FormPtRef:
+		if m := ptRefRE.FindStringSubmatch(title); m != nil {
+			label := PtLabel(m[2])
+			if _, err := TitleLabelToOSIS(label); err == nil {
+				return TitleParts{Title: title, Label: label}, true
 			}
 		}
 	case FormNumbered:

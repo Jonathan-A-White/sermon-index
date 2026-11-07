@@ -21,7 +21,8 @@
 // where the archive prints it there: "Basil (329–379): The Creation of the
 // World", "Christ’s Desire for His People—By William Henry Green (John 17:24)",
 // "XXIII: The Claims of the Christian Ministry" (see titles.go);
-// --title-from-ref adds a row's ref to a title that is only "Sermon N". It writes REPORT.md beside rows.jsonl
+// "I. Primeiro Sermão: Gênesis 25.12–22" (pt-ref: Calvin in Portuguese, the
+// title kept whole); --title-from-ref adds a row's ref to a title that is only "Sermon N". It writes REPORT.md beside rows.jsonl
 // (what it dropped and what it could not place). A run over the same input
 // writes the same bytes. source.toml is by hand (docs/adding-a-source.md).
 package main
