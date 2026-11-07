@@ -551,6 +551,12 @@ func TestLoadLogosArchives(t *testing.T) {
 		{"smale-logos", 6, 0, 0, 6},
 		{"wi-evans-logos", 10, 1, 0, 9},
 		{"calvin-pt-logos", 13, 13, 0, 0},
+		{"evangelistic-sermon-outlines-logos", 29, 29, 0, 0},
+		{"sermon-outlines-for-growing-christians-logos", 27, 26, 1, 0},
+		{"sermon-outlines-for-seekers-logos", 26, 26, 0, 0},
+		{"sermon-outlines-for-special-days-logos", 28, 28, 0, 0},
+		{"sermon-outlines-on-1-corinthians-logos", 28, 28, 0, 0},
+		{"sermon-outlines-on-acts-logos", 38, 37, 1, 0},
 	}
 	ctx := context.Background()
 	db := migrated(t)
@@ -592,13 +598,15 @@ func TestLoadLogosArchives(t *testing.T) {
 		t.Errorf("Who Is Man is under Genesis 1 %d times, want once", n)
 	}
 	// Romans 5:8: Greg Laurie preached on Romans 5 three times (YEAR.2000.8,
-	// YEAR.2006.30, YEAR.2010.2); no other archive has a text there.
+	// YEAR.2006.30, YEAR.2010.2); the only other texts there are two Sermon
+	// Outlines (Special Days' Memorial Day, Romans 5:6-8, and Seekers' The
+	// Great Therefore, Romans 5:1-10).
 	rom58, err := passage.Parse("Rom.5.8")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if n := count(t, db, "select count(distinct (p.source_id, p.sermon_id)) from sermon_passages p where p.role = 'text' and p.source_id like '%-logos' and p.span && $1::int4range", rom58.PG()); n != 3 {
-		t.Errorf("%d Logos rows on Romans 5:8, want 3", n)
+	if n := count(t, db, "select count(distinct (p.source_id, p.sermon_id)) from sermon_passages p where p.role = 'text' and p.source_id like '%-logos' and p.span && $1::int4range", rom58.PG()); n != 5 {
+		t.Errorf("%d Logos rows on Romans 5:8, want 5", n)
 	}
 	if n := count(t, db, "select count(*) from sermon_passages p where p.role = 'text' and p.source_id like '%-logos' and p.sermon_id in ('YEAR.2000.8', 'YEAR.2006.30', 'YEAR.2010.2') and p.span && $1::int4range", rom58.PG()); n != 3 {
 		t.Errorf("YEAR.2000.8, YEAR.2006.30 and YEAR.2010.2 on Romans 5:8: %d, want 3", n)
@@ -765,5 +773,42 @@ func TestLoadLogosArchives(t *testing.T) {
 	}
 	if n := count(t, db, "select count(*) from sermons where source_id in ('wi-evans-logos', 'smale-logos') and title ~ '^Chapter '"); n != 0 {
 		t.Errorf("Evans and Smale: %d titles that keep \"Chapter N: \"", n)
+	}
+
+	// Batch 6a (the Sermon Outlines books): the passage in a title is the ref
+	// and is off the title ("Paul and the Corinthians" is 1 Corinthians
+	// 1:1-9); Special Days keeps the bracket of the three titles whose
+	// passage the book table does not read; Acts keeps one row for each
+	// chapter outline (no numbered sub-point, no "Chapter N: ") and the
+	// Soul Winning book is not a source.
+	for _, c := range []struct {
+		source, id, title, ref, preacher string
+	}{
+		{"sermon-outlines-on-1-corinthians-logos", "SO1COR.1-2867", "Paul and the Corinthians", "1Cor.1.1-1Cor.1.9", "Ben Merold"},
+		{"sermon-outlines-for-growing-christians-logos", "SOGROWCHR.1-1913", "So Help Me, Me", "Heb.6.13-Heb.6.20", "Stephen M. Hooks"},
+		{"sermon-outlines-for-seekers-logos", "SOSEEKERS.1-9766", "Seven Secrets to Spiritual Success", "Luke.5.1-Luke.5.11", "J. Michael Shannon"},
+		{"sermon-outlines-for-special-days-logos", "SOSPECDAYS.1-8396", "Maundy Thursday: The Example of Jesus at Communion", "Luke.22.7-Luke.22.16", "Robert C. Shannon"},
+		{"sermon-outlines-on-acts-logos", "SOACTS.1-129186", "The Holy Spirit in Conversion", "Acts.7.51-Acts.7.53", "C. C. Crawford"},
+		{"evangelistic-sermon-outlines-logos", "SOEVANG.1-8054", "What Think Ye of Christ?", "Matt.22.41-Matt.22.45", "Burris Butler"},
+	} {
+		rg, err := passage.Parse(c.ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if n := count(t, db, "select count(*) from sermon_passages p join sermons s on s.source_id = p.source_id and s.id = p.sermon_id where p.role = 'text' and p.source_id = $1 and s.id = $2 and s.title = $3 and s.preacher = $4 and s.url like 'https://ref.ly/logosres/LLS:%?off=%' and p.span = $5::int4range", c.source, c.id, c.title, c.preacher, rg.PG()); n != 1 {
+			t.Errorf("%s %s %q exactly %s: %d, want once", c.source, c.id, c.title, c.ref, n)
+		}
+	}
+	if n := count(t, db, "select count(*) from sermons where source_id = 'sermon-outlines-on-acts-logos' and (title ~ '^[0-9]+\\. ' or title ~ '^Chapter ' or title = 'Afterword')"); n != 0 {
+		t.Errorf("Acts: %d rows that are a sub-point, keep \"Chapter N: \" or are the afterword", n)
+	}
+	if n := count(t, db, "select count(*) from sermons where source_id like 'sermon-outlines-%-logos' and source_id <> 'sermon-outlines-on-acts-logos' and title ~ '\\((Matthew|Mark|Luke|John|Acts|Hebrews|1 Corinthians) [0-9]+:[0-9–]+\\)$'"); n != 0 {
+		t.Errorf("%d outline rows that keep a bracketed passage a book table can read", n)
+	}
+	if n := count(t, db, "select count(*) from sermons where source_id = 'sermon-outlines-for-special-days-logos' and title like '%(%'"); n != 3 {
+		t.Errorf("Special Days: %d titles with a bracketed passage kept, want the 3 it does not read", n)
+	}
+	if n := count(t, db, "select count(*) from sermons where source_id like '%soul-winning%'"); n != 0 {
+		t.Errorf("%d rows of the Soul Winning book, which is not imported", n)
 	}
 }
