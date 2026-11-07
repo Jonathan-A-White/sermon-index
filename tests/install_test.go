@@ -102,7 +102,8 @@ bad:*/v1/health) printf '{"status":"ok","version":"x","sources":1,"sermons":3}\n
 down:*) printf '\n000\n'; exit 7 ;;
 *:*/v1/health) printf '{\n  "status": "ok",\n  "version": "x",\n  "sources": 4,\n  "sermons": 3563\n}\n200\n' ;;
 bad2:*/v1/sermons*) printf '{"ref":"Rom.5.8","total":1,"rows":[{"title":"Another Sermon"}]}\n200\n' ;;
-*:*/v1/sermons*) printf '{\n  "ref": "Rom.5.8",\n  "total": 2,\n  "rows": [\n    {\n      "title": "Love'"'"'s Commendation"\n    },\n    {\n      "title": "Other"\n    }\n  ]\n}\n200\n' ;;
+bad3:*/v1/sermons*) printf '{"error":"internal"}\n500\n' ;;
+*:*/v1/sermons*) printf '{\n  "ref": "Rom.5.8",\n  "total": 2,\n  "rows": [\n    {\n      "title": "God’s Love"\n    },\n    {\n      "title": "Love'"'"'s Commendation"\n    }\n  ]\n}\n200\n' ;;
 esac
 exit 0
 `
@@ -471,7 +472,8 @@ func TestSmoke(t *testing.T) {
 	}
 	cases := map[string]string{
 		"bad":  "fewer than two sources",
-		"bad2": "wrong first sermon",
+		"bad2": "Love's Commendation is not among",
+		"bad3": "answered 500",
 		"down": "service down",
 	}
 	for mode := range cases {

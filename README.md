@@ -104,7 +104,7 @@ The Laptop runs it as two systemd **user** units (no sudo): `sermon-index-pg` (P
 
 ```sh
 scripts/install-laptop.sh      # build, env files, units, enable, migrate, load every source, smoke test
-scripts/smoke.sh               # health 200 with at least 2 sources; Romans 5:8 starts with Love's Commendation
+scripts/smoke.sh               # health 200 with at least 2 sources; Romans 5:8 has Love's Commendation among its sermons
 scripts/uninstall-laptop.sh    # the way back: stops and removes the units and the binary
 ```
 

@@ -6,7 +6,8 @@
 #
 # Checks that /v1/health answers 200 with at least two sources, and that
 # /v1/sermons?ref=rom.5.8 answers 200 with "Love's Commendation" (Spurgeon
-# 104, whose preaching text is Romans 5:8) first. Exits 0 when both hold and
+# 104, whose preaching text is Romans 5:8) among its rows, not first: any
+# source loaded later may sit on Romans 5:8 too. Exits 0 when both hold and
 # 1 otherwise, saying which failed. SMOKE_WAIT (default 30) is how many
 # seconds to wait for /v1/health to answer 200 (the service has just been
 # started). Needs curl, nothing else.
@@ -40,9 +41,11 @@ sources=$(printf '%s\n' "$BODY" | tr -d '\n' | sed -n 's/.*"sources": *\([0-9][0
 [ -n "$sources" ] || fail "/v1/health has no sources count: $BODY"
 [ "$sources" -ge 2 ] || fail "fewer than two sources loaded ($sources): run 'sermons load --all sources/'"
 
-get "$URL/v1/sermons?ref=rom.5.8"
+# limit=200 is the API's largest page, so a tie on the exact verse between
+# sources (the order among them is by source id) cannot push the row off it.
+get "$URL/v1/sermons?ref=rom.5.8&limit=200"
 [ "$STATUS" = 200 ] || fail "GET /v1/sermons?ref=rom.5.8 answered $STATUS"
-first=$(printf '%s\n' "$BODY" | grep -o '"title": *"[^"]*"' | head -n 1 | sed 's/^"title": *"\(.*\)"$/\1/')
-[ "$first" = "Love's Commendation" ] || fail "wrong first sermon for rom.5.8: '$first', want 'Love's Commendation'"
+printf '%s\n' "$BODY" | grep -q '"title": *"Love'"'"'s Commendation"' ||
+	fail "Love's Commendation is not among the sermons for rom.5.8 (is spurgeon-ccel loaded? sermons load --all sources/)"
 
-echo "smoke: ok: $sources sources; Romans 5:8 starts with $first"
+echo "smoke: ok: $sources sources; Romans 5:8 has Love's Commendation"
