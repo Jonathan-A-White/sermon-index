@@ -58,16 +58,17 @@ func main() {
 	var skipped stringList
 	flag.Var(&skipped, "skipped", "a book of the order this source leaves out, with its titles, \"<book>: <why> || <title> || <title>\" (more than once); REPORT.md has a Skipped section")
 	chapterOutlines := flag.Bool("chapter-outlines", false, "the book is chapters, each an outline on a passage, with numbered sub-points beside them: only a \"Chapter N: Title\" line with a passage is a row (Sermon Outlines on Acts)")
+	inferText := flag.Bool("infer-text", false, "a row the index gives no text takes the first passage it cites as its text, marked inferred in its notes: when it is the only one cited, its title names it, or two sermons beside it are on it")
 	note := flag.String("note", "", "a sentence added to the notes of every row (the kind of the book's pieces, where the index does not say)")
 	titleFromRef := flag.Bool("title-from-ref", false, "a title that is only \"Sermon N\" becomes \"Sermon N: <its ref>\" (Moberly's)")
 	refsFromTitle := flag.Bool("refs-from-title", false, "a line with no Logos reference and no label that reads takes its ref from the passages its title names (Augustine's titles)")
 	report := flag.String("report", "", "where to write the report (default <out>/REPORT.md)")
 	flag.Parse()
 	if len(ins) == 0 || *id == "" || *out == "" || flag.NArg() != 0 {
-		fmt.Fprintln(os.Stderr, "usage: logos-import --in <slug>-sermons.jsonl [--in <more>] [--dedupe-titles] [--preacher <name>] [--refs-from-title] [--title-form <form>] [--title-from-ref] [--note <text>] [--not-imported <book: why>] [--skipped <book: why || title ...>] [--chapter-outlines] --id <source id> --out <source dir> [--report <file>]")
+		fmt.Fprintln(os.Stderr, "usage: logos-import --in <slug>-sermons.jsonl [--in <more>] [--dedupe-titles] [--preacher <name>] [--refs-from-title] [--title-form <form>] [--title-from-ref] [--note <text>] [--not-imported <book: why>] [--skipped <book: why || title ...>] [--chapter-outlines] [--infer-text] --id <source id> --out <source dir> [--report <file>]")
 		os.Exit(2)
 	}
-	opts := Options{Dedupe: *dedupe, Preacher: *preacher, RefsFromTitle: *refsFromTitle, TitleForm: *titleForm, Note: *note, NotImported: notImported, TitleFromRef: *titleFromRef, Skipped: skipped, ChapterOutlines: *chapterOutlines}
+	opts := Options{Dedupe: *dedupe, Preacher: *preacher, RefsFromTitle: *refsFromTitle, TitleForm: *titleForm, Note: *note, NotImported: notImported, TitleFromRef: *titleFromRef, Skipped: skipped, ChapterOutlines: *chapterOutlines, InferText: *inferText}
 	if err := run(ins, *id, *out, *report, opts, os.Stdout); err != nil {
 		fmt.Fprintln(os.Stderr, "logos-import:", err)
 		os.Exit(1)
@@ -85,6 +86,7 @@ type Options struct {
 	TitleFromRef    bool     // --title-from-ref
 	Skipped         []string // --skipped
 	ChapterOutlines bool     // --chapter-outlines
+	InferText       bool     // --infer-text
 }
 
 func run(ins []string, id, out, reportPath string, opts Options, stdout io.Writer) error {
@@ -105,7 +107,7 @@ func run(ins []string, id, out, reportPath string, opts Options, stdout io.Write
 		}
 		base := filepath.Base(in)
 		names = append(names, base)
-		files = append(files, File{Name: strings.TrimSuffix(base, "-sermons.jsonl"), Inputs: inputs, Preacher: opts.Preacher, RefsFromTitle: opts.RefsFromTitle, TitleForm: opts.TitleForm, Note: opts.Note, TitleFromRef: opts.TitleFromRef, ChapterOutlines: opts.ChapterOutlines})
+		files = append(files, File{Name: strings.TrimSuffix(base, "-sermons.jsonl"), Inputs: inputs, Preacher: opts.Preacher, RefsFromTitle: opts.RefsFromTitle, TitleForm: opts.TitleForm, Note: opts.Note, TitleFromRef: opts.TitleFromRef, ChapterOutlines: opts.ChapterOutlines, InferText: opts.InferText})
 	}
 	rows, rep := BuildSource(files, opts.Dedupe)
 	rep.Preacher, rep.RefsFromTitle, rep.TitleForm, rep.Note, rep.NotImported = opts.Preacher, opts.RefsFromTitle, opts.TitleForm, opts.Note, opts.NotImported

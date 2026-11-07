@@ -2177,3 +2177,153 @@ func TestBatch6cRunPassesTheChecker(t *testing.T) {
 		}
 	}
 }
+
+// --infer-text (mw-qtu3zvz.35): a row the index gives no text takes the first
+// passage it cites as its text, marked inferred; Logos's own refs win.
+
+// inferLine is a book-archive line: a title, a label (the index's own text,
+// "" for none) and the passages cited, as Logos writes them.
+func inferLine(n int, title, label string, cited ...string) Input {
+	x := Input{ID: fmt.Sprintf("1~%d", n*1000), Title: title, URL: fmt.Sprintf("https://ref.ly/logosres/LLS:INFERBOOK?off=%d", n*1000), Cited: cited}
+	if label != "" {
+		x.Ref = ptr(label)
+	}
+	return x
+}
+
+func inferRows(t *testing.T, on bool, in ...Input) ([]sources.Row, *Report) {
+	t.Helper()
+	return BuildSource([]File{{Name: "inferbook", Inputs: in, InferText: on}}, false)
+}
+
+func TestInferTextTheOnlyCitedPassage(t *testing.T) {
+	in := []Input{inferLine(1, "The First Beatitude", "", "bible.61.5.3"), inferLine(2, "The Second Beatitude", "", "bible.61.5.4")}
+	rows, rep := inferRows(t, true, in...)
+	r := byID(rows, "INFERBOOK.1-1000")
+	if r == nil || str(r.Ref) != "Matt.5.3" || len(r.Cited) != 0 || !strings.Contains(str(r.Notes), "The ref is inferred, not the index's") || !strings.Contains(str(r.Notes), "the only passage the sermon cites") {
+		t.Fatalf("the only cited passage: %+v", r)
+	}
+	if rep.WithRef != 2 || len(rep.Inferred) != 2 || len(rep.NoRef) != 0 {
+		t.Errorf("with ref %d, inferred %v, no ref %v", rep.WithRef, rep.Inferred, rep.NoRef)
+	}
+	// Off, the rows are as they were: no ref, the passage cited.
+	rows, rep = inferRows(t, false, in...)
+	if r := byID(rows, "INFERBOOK.1-1000"); r == nil || r.Ref != nil || strings.Join(r.Cited, " ") != "Matt.5.3" || r.Notes != nil || len(rep.Inferred) != 0 || strings.Contains(rep.Summary(), "inferred") {
+		t.Errorf("without --infer-text: %+v %v", r, rep.Inferred)
+	}
+}
+
+// Burroughs's Rare Jewel: Sermon I cites Philippians 4:11 first among twenty
+// others and the sermons after it are on Philippians 4:11.
+func TestInferTextFirstCitedWhereTheSermonsBesideItAreOnIt(t *testing.T) {
+	in := []Input{
+		inferLine(1, "Sermon I", "", "bible.71.4.11", "bible.71.4.12", "bible.64.1.16"),
+		inferLine(2, "Sermon II", "Phil. 4:11", "bible.71.4.7"),
+		inferLine(3, "Sermon III", "Phil. 4:11"),
+		inferLine(4, "Sermon IV", "Phil. 4:11"),
+		inferLine(5, "The Saints Dutie", "Exod. 14:13"),
+	}
+	rows, rep := inferRows(t, true, in...)
+	r := byID(rows, "INFERBOOK.1-1000")
+	if r == nil || str(r.Ref) != "Phil.4.11" || strings.Join(r.Cited, " ") != "Phil.4.12 John.1.16" || !strings.Contains(str(r.Notes), "the 3 sermons next to it") {
+		t.Fatalf("Sermon I: %+v", r)
+	}
+	if len(rep.Inferred) != 1 || !strings.HasPrefix(rep.Inferred[0], "INFERBOOK.1-1000: Phil.4.11 (") {
+		t.Errorf("inferred %v", rep.Inferred)
+	}
+	// The sermons beside it are the index's own: they are not inferred.
+	if r := byID(rows, "INFERBOOK.1-2000"); r == nil || strings.Contains(str(r.Notes), "inferred") {
+		t.Errorf("Sermon II: %+v", r)
+	}
+	// One sermon beside it is not enough.
+	rows, rep = inferRows(t, true, in[0], in[1], in[4])
+	if r := byID(rows, "INFERBOOK.1-1000"); r == nil || r.Ref != nil || len(rep.Inferred) != 0 {
+		t.Errorf("with a single neighbour: %+v %v", r, rep.Inferred)
+	}
+	// A run that is broken by a sermon on another text does not count.
+	broken := []Input{in[0], in[1], in[4], in[2], in[3]}
+	if rows, rep = inferRows(t, true, broken...); byID(rows, "INFERBOOK.1-1000").Ref != nil || len(rep.Inferred) != 0 {
+		t.Errorf("with a broken run: %v", rep.Inferred)
+	}
+}
+
+func TestInferTextFirstCitedWhereTheTitleNamesIt(t *testing.T) {
+	in := []Input{
+		inferLine(1, "Peace with God (Romans 5:1)", "", "bible.66.5.1", "bible.64.3.16"),
+		inferLine(2, "Peace with God", "", "bible.66.5.1", "bible.64.3.16"),
+	}
+	rows, rep := inferRows(t, true, in...)
+	if r := byID(rows, "INFERBOOK.1-1000"); r == nil || str(r.Ref) != "Rom.5.1" || strings.Join(r.Cited, " ") != "John.3.16" || !strings.Contains(str(r.Notes), "its title names") {
+		t.Errorf("a title that names the first cited passage: %+v", r)
+	}
+	if r := byID(rows, "INFERBOOK.1-2000"); r == nil || r.Ref != nil || len(r.Cited) != 2 || len(rep.Inferred) != 1 {
+		t.Errorf("the title names nothing: %+v %v", r, rep.Inferred)
+	}
+}
+
+// Several cited passages, no title that names the first and no neighbours
+// on it: no text.
+func TestInferTextLeavesAnUndecidedSermonWithoutOne(t *testing.T) {
+	in := []Input{
+		inferLine(1, "Two Forms of One Saying", "", "bible.61.24.13", "bible.63.21.19"),
+		inferLine(2, "On Reading the Bible by Books", "", "bible.67.8", "bible.67.9", "bible.66.6"),
+		inferLine(3, "Worship", "John 4:24"),
+		inferLine(4, "Prayer", "Matt. 7:7"),
+	}
+	rows, rep := inferRows(t, true, in...)
+	for _, id := range []string{"INFERBOOK.1-1000", "INFERBOOK.1-2000"} {
+		if r := byID(rows, id); r == nil || r.Ref != nil || len(r.Cited) < 2 {
+			t.Errorf("%s: %+v", id, r)
+		}
+	}
+	if len(rep.Inferred) != 0 || len(rep.NoRef) != 2 {
+		t.Errorf("inferred %v, no ref %v", rep.Inferred, rep.NoRef)
+	}
+}
+
+// Logos's own reference and the label win over any inference.
+func TestInferTextNeverOverridesTheIndex(t *testing.T) {
+	logos := inferLine(1, "From Logos", "", "bible.61.5.3")
+	logos.BibleRefs = []string{"bible.66.5.8"}
+	rows, rep := inferRows(t, true, logos, inferLine(2, "From the label", "Rom. 8:1", "bible.61.5.3"))
+	if r := byID(rows, "INFERBOOK.1-1000"); r == nil || str(r.Ref) != "Rom.5.8" || strings.Join(r.Cited, " ") != "Matt.5.3" || strings.Contains(str(r.Notes), "inferred") {
+		t.Errorf("Logos's ref: %+v", r)
+	}
+	if r := byID(rows, "INFERBOOK.1-2000"); r == nil || str(r.Ref) != "Rom.8.1" || strings.Contains(str(r.Notes), "inferred") {
+		t.Errorf("the label's ref: %+v", r)
+	}
+	if len(rep.Inferred) != 0 {
+		t.Errorf("inferred %v", rep.Inferred)
+	}
+}
+
+func TestInferTextReportAndRowsPassTheChecker(t *testing.T) {
+	in := []Input{inferLine(1, "The First Beatitude", "", "bible.61.5.3"), inferLine(2, "Teacher or Saviour?", "", "bible.64.3.2", "bible.64.3.3"), inferLine(3, "Nothing cited", "")}
+	rows, rep := inferRows(t, true, in...)
+	sum := rep.Summary()
+	if !strings.Contains(sum, "an inferred text:          1\n") {
+		t.Errorf("summary lacks the inferred count:\n%s", sum)
+	}
+	md := rep.Markdown("infer-test-logos", []string{"inferbook-sermons.jsonl"})
+	for _, want := range []string{"--infer-text --id infer-test-logos", "## Rows given an inferred text (1)", "- INFERBOOK.1-1000: Matt.5.3 (it is the only passage the sermon cites)"} {
+		if !strings.Contains(md, want) {
+			t.Errorf("REPORT.md lacks %q:\n%s", want, md)
+		}
+	}
+	// Off, the report is as it was.
+	_, off := inferRows(t, false, in...)
+	if md := off.Markdown("infer-test-logos", []string{"inferbook-sermons.jsonl"}); strings.Contains(md, "inferred") || strings.Contains(md, "--infer-text") {
+		t.Errorf("REPORT.md without the flag mentions inference:\n%s", md)
+	}
+	out := t.TempDir()
+	if err := writeRows(filepath.Join(out, "rows.jsonl"), rows); err != nil {
+		t.Fatal(err)
+	}
+	toml := "id = \"" + filepath.Base(out) + "\"\nname = \"t\"\nkind = \"sermons\"\nlicence = \"x\"\ncredit = \"x\"\nhomepage = \"https://example.org\"\nterms_url = \"https://example.org\"\nadded = 2026-11-06\non_by_default = false\n"
+	if err := os.WriteFile(filepath.Join(out, "source.toml"), []byte(toml), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if faults, warnings := sources.CheckReport(out); len(faults) != 0 {
+		t.Fatalf("faults %v, warnings %v", sources.Faults(faults), sources.Faults(warnings))
+	}
+}

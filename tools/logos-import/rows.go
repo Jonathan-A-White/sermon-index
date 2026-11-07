@@ -88,6 +88,8 @@ type Report struct {
 	TitleForm       string      // --title-form
 	TitleFromRef    bool        // --title-from-ref
 	ChapterOutlines bool        // --chapter-outlines
+	InferText       bool        // --infer-text
+	Inferred        []string    // "ID: ref (why)", rows with no text of the index's whose sole or first cited passage was taken as the text
 	TitledByRef     int         // rows whose bare "Sermon N" title took the row's ref
 	BareNoRef       []string    // "ID: "title"", bare "Sermon N" titles with no ref to take: kept as they are
 	Note            string      // --note
@@ -135,6 +137,11 @@ type File struct {
 	// (Sermon Outlines on Acts). Only a "Chapter N: Title" line that has a
 	// passage is a row.
 	ChapterOutlines bool
+	// InferText: a row the index gives no text (no Logos reference, no label
+	// that reads) takes the first passage it cites as its text, when that is
+	// the only one it cites, when its title names it, or when the sermons
+	// beside it in the book are on it (InferTexts). The note says so.
+	InferText bool
 }
 
 var (
@@ -192,7 +199,23 @@ func rowID(x Input) string {
 // of a row of an EARLIER file is dropped as a repeat and listed; titles that
 // repeat inside one file are all kept.
 func BuildSource(files []File, dedupeTitles bool) ([]sources.Row, *Report) {
+	rows, rep := buildSource(files, dedupeTitles, nil)
+	inferred := InferTexts(files, rows)
+	if len(inferred) == 0 {
+		return rows, rep
+	}
+	// A second pass gives those rows their text, so everything that follows
+	// from a ref (the series mark, a title that takes its ref) is the same as
+	// for a row that had one. The first pass is what the neighbours were
+	// judged by, so an inferred text never makes another row's.
+	return buildSource(files, dedupeTitles, inferred)
+}
+
+func buildSource(files []File, dedupeTitles bool, inferred map[string]Inferred) ([]sources.Row, *Report) {
 	rep := &Report{Dedupe: dedupeTitles}
+	for _, f := range files {
+		rep.InferText = rep.InferText || f.InferText
+	}
 	var rows []sources.Row
 	type seenAt struct {
 		file string
@@ -409,6 +432,13 @@ func BuildSource(files []File, dedupeTitles bool) ([]sources.Row, *Report) {
 			if len(problems) > 0 {
 				rep.Refused = append(rep.Refused, fmt.Sprintf("%s: %s", id, strings.Join(problems, "; ")))
 			}
+			// No text of the index's: the first passage the sermon cites, where
+			// InferTexts judged it the text.
+			if inf, ok := inferred[id]; ok && len(osis) == 0 {
+				osis = []string{inf.Ref}
+				notes = append(notes, "The ref is inferred, not the index's: the archive's index names no text, and "+inf.Why+".")
+				rep.Inferred = append(rep.Inferred, fmt.Sprintf("%s: %s (%s)", id, inf.Ref, inf.Why))
+			}
 			var cited []string
 			if len(osis) > 0 {
 				r.Ref = ptr(osis[0])
@@ -526,6 +556,89 @@ func BuildSource(files []File, dedupeTitles bool) ([]sources.Row, *Report) {
 	return rows, rep
 }
 
+// Inferred is the text InferTexts takes for a row: the OSIS ref and why, in
+// words that finish the sentence "the archive's index names no text, and ...".
+type Inferred struct {
+	Ref, Why string
+}
+
+// InferTexts judges, for each file with InferText, which rows the first pass
+// left without a ref (rows, as BuildSource's first pass wrote them) have a
+// first cited passage that is their text, and returns them by row id. The
+// rule: the first cited passage is the text when (a) it is the only passage
+// the sermon cites, or (b) the title names it, or (c) at least two sermons
+// next to it in the book (an unbroken run, before or after, whose refs are
+// the index's own or the label's) are on that passage. A sermon that cites
+// several passages with none of these stays without a text.
+func InferTexts(files []File, rows []sources.Row) map[string]Inferred {
+	out := map[string]Inferred{}
+	fileOf := map[string]int{}
+	for i, f := range files {
+		for _, x := range f.Inputs {
+			if _, ok := fileOf[rowID(x)]; !ok {
+				fileOf[rowID(x)] = i
+			}
+		}
+	}
+	titleOf := map[string]string{}
+	for i, f := range files {
+		for _, x := range f.Inputs {
+			if fileOf[rowID(x)] == i {
+				if _, ok := titleOf[rowID(x)]; !ok {
+					titleOf[rowID(x)] = strings.TrimSpace(x.Title)
+				}
+			}
+		}
+	}
+	for fi, f := range files {
+		if !f.InferText {
+			continue
+		}
+		var book []sources.Row
+		for _, r := range rows {
+			if fileOf[r.ID] == fi {
+				book = append(book, r)
+			}
+		}
+		same := func(r sources.Row, ref string) bool { return r.Ref != nil && *r.Ref == ref }
+		for i, r := range book {
+			if r.Ref != nil || len(r.Cited) == 0 {
+				continue
+			}
+			first := r.Cited[0]
+			switch {
+			case len(r.Cited) == 1:
+				out[r.ID] = Inferred{first, "it is the only passage the sermon cites"}
+				continue
+			case namesRef(RefsInTitle(titleOf[r.ID]), first):
+				out[r.ID] = Inferred{first, "its title names the first passage it cites"}
+				continue
+			}
+			run := 0
+			for j := i - 1; j >= 0 && same(book[j], first); j-- {
+				run++
+			}
+			for j := i + 1; j < len(book) && same(book[j], first); j++ {
+				run++
+			}
+			if run >= 2 {
+				out[r.ID] = Inferred{first, fmt.Sprintf("the %d sermons next to it in the book are on the first passage it cites", run)}
+			}
+		}
+	}
+	return out
+}
+
+// namesRef says whether the list holds the ref.
+func namesRef(list []string, s string) bool {
+	for _, x := range list {
+		if x == s {
+			return true
+		}
+	}
+	return false
+}
+
 var subPointRE = regexp.MustCompile(`^\d+\.\s`)
 
 // notChapterOutline says why a line of a --chapter-outlines book is not an
@@ -613,6 +726,9 @@ func (r *Report) Summary() string {
 		fmt.Fprintf(&b, "  of them read from the title:       %d\n", r.FromTitle)
 	}
 	fmt.Fprintf(&b, "  of them with cited references:     %d\n", r.Cited)
+	if r.InferText {
+		fmt.Fprintf(&b, "  of them an inferred text:          %d\n", len(r.Inferred))
+	}
 	fmt.Fprintf(&b, "rows with no ref:                    %d\n", len(r.NoRef))
 	fmt.Fprintf(&b, "series rows (ref over >%d chapters):  %d\n", sources.WideChapters, r.Series)
 	fmt.Fprintf(&b, "rows with their own date:            %d\n", r.Dated)
@@ -667,6 +783,9 @@ func (r *Report) Markdown(id string, inNames []string) string {
 	}
 	if r.ChapterOutlines {
 		cmd += " --chapter-outlines"
+	}
+	if r.InferText {
+		cmd += " --infer-text"
 	}
 	if r.Note != "" {
 		cmd += fmt.Sprintf(" --note %q", r.Note)
@@ -736,6 +855,9 @@ func (r *Report) Markdown(id string, inNames []string) string {
 		list("Bare sermon numbers with no ref", "--title-from-ref adds the text to a title that is only \"Sermon N\"; these have no ref to add, so the row keeps the title as it is.", r.BareNoRef)
 	}
 	list("References the book table refused", "A Logos reference to a book outside the sixty-six, or a chapter or verse past the end; it is left out of the row, and the row stays.", r.Refused)
+	if r.InferText {
+		list("Rows given an inferred text", "The archive's index names no text for these. Each takes the first passage it cites as its text (the only passage it cites, a passage its title names, or the passage the sermons beside it are on); the row's notes say it is inferred, and the passage is the row's ref and no longer among its cited ones. A sermon that cites several passages with none of these has no text.", r.Inferred)
+	}
 	list("Series rows", "The ref spans more than three chapters (a whole book or a long text): the row is kept, found by its title and listed by its source, and matched by no passage.", r.Wide)
 	list("Logos and the label disagree", "Both were read and differ; the row carries Logos's reference.", r.Disagree)
 	if len(r.Multipart) > 0 {
