@@ -20,7 +20,8 @@
 // sermon's words is read or written. --title-form reads more out of a title
 // where the archive prints it there: "Basil (329–379): The Creation of the
 // World", "Christ’s Desire for His People—By William Henry Green (John 17:24)",
-// "XXIII: The Claims of the Christian Ministry" (see titles.go). It writes REPORT.md beside rows.jsonl
+// "XXIII: The Claims of the Christian Ministry" (see titles.go);
+// --title-from-ref adds a row's ref to a title that is only "Sermon N". It writes REPORT.md beside rows.jsonl
 // (what it dropped and what it could not place). A run over the same input
 // writes the same bytes. source.toml is by hand (docs/adding-a-source.md).
 package main
@@ -51,14 +52,15 @@ func main() {
 	var notImported stringList
 	flag.Var(&notImported, "not-imported", "a book of the order this source leaves out and why, \"<book>: <why>\" (more than once); REPORT.md names it")
 	note := flag.String("note", "", "a sentence added to the notes of every row (the kind of the book's pieces, where the index does not say)")
+	titleFromRef := flag.Bool("title-from-ref", false, "a title that is only \"Sermon N\" becomes \"Sermon N: <its ref>\" (Moberly's)")
 	refsFromTitle := flag.Bool("refs-from-title", false, "a line with no Logos reference and no label that reads takes its ref from the passages its title names (Augustine's titles)")
 	report := flag.String("report", "", "where to write the report (default <out>/REPORT.md)")
 	flag.Parse()
 	if len(ins) == 0 || *id == "" || *out == "" || flag.NArg() != 0 {
-		fmt.Fprintln(os.Stderr, "usage: logos-import --in <slug>-sermons.jsonl [--in <more>] [--dedupe-titles] [--preacher <name>] [--refs-from-title] [--title-form <form>] [--note <text>] [--not-imported <book: why>] --id <source id> --out <source dir> [--report <file>]")
+		fmt.Fprintln(os.Stderr, "usage: logos-import --in <slug>-sermons.jsonl [--in <more>] [--dedupe-titles] [--preacher <name>] [--refs-from-title] [--title-form <form>] [--title-from-ref] [--note <text>] [--not-imported <book: why>] --id <source id> --out <source dir> [--report <file>]")
 		os.Exit(2)
 	}
-	opts := Options{Dedupe: *dedupe, Preacher: *preacher, RefsFromTitle: *refsFromTitle, TitleForm: *titleForm, Note: *note, NotImported: notImported}
+	opts := Options{Dedupe: *dedupe, Preacher: *preacher, RefsFromTitle: *refsFromTitle, TitleForm: *titleForm, Note: *note, NotImported: notImported, TitleFromRef: *titleFromRef}
 	if err := run(ins, *id, *out, *report, opts, os.Stdout); err != nil {
 		fmt.Fprintln(os.Stderr, "logos-import:", err)
 		os.Exit(1)
@@ -73,6 +75,7 @@ type Options struct {
 	TitleForm     string   // --title-form
 	Note          string   // --note
 	NotImported   []string // --not-imported
+	TitleFromRef  bool     // --title-from-ref
 }
 
 func run(ins []string, id, out, reportPath string, opts Options, stdout io.Writer) error {
@@ -93,10 +96,11 @@ func run(ins []string, id, out, reportPath string, opts Options, stdout io.Write
 		}
 		base := filepath.Base(in)
 		names = append(names, base)
-		files = append(files, File{Name: strings.TrimSuffix(base, "-sermons.jsonl"), Inputs: inputs, Preacher: opts.Preacher, RefsFromTitle: opts.RefsFromTitle, TitleForm: opts.TitleForm, Note: opts.Note})
+		files = append(files, File{Name: strings.TrimSuffix(base, "-sermons.jsonl"), Inputs: inputs, Preacher: opts.Preacher, RefsFromTitle: opts.RefsFromTitle, TitleForm: opts.TitleForm, Note: opts.Note, TitleFromRef: opts.TitleFromRef})
 	}
 	rows, rep := BuildSource(files, opts.Dedupe)
 	rep.Preacher, rep.RefsFromTitle, rep.TitleForm, rep.Note, rep.NotImported = opts.Preacher, opts.RefsFromTitle, opts.TitleForm, opts.Note, opts.NotImported
+	rep.TitleFromRef = opts.TitleFromRef
 	if len(rows) == 0 {
 		return fmt.Errorf("%s: no row to write (%d lines read)", strings.Join(ins, ", "), rep.Input)
 	}

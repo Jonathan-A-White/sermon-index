@@ -168,12 +168,13 @@ func TitleDate(title string) string {
 }
 
 // TitleForms are the forms --title-form reads.
-var TitleForms = []string{FormPreacherYears, FormByPreacherRef, FormNumbered}
+var TitleForms = []string{FormPreacherYears, FormByPreacherRef, FormNumbered, FormRefInBrackets}
 
 const (
 	FormPreacherYears = "preacher-years"  // "Basil (329–379): Title" or "Title—Hooker (1586–1647)"
 	FormByPreacherRef = "by-preacher-ref" // "Title—By William Henry Green (John 17:24)"
 	FormNumbered      = "numbered"        // "XXIII: Title"
+	FormRefInBrackets = "ref-in-brackets" // "Title (Reyel. 12:15, 16.)"
 )
 
 func validTitleForm(f string) bool {
@@ -202,6 +203,8 @@ var (
 	yearsLastRE = regexp.MustCompile(`^(.+?)—([^—:()]+?)\s+\(` + yearsRE + `\)$`)
 	// "Drifting—By Charles A. Aiken (Hebrews 2:1)"
 	byRefRE = regexp.MustCompile(`^(.+)—By\s+([^()]+?)\s+\(([^()]+)\)$`)
+	// "The Nature and Danger of Heresies (Reyel. 12:15, 16.)"
+	refInBracketsRE = regexp.MustCompile(`^(.+?)\s*\(([^()]+)\)\.?$`)
 	// "XXIII: The Claims of the Christian Ministry"
 	numberedRE = regexp.MustCompile(`^([IVXLCDM]+):\s+(.+)$`)
 	// ", Jr." after a name: kept; any other comma between two words of a name is a slip.
@@ -226,7 +229,114 @@ var corRE = regexp.MustCompile(`\b([12]) Cor\.`)
 // title ("2 Cor. 3:6" is "2 Corinthians 3:6"); the book table reads the rest
 // as it stands.
 func CleanTitleLabel(label string) string {
+	label = strings.TrimSpace(label)
+	label = oldSpellingRE.ReplaceAllStringFunc(label, func(w string) string {
+		return oldSpellings[strings.ToLower(strings.TrimRight(strings.TrimSpace(w), " ."))]
+	})
+	label = strings.TrimRight(label, ". ")
 	return corRE.ReplaceAllString(label, "$1 Corinthians")
+}
+
+// oldSpellings are the books Sedgwick's titles name in a seventeenth-century
+// hand or abbreviation ("Reyel. 12:15, 16", "Jerem . 4:3"), written out.
+var oldSpellings = map[string]string{"reyel": "Revelation", "jerem": "Jeremiah"}
+
+var oldSpellingRE = regexp.MustCompile(`(?i)\b(?:reyel|jerem)\b(?:\s?\.)?`)
+
+// TitleLabelToOSIS reads the passage a title prints as OSIS references. It is
+// LabelToOSIS over CleanTitleLabel, and then verses that follow one another in
+// a chapter ("12:15, 16", "John 3:14, 15, 16") are one range: the text of
+// the sermon is the whole of it, not 12:15 with 12:16 cited.
+func TitleLabelToOSIS(label string) ([]string, error) {
+	refs, err := LabelToOSIS(CleanTitleLabel(label))
+	if err != nil {
+		return nil, err
+	}
+	return mergeFollowing(refs), nil
+}
+
+// mergeFollowing joins a reference to the one before it when it starts at the
+// verse after the other ends, in the same chapter.
+func mergeFollowing(refs []string) []string {
+	var out []string
+	var prev passage.Range
+	var start string
+	for i, ref := range refs {
+		r, err := passage.Parse(ref)
+		if err != nil || i == 0 || len(out) == 0 || !followsInChapter(prev, r) {
+			out = append(out, ref)
+			prev, start = r, ref
+			continue
+		}
+		end := ref
+		if k := strings.Index(ref, "-"); k > 0 {
+			end = ref[k+1:]
+		}
+		start = strings.SplitN(start, "-", 2)[0] + "-" + end
+		out[len(out)-1] = start
+		prev = passage.Range{OSIS: start, Lo: prev.Lo, Hi: r.Hi}
+	}
+	return out
+}
+
+// followsInChapter says whether b begins at the verse after a ends, in the
+// same chapter (ordinals are book, chapter, verse in one number).
+func followsInChapter(a, b passage.Range) bool {
+	return b.Lo == a.Hi+1 && b.Lo/1000 == a.Hi/1000 && a.Lo%1000 != 0 && b.Lo%1000 != 0
+}
+
+// ReadableRef writes an OSIS reference as a title does: "Matthew 5:3",
+// "Matthew 23:29–32", "Matthew 5:3–6:2", "Romans 8–9", "Jude".
+func ReadableRef(osis string) string {
+	ends := strings.SplitN(osis, "-", 2)
+	type pt struct {
+		book           *passage.Book
+		chapter, verse string
+	}
+	var pts []pt
+	for _, e := range ends {
+		f := strings.Split(e, ".")
+		b, ok := passage.Lookup(f[0])
+		if !ok {
+			return osis
+		}
+		p := pt{book: b}
+		if len(f) > 1 {
+			p.chapter = f[1]
+		}
+		if len(f) > 2 {
+			p.verse = f[2]
+		}
+		pts = append(pts, p)
+	}
+	write := func(p pt) string {
+		switch {
+		case p.verse != "":
+			return p.chapter + ":" + p.verse
+		default:
+			return p.chapter
+		}
+	}
+	a := pts[0]
+	out := a.book.Name
+	if a.chapter != "" {
+		out += " " + write(a)
+	}
+	if len(pts) == 2 {
+		z := pts[1]
+		switch {
+		case z.book != a.book:
+			out += "–" + z.book.Name
+			if z.chapter != "" {
+				out += " " + write(z)
+			}
+		case z.chapter == a.chapter && z.verse != "":
+			out += "–" + z.verse
+		default:
+			out += "–" + write(z)
+		}
+	}
+	return out
 }
 
 // CleanName mends a name set with a comma between two of its words
@@ -253,6 +363,9 @@ func CleanName(name string) string {
 //   - by-preacher-ref: Princeton Sermons print "Christ’s Desire for His
 //     People—By William Henry Green (John 17:24)": title, preacher and the
 //     preaching text.
+//   - ref-in-brackets: Sedgwick prints "The Nature and Danger of Heresies
+//     (Reyel. 12:15, 16.)": the title and the preaching text, which must read
+//     as a passage (a date in brackets, "(July the 6th, 1645)", does not).
 //   - numbered: Strong's collection prints "XXIII: The Claims of ...": the
 //     number is taken off the title.
 func ParseTitle(form, title string) (TitleParts, bool) {
@@ -268,6 +381,12 @@ func ParseTitle(form, title string) (TitleParts, bool) {
 	case FormByPreacherRef:
 		if m := byRefRE.FindStringSubmatch(title); m != nil {
 			return TitleParts{Title: strings.TrimSpace(m[1]), Preacher: CleanName(m[2]), Label: strings.TrimSpace(m[3])}, true
+		}
+	case FormRefInBrackets:
+		if m := refInBracketsRE.FindStringSubmatch(title); m != nil {
+			if _, err := TitleLabelToOSIS(m[2]); err == nil {
+				return TitleParts{Title: strings.TrimSpace(m[1]), Label: strings.TrimSpace(m[2])}, true
+			}
 		}
 	case FormNumbered:
 		if m := numberedRE.FindStringSubmatch(title); m != nil && isRoman(strings.ToLower(m[1])) {

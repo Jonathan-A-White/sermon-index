@@ -86,6 +86,9 @@ type Report struct {
 	Preacher      string      // --preacher, if given
 	RefsFromTitle bool        // --refs-from-title
 	TitleForm     string      // --title-form
+	TitleFromRef  bool        // --title-from-ref
+	TitledByRef   int         // rows whose bare "Sermon N" title took the row's ref
+	BareNoRef     []string    // "ID: "title"", bare "Sermon N" titles with no ref to take: kept as they are
 	Note          string      // --note
 	NotImported   []string    // --not-imported: "book: why", books of the order left out
 	TitleDisagree []string    // "ID: ...", the text a title prints is not Logos's first cited reference
@@ -123,6 +126,7 @@ type File struct {
 	Preacher      string // if set, the preacher of every row of this input (the index names the book's editor)
 	TitleForm     string // if set, one of TitleForms: what each title carries besides its words
 	Note          string // if set, a sentence added to the notes of every row of this input
+	TitleFromRef  bool   // a title that is only "Sermon N" becomes "Sermon N: <its ref>"
 }
 
 var (
@@ -335,11 +339,16 @@ func BuildSource(files []File, dedupeTitles bool) ([]sources.Row, *Report) {
 				}
 			}
 			// The preaching text a title prints in brackets (Princeton's) is the
-			// ref where the index names none.
-			if titleLabel != "" && len(osis) == 0 && label == "" {
-				if refs, err := LabelToOSIS(CleanTitleLabel(titleLabel)); err != nil {
+			// ref where the index names none. Sedgwick's title prints it where
+			// Logos lists its verses one by one ("Reyel. 12:15, 16." is 12:15
+			// and 12:16): the title's is then the ref, if it holds every one.
+			if titleLabel != "" {
+				refs, err := TitleLabelToOSIS(titleLabel)
+				switch {
+				case err != nil && len(osis) == 0 && label == "":
 					problems = append(problems, err.Error())
-				} else {
+				case err != nil:
+				case len(osis) == 0 && label == "":
 					osis, fromTitle = refs[:1], refs[1:]
 					if len(x.Cited) > 0 {
 						if first, err := LogosToOSIS(x.Cited[0]); err == nil && first != refs[0] {
@@ -347,6 +356,12 @@ func BuildSource(files []File, dedupeTitles bool) ([]sources.Row, *Report) {
 						}
 					}
 					notes = append(notes, "The ref is read from the title; the archive's index names no text for it.")
+					rep.FromTitle++
+					readFromTitle = true
+					labelErr = nil
+				case file.TitleForm == FormRefInBrackets && len(osis) > 0 && holdsAll(refs[0], osis):
+					osis, fromTitle = refs[:1], refs[1:]
+					notes = append(notes, "The ref is read from the title, which prints the whole text; Logos lists its verses one by one.")
 					rep.FromTitle++
 					readFromTitle = true
 					labelErr = nil
@@ -404,6 +419,20 @@ func BuildSource(files []File, dedupeTitles bool) ([]sources.Row, *Report) {
 			if len(cited) > 0 {
 				r.Cited = cited
 				rep.Cited++
+			}
+
+			// A title that is only "Sermon N" (Moberly's) is the number and the
+			// text: "Sermon I: Matthew 5:3". With no ref there is nothing to add.
+			if file.TitleFromRef {
+				if _, bare, ok := SermonNumber(title); ok && bare {
+					if r.Ref != nil {
+						r.Title = strings.TrimRight(title, " :.") + ": " + ReadableRef(*r.Ref)
+						notes = append(notes, "The title is the sermon's number and its text; the archive's index titles it by the number alone.")
+						rep.TitledByRef++
+					} else {
+						rep.BareNoRef = append(rep.BareNoRef, fmt.Sprintf("%s: %q", id, title))
+					}
+				}
 			}
 
 			// A contents entry that reads "Chapter I: Gen. 19:15" is titled
@@ -480,6 +509,22 @@ func BuildSource(files []File, dedupeTitles bool) ([]sources.Row, *Report) {
 	return rows, rep
 }
 
+// holdsAll says whether the first reference is a range that holds every one
+// of the others.
+func holdsAll(first string, others []string) bool {
+	whole, err := passage.Parse(first)
+	if err != nil {
+		return false
+	}
+	for _, o := range others {
+		r, err := passage.Parse(o)
+		if err != nil || r.Lo < whole.Lo || r.Hi > whole.Hi {
+			return false
+		}
+	}
+	return true
+}
+
 func sameRefs(a, b []string) bool {
 	if len(a) != len(b) {
 		return false
@@ -547,6 +592,9 @@ func (r *Report) Summary() string {
 	if r.Retitled > 0 {
 		fmt.Fprintf(&b, "titles made readable:                %d\n", r.Retitled)
 	}
+	if r.TitledByRef > 0 {
+		fmt.Fprintf(&b, "titles that took their ref:          %d\n", r.TitledByRef)
+	}
 	if len(r.Multipart) > 0 {
 		fmt.Fprintf(&b, "contents entries split in parts:     %d\n", len(r.Multipart))
 	}
@@ -574,6 +622,9 @@ func (r *Report) Markdown(id string, inNames []string) string {
 	}
 	if r.TitleForm != "" {
 		cmd += fmt.Sprintf(" --title-form %q", r.TitleForm)
+	}
+	if r.TitleFromRef {
+		cmd += " --title-from-ref"
 	}
 	if r.Note != "" {
 		cmd += fmt.Sprintf(" --note %q", r.Note)
@@ -621,6 +672,9 @@ func (r *Report) Markdown(id string, inNames []string) string {
 	}
 	if len(r.TitleDisagree) > 0 || r.TitleForm == FormByPreacherRef {
 		list("The title and Logos disagree", "The passage a title prints and the first passage Logos lists for the sermon differ; the row carries the title's, which is the book's own word for its text, and Logos's stays in the row among its cited passages.", r.TitleDisagree)
+	}
+	if r.TitleFromRef {
+		list("Bare sermon numbers with no ref", "--title-from-ref adds the text to a title that is only \"Sermon N\"; these have no ref to add, so the row keeps the title as it is.", r.BareNoRef)
 	}
 	list("References the book table refused", "A Logos reference to a book outside the sixty-six, or a chapter or verse past the end; it is left out of the row, and the row stays.", r.Refused)
 	list("Series rows", "The ref spans more than three chapters (a whole book or a long text): the row is kept, found by its title and listed by its source, and matched by no passage.", r.Wide)

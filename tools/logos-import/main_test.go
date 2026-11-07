@@ -1261,3 +1261,233 @@ func TestNotImportedBooksAreNamedInTheReport(t *testing.T) {
 		t.Errorf("REPORT.md names books not imported with none given")
 	}
 }
+
+// Batch 5a. Sedgwick prints his text in his title in the old spelling,
+// "Reyel. 12:15, 16.", which Logos lists as two separate verses.
+func TestTitleLabelToOSISReadsSedgwicksText(t *testing.T) {
+	if got := CleanTitleLabel("Reyel. 12:15, 16."); got != "Revelation 12:15, 16" {
+		t.Errorf("CleanTitleLabel = %q, want %q", got, "Revelation 12:15, 16")
+	}
+	for in, want := range map[string][]string{
+		"Reyel. 12:15, 16.":  {"Rev.12.15-Rev.12.16"},
+		"Reyel. 12:15,16":    {"Rev.12.15-Rev.12.16"},
+		"Jerem . 4:3":        {"Jer.4.3"},
+		"Luke 10:17, 20":     {"Luke.10.17", "Luke.10.20"},
+		"John 3:14, 15, 16":  {"John.3.14-John.3.16"},
+		"Psalms 90:9":        {"Ps.90.9"},
+		"Romans 5:1-3, 6, 7": {"Rom.5.1-Rom.5.3", "Rom.5.6-Rom.5.7"},
+	} {
+		got, err := TitleLabelToOSIS(in)
+		if err != nil || !reflect.DeepEqual(got, want) {
+			t.Errorf("TitleLabelToOSIS(%q) = %v, %v; want %v", in, got, err, want)
+		}
+	}
+	if got, err := TitleLabelToOSIS("Reyel. 99:1"); err == nil {
+		t.Errorf("a chapter past the end is read: %v", got)
+	}
+}
+
+func TestParseTitleRefInBrackets(t *testing.T) {
+	p, ok := ParseTitle(FormRefInBrackets, "The Nature and Danger of Heresies (Reyel. 12:15, 16.)")
+	if !ok || p.Title != "The Nature and Danger of Heresies" || p.Label != "Reyel. 12:15, 16." || p.Preacher != "" {
+		t.Errorf("ParseTitle = %+v, %v", p, ok)
+	}
+	for _, title := range []string{
+		"A Sermon Preached at the Late Fast, to the Commons House of Parliament",
+		"Burnt (July the 6th, 1645)",
+		"Second Part: And Sow Not among Thornes (Part Two)",
+	} {
+		if p, ok := ParseTitle(FormRefInBrackets, title); ok {
+			t.Errorf("ParseTitle(%q) = %+v, want it refused", title, p)
+		}
+	}
+}
+
+func TestReadableRef(t *testing.T) {
+	for in, want := range map[string]string{
+		"Matt.5.3":              "Matthew 5:3",
+		"Matt.23.29-Matt.23.32": "Matthew 23:29–32",
+		"Acts.5.12-Acts.5.14":   "Acts 5:12–14",
+		"Rom.8":                 "Romans 8",
+		"Ps.3.8":                "Psalms 3:8",
+		"Matt.5.3-Matt.6.2":     "Matthew 5:3–6:2",
+		"Rom.8-Rom.9":           "Romans 8–9",
+		"1Cor.13.4":             "1 Corinthians 13:4",
+		"Jude":                  "Jude",
+	} {
+		if got := ReadableRef(in); got != want {
+			t.Errorf("ReadableRef(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+// AC2: Sedgwick's heresies sermon is Revelation 12:15-16, not 12:15 with 12:16
+// cited; his other six lines are kept as they are.
+func TestSedgwickRefsAreParsed(t *testing.T) {
+	rows, rep := BuildSource([]File{{Name: "sedgwick", Inputs: readFile(t, "testdata/sedgwick-sermons.jsonl"), TitleForm: FormRefInBrackets}}, false)
+	if rep.Input != 7 || len(rows) != 7 || len(rep.Dropped) != 0 || len(rep.NonSermon) != 0 {
+		t.Fatalf("lines %d, rows %d, dropped %v, non-sermons %v; want 7, 7, none, none", rep.Input, len(rows), rep.Dropped, rep.NonSermon)
+	}
+	r := byID(rows, "NTRDNGRHRSS.1-4734")
+	if r == nil || r.Title != "The Nature and Danger of Heresies" || str(r.Preacher) != "Obadiah Sedgwick" || str(r.Ref) != "Rev.12.15-Rev.12.16" {
+		t.Fatalf("Heresies: %+v", r)
+	}
+	for _, c := range r.Cited {
+		if c == "Rev.12.15" || c == "Rev.12.16" {
+			t.Errorf("Heresies cites %s, which its text holds: %v", c, r.Cited)
+		}
+	}
+	if !strings.Contains(str(r.Notes), "read from the title") {
+		t.Errorf("Heresies notes: %q", str(r.Notes))
+	}
+	if len(rep.Disagree) != 0 || len(rep.TitleDisagree) != 0 || len(rep.Refused) != 0 {
+		t.Errorf("disagreements %v %v, refused %v", rep.Disagree, rep.TitleDisagree, rep.Refused)
+	}
+	// The others keep Logos's ref and the title as it is.
+	if r := byID(rows, "THNKSGVNGSRMNWS.1-3910"); r == nil || str(r.Ref) != "Ps.3.8" || !strings.HasPrefix(r.Title, "A Sermon Preached at the Thanksgiving") {
+		t.Errorf("Thanksgiving: %+v", r)
+	}
+	if r := byID(rows, "NGLNDSPRJDGMNTS.1-6622"); r == nil || str(r.Ref) != "Jer.4.3" {
+		t.Errorf("England's Preservation: %+v", r)
+	}
+	if r := byID(rows, "LSHHSTRNSLTNLJH.1-5309"); r == nil || r.Ref != nil || len(r.Cited) == 0 {
+		t.Errorf("Elisha has no ref and cites passages: %+v", r)
+	}
+	// 4 with a Logos text (Thanksgiving, Arke, England's, Heresies), 3 without.
+	if rep.WithRef != 4 || len(rep.NoRef) != 3 || rep.FromTitle != 1 || len(rep.Unparsed) != 6 {
+		t.Errorf("with ref %d, no ref %v, from title %d, unparsed %d; want 4, 3 ids, 1, 6", rep.WithRef, rep.NoRef, rep.FromTitle, len(rep.Unparsed))
+	}
+}
+
+// Without the form, Sedgwick's heresies sermon keeps what Logos lists.
+func TestSedgwickWithoutTheFormKeepsLogosRef(t *testing.T) {
+	rows, _ := BuildRows(readFile(t, "testdata/sedgwick-sermons.jsonl"))
+	r := byID(rows, "NTRDNGRHRSS.1-4734")
+	if r == nil || str(r.Ref) != "Rev.12.15" || r.Title != "The Nature and Danger of Heresies (Reyel. 12:15, 16.)" {
+		t.Errorf("Heresies: %+v", r)
+	}
+}
+
+// AC1: Moberly's titles are only "Sermon I" to "Sermon XV"; each takes its ref.
+func TestMoberlyTitlesComeFromTheirRefs(t *testing.T) {
+	rows, rep := BuildSource([]File{{Name: "moberly", Inputs: readFile(t, "testdata/moberly-sermons.jsonl"), TitleFromRef: true}}, false)
+	if rep.Input != 15 || len(rows) != 15 || rep.WithRef != 15 || rep.TitledByRef != 15 || len(rep.BareNoRef) != 0 {
+		t.Fatalf("lines %d, rows %d, with ref %d, titled by ref %d, bare with no ref %v; want 15, 15, 15, 15, none", rep.Input, len(rows), rep.WithRef, rep.TitledByRef, rep.BareNoRef)
+	}
+	for id, want := range map[string]string{
+		"SRMNSBTTD.1-113776": "Sermon I: Matthew 5:3",
+		"SRMNSBTTD.1-327410": "Sermon IX: Matthew 23:29–32",
+		"SRMNSBTTD.1-353883": "Sermon X: Acts 5:12–14",
+		"SRMNSBTTD.1-387332": "Sermon XI: John 13:18",
+		"SRMNSBTTD.1-418201": "Sermon XII: Revelation 2:14",
+		"SRMNSBTTD.1-444228": "Sermon XIII: Romans 8:9",
+		"SRMNSBTTD.1-469088": "Sermon XIV: Revelation 5:9",
+		"SRMNSBTTD.1-489559": "Sermon XV: Revelation 5:9",
+	} {
+		if r := byID(rows, id); r == nil || r.Title != want || str(r.Preacher) != "George Moberly" {
+			t.Errorf("%s: %+v, want the title %q", id, r, want)
+		}
+	}
+	for _, r := range rows {
+		if !strings.Contains(r.Title, ": ") || r.Ref == nil {
+			t.Errorf("%s is %q with ref %s", r.ID, r.Title, str(r.Ref))
+		}
+		if !strings.Contains(str(r.Notes), "titles it by the number alone") {
+			t.Errorf("%s notes: %q", r.ID, str(r.Notes))
+		}
+	}
+	// Off unless asked.
+	rows, rep = BuildRows(readFile(t, "testdata/moberly-sermons.jsonl"))
+	if r := byID(rows, "SRMNSBTTD.1-113776"); r == nil || r.Title != "Sermon I" || r.Notes != nil || rep.TitledByRef != 0 {
+		t.Errorf("without the flag: %+v", r)
+	}
+}
+
+// A bare "Sermon N" with no ref has nothing to take: kept, and listed.
+func TestBareSermonTitleWithNoRefIsKeptAndListed(t *testing.T) {
+	in := []Input{
+		{ID: "1~10", Title: "Sermon III", Preacher: "X", URL: "https://ref.ly/logosres/LLS:X?off=10"},
+		{ID: "1~20", Title: "Sermon IV: A Title of Its Own", Preacher: "X", Ref: ptr("John 3:16"), URL: "https://ref.ly/logosres/LLS:X?off=20"},
+	}
+	rows, rep := BuildSource([]File{{Name: "x", Inputs: in, TitleFromRef: true}}, false)
+	if len(rows) != 2 || rows[0].Title != "Sermon III" || rows[1].Title != "Sermon IV: A Title of Its Own" || rep.TitledByRef != 0 || len(rep.BareNoRef) != 1 {
+		t.Fatalf("rows %+v, titled %d, bare %v", rows, rep.TitledByRef, rep.BareNoRef)
+	}
+	rep.TitleFromRef = true
+	md := rep.Markdown("x-logos", []string{"x-sermons.jsonl"})
+	for _, want := range []string{"--title-from-ref", "Bare sermon numbers with no ref (1)", "X.1-10"} {
+		if !strings.Contains(md, want) {
+			t.Errorf("REPORT.md lacks %q:\n%s", want, md)
+		}
+	}
+}
+
+// Eyton, Chapin and Watson need no rule: their counts, and what each has.
+func TestEytonChapinWatson(t *testing.T) {
+	for _, c := range []struct {
+		name                  string
+		rows, withRef, cited  int
+		first, firstTitle, pr string
+	}{
+		{"eyton", 17, 0, 17, "BEATITUDES.1-3676", "Sermon I: Christ as a Moral Teacher", "Robert Eyton"},
+		{"chapin", 8, 0, 8, "DSCRSSBTTDS.1-2048", "Discourse I: The Blessing of the Poor in Spirit", "E. H. Chapin"},
+		{"watson", 8, 8, 3, "SRMNSBTTDWATSON.1-3399", "Sermon I: Meekness the Rule of Advancement in Christ’s Kingdom", "Alexander Watson"},
+	} {
+		rows, rep := BuildRows(readFile(t, "testdata/"+c.name+"-sermons.jsonl"))
+		if len(rows) != c.rows || rep.WithRef != c.withRef || rep.Cited != c.cited || len(rep.Dropped) != 0 || len(rep.NonSermon) != 0 {
+			t.Errorf("%s: rows %d, with ref %d, cited %d, dropped %v, non-sermons %v", c.name, len(rows), rep.WithRef, rep.Cited, rep.Dropped, rep.NonSermon)
+			continue
+		}
+		if r := byID(rows, c.first); r == nil || r.Title != c.firstTitle || str(r.Preacher) != c.pr {
+			t.Errorf("%s first: %+v", c.name, r)
+		}
+	}
+	rows, _ := BuildRows(readFile(t, "testdata/watson-sermons.jsonl"))
+	if r := byID(rows, "SRMNSBTTDWATSON.1-3399"); r == nil || str(r.Ref) != "Matt.5.5" {
+		t.Errorf("Watson I: %+v", r)
+	}
+}
+
+// The batch 5a fixtures make rows the checker accepts, and the same bytes twice.
+func TestBatch5aRunPassesTheChecker(t *testing.T) {
+	for _, c := range []struct {
+		in   string
+		opts Options
+		rows int
+	}{
+		{"testdata/sedgwick-sermons.jsonl", Options{TitleForm: FormRefInBrackets}, 7},
+		{"testdata/moberly-sermons.jsonl", Options{TitleFromRef: true}, 15},
+		{"testdata/eyton-sermons.jsonl", Options{}, 17},
+		{"testdata/chapin-sermons.jsonl", Options{}, 8},
+		{"testdata/watson-sermons.jsonl", Options{}, 8},
+	} {
+		out := t.TempDir()
+		if err := run([]string{c.in}, filepath.Base(out), out, "", c.opts, &bytes.Buffer{}); err != nil {
+			t.Fatal(err)
+		}
+		rows1, _ := os.ReadFile(filepath.Join(out, "rows.jsonl"))
+		if n := bytes.Count(rows1, []byte("\n")); n != c.rows {
+			t.Errorf("%s: %d rows, want %d", c.in, n, c.rows)
+		}
+		if c.opts.TitleFromRef && !bytes.Contains(rows1, []byte(`"title":"Sermon I: Matthew 5:3"`)) {
+			t.Errorf("%s: run did not give the title from the ref", c.in)
+		}
+		if c.opts.TitleForm == FormRefInBrackets && !bytes.Contains(rows1, []byte(`"ref":"Rev.12.15-Rev.12.16"`)) {
+			t.Errorf("%s: run did not read Revelation 12:15-16", c.in)
+		}
+		out2 := t.TempDir()
+		if err := run([]string{c.in}, filepath.Base(out), out2, "", c.opts, &bytes.Buffer{}); err != nil {
+			t.Fatal(err)
+		}
+		if rows2, _ := os.ReadFile(filepath.Join(out2, "rows.jsonl")); !bytes.Equal(rows1, rows2) {
+			t.Errorf("%s: two runs differ", c.in)
+		}
+		toml := "id = \"" + filepath.Base(out) + "\"\nname = \"t\"\nkind = \"sermons\"\nlicence = \"x\"\ncredit = \"x\"\nhomepage = \"https://example.org\"\nterms_url = \"https://example.org\"\nadded = 2026-11-06\non_by_default = false\n"
+		if err := os.WriteFile(filepath.Join(out, "source.toml"), []byte(toml), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if faults, warnings := sources.CheckReport(out); len(faults) != 0 || len(warnings) != 0 {
+			t.Errorf("%s: faults %v, warnings %v", c.in, sources.Faults(faults), sources.Faults(warnings))
+		}
+	}
+}
