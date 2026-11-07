@@ -1,0 +1,47 @@
+# C. C. Crawford's Sermon Outlines on Acts (SOACTS) in the
+# Governor's Logos library, 38 rows, made by
+#
+#   go run ./tools/logos-import --in <vault>/plans/sermons-2026-11-05/sermon-outlines-on-acts-sermons.jsonl --chapter-outlines --id sermon-outlines-on-acts-logos --out sources/sermon-outlines-on-acts-logos
+#
+# from the index file the Mayor made of the book on 2026-11-06 (the parser's
+# book-archive form). The index keeps facts only: a title, the passage, the cited
+# passages and the ref.ly address. No sentence of a sermon, and no Logos text, is
+# written anywhere.
+#
+# What the tool counted (REPORT.md lists what it could not place): 86 lines read, 38 rows, 48 dropped by --chapter-outlines.
+# This book is mixed: its index lists the book's chapters, each an outline on a passage, and beside
+# them the numbered sub-points of other chapters, two introductory chapters with no passage, a
+# chapter that only concludes another, two essay chapters and an afterword. The rule
+# (--chapter-outlines): a "Chapter N: Title" line with a passage is a row, one row for each
+# outline (38); the other 48 lines are dropped (42 sub-points, 5 chapters with no passage, the
+# afterword) and REPORT.md lists each with its reason. "Chapter N: " is taken off a title and noted
+# ("Chapter XIX."). All 38 rows have a `ref`; one (Acts 1–7) is over three chapters, so it is a
+# series row, found by title and matched by no verse. Logos cites Romans 16:25 and 16:26 in
+# one row, which the book table refuses (its Romans 16 ends at verse 24); REPORT.md lists it and
+# the row stays.
+# The link (https://ref.ly/logosres/LLS:<resource>?off=<offset>) opens the book at
+# the outline in Logos for an owner of the book and for no one else. It is
+# UNVERIFIED: no one has tapped one yet (sermons check --urls was not run on it).
+
+
+id = "sermon-outlines-on-acts-logos"
+name = "C. C. Crawford's Sermon Outlines on Acts (his Logos library)"
+kind = "sermons"
+
+# No terms page was read or quoted: the Governor's library is his own, and the
+# words below are his, given to the Mayor in the Postern general channel on
+# 2026-11-06 (about 14:52Z), quoted verbatim, with his word "links" for what
+# this index holds.
+licence = """
+index these sermons so that you can add it to your sermon index with links"""
+
+licence_note = """
+From the Governor's own Logos library at his word (2026-11-06, mw-qtu3zvz); the index keeps titles, passages and ref.ly links only; a link opens the sermon only for a Logos owner of the archive. Same footing as the Logos Atlas index (mw-zbjgn3r.9).
+Faithlife's terms bind the books the links open, not these rows; no terms page was read."""
+
+credit = "C. C. Crawford, Sermon Outlines on Acts, in Logos (Faithlife)"
+homepage = "https://www.logos.com/"
+# Faithlife's terms of service, named for the reader; they were not read or quoted for this source.
+terms_url = "https://faithlife.com/terms"
+added = 2026-11-06
+on_by_default = false

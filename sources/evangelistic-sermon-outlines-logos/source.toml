@@ -1,0 +1,42 @@
+# Burris Butler's Evangelistic Sermon Outlines (SOEVANG) in the
+# Governor's Logos library, 29 rows, made by
+#
+#   go run ./tools/logos-import --in <vault>/plans/sermons-2026-11-05/evangelistic-sermon-outlines-sermons.jsonl --skipped "<Sermon Outlines: Soul Winning! Church Building! and its 24 titles>" --id evangelistic-sermon-outlines-logos --out sources/evangelistic-sermon-outlines-logos
+#
+# from the index file the Mayor made of the book on 2026-11-06 (the parser's
+# book-archive form). The index keeps facts only: a title, the passage, the cited
+# passages and the ref.ly address. No sentence of a sermon, and no Logos text, is
+# written anywhere.
+#
+# What the tool counted (REPORT.md lists what it could not place): 29 lines read, 29 rows, none dropped.
+# Each row is one sermon outline, with the passage it is on in Logos's own reference: all 29 have a
+# `ref` and 18 cite further passages. The book's index lists no bracketed passage in a title, so no
+# title form is read. The same series' Soul Winning! Church Building! (LLS:SOSOULWIN) is NOT
+# imported: the Mayor's index found 0 of its 24 titles with a passage; REPORT.md has a Skipped
+# section naming it with the 24 titles, for a later decision.
+# The link (https://ref.ly/logosres/LLS:<resource>?off=<offset>) opens the book at
+# the outline in Logos for an owner of the book and for no one else. It is
+# UNVERIFIED: no one has tapped one yet (sermons check --urls was not run on it).
+
+
+id = "evangelistic-sermon-outlines-logos"
+name = "Burris Butler's Evangelistic Sermon Outlines (his Logos library)"
+kind = "sermons"
+
+# No terms page was read or quoted: the Governor's library is his own, and the
+# words below are his, given to the Mayor in the Postern general channel on
+# 2026-11-06 (about 14:52Z), quoted verbatim, with his word "links" for what
+# this index holds.
+licence = """
+index these sermons so that you can add it to your sermon index with links"""
+
+licence_note = """
+From the Governor's own Logos library at his word (2026-11-06, mw-qtu3zvz); the index keeps titles, passages and ref.ly links only; a link opens the sermon only for a Logos owner of the archive. Same footing as the Logos Atlas index (mw-zbjgn3r.9).
+Faithlife's terms bind the books the links open, not these rows; no terms page was read."""
+
+credit = "Burris Butler, Evangelistic Sermon Outlines, in Logos (Faithlife)"
+homepage = "https://www.logos.com/"
+# Faithlife's terms of service, named for the reader; they were not read or quoted for this source.
+terms_url = "https://faithlife.com/terms"
+added = 2026-11-06
+on_by_default = false
