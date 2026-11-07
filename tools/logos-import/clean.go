@@ -108,8 +108,10 @@ func NonSermon(title string) string {
 		return "a table of contents"
 	case strings.HasPrefix(n, "argument ") || strings.HasPrefix(n, "the argument "):
 		return "the argument of the work"
-	case strings.HasSuffix(n, " index of texts") || n == "index of texts" || strings.HasPrefix(n, "index of "):
+	case strings.HasSuffix(n, " index of texts") || n == "index of texts" || strings.HasPrefix(n, "index of ") || n == "general index":
 		return "an index"
+	case strings.HasPrefix(n, "addresses to successive graduating classes"):
+		return "a heading over the book's closing addresses, which the index does not list one by one"
 	}
 	return ""
 }

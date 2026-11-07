@@ -166,3 +166,113 @@ func TitleDate(title string) string {
 	}
 	return date
 }
+
+// TitleForms are the forms --title-form reads.
+var TitleForms = []string{FormPreacherYears, FormByPreacherRef, FormNumbered}
+
+const (
+	FormPreacherYears = "preacher-years"  // "Basil (329–379): Title" or "Title—Hooker (1586–1647)"
+	FormByPreacherRef = "by-preacher-ref" // "Title—By William Henry Green (John 17:24)"
+	FormNumbered      = "numbered"        // "XXIII: Title"
+)
+
+func validTitleForm(f string) bool {
+	for _, x := range TitleForms {
+		if x == f {
+			return true
+		}
+	}
+	return false
+}
+
+// TitleParts is what a title of one of the TitleForms carries.
+type TitleParts struct {
+	Title    string // the words of the title alone
+	Preacher string // the name printed in the title, if any
+	Years    string // "329–379" or "born 1851", the preacher's years as printed
+	Label    string // the passage printed in the title, as a person writes it
+	Numeral  string // the Roman numeral the title is numbered with
+}
+
+var (
+	yearsRE = `(\d{3,4}\s?–\s?\d{3,4}|Born in \d{4})`
+	// "Basil (329–379): The Creation of the World"
+	yearsFirstRE = regexp.MustCompile(`^([^:()]+?)\s+\(` + yearsRE + `\):\s+(.+)$`)
+	// "The Heavenly Footman—Bunyan (1628–1688)"
+	yearsLastRE = regexp.MustCompile(`^(.+?)—([^—:()]+?)\s+\(` + yearsRE + `\)$`)
+	// "Drifting—By Charles A. Aiken (Hebrews 2:1)"
+	byRefRE = regexp.MustCompile(`^(.+)—By\s+([^()]+?)\s+\(([^()]+)\)$`)
+	// "XXIII: The Claims of the Christian Ministry"
+	numberedRE = regexp.MustCompile(`^([IVXLCDM]+):\s+(.+)$`)
+	// ", Jr." after a name: kept; any other comma between two words of a name is a slip.
+	nameSuffixRE = regexp.MustCompile(`^(?i:jr\.?|sr\.?|[ivx]+|d\.\s?d\.|ll\.\s?d\.|m\.\s?d\.)$`)
+)
+
+// years says a preacher's years the way a note gives them: "329–379" as
+// printed, "Born in 1851" as "born 1851".
+func years(s string) string {
+	s = strings.Join(strings.Fields(s), "")
+	if strings.HasPrefix(s, "Bornin") {
+		return "born " + strings.TrimPrefix(s, "Bornin")
+	}
+	return s
+}
+
+// corRE: "1 Cor." and "2 Cor.", how Princeton's titles print the epistles to
+// the Corinthians, written out before the passage is read.
+var corRE = regexp.MustCompile(`\b([12]) Cor\.`)
+
+// CleanTitleLabel writes out the abbreviation of a passage printed in a
+// title ("2 Cor. 3:6" is "2 Corinthians 3:6"); the book table reads the rest
+// as it stands.
+func CleanTitleLabel(label string) string {
+	return corRE.ReplaceAllString(label, "$1 Corinthians")
+}
+
+// CleanName mends a name set with a comma between two of its words
+// ("William, Paxton" is William Paxton); a suffix ("John Smith, Jr.") stays.
+func CleanName(name string) string {
+	name = strings.Join(strings.Fields(name), " ")
+	words := strings.Split(name, " ")
+	for i := 0; i+1 < len(words); i++ {
+		if w := words[i]; strings.HasSuffix(w, ",") && !nameSuffixRE.MatchString(words[i+1]) {
+			words[i] = strings.TrimSuffix(w, ",")
+		}
+	}
+	return strings.Join(words, " ")
+}
+
+// ParseTitle reads a title of the given form. ok is false when the title does
+// not have the form (a heading, an index): the caller keeps it as it is.
+//
+//   - preacher-years: the World's Great Sermons print "Basil (329–379): The
+//     Creation of the World" (also "Wagner (Born in 1851): ...") and, in
+//     Volume 2, "The Heavenly Footman—Bunyan (1628–1688)". Preacher and years
+//     come from the title; the name the index gives on every line is the
+//     book's editor.
+//   - by-preacher-ref: Princeton Sermons print "Christ’s Desire for His
+//     People—By William Henry Green (John 17:24)": title, preacher and the
+//     preaching text.
+//   - numbered: Strong's collection prints "XXIII: The Claims of ...": the
+//     number is taken off the title.
+func ParseTitle(form, title string) (TitleParts, bool) {
+	title = strings.TrimSpace(title)
+	switch form {
+	case FormPreacherYears:
+		if m := yearsFirstRE.FindStringSubmatch(title); m != nil {
+			return TitleParts{Title: strings.TrimSpace(m[3]), Preacher: CleanName(m[1]), Years: years(m[2])}, true
+		}
+		if m := yearsLastRE.FindStringSubmatch(title); m != nil {
+			return TitleParts{Title: strings.TrimSpace(m[1]), Preacher: CleanName(m[2]), Years: years(m[3])}, true
+		}
+	case FormByPreacherRef:
+		if m := byRefRE.FindStringSubmatch(title); m != nil {
+			return TitleParts{Title: strings.TrimSpace(m[1]), Preacher: CleanName(m[2]), Label: strings.TrimSpace(m[3])}, true
+		}
+	case FormNumbered:
+		if m := numberedRE.FindStringSubmatch(title); m != nil && isRoman(strings.ToLower(m[1])) {
+			return TitleParts{Title: strings.TrimSpace(m[2]), Numeral: m[1]}, true
+		}
+	}
+	return TitleParts{}, false
+}

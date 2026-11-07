@@ -162,7 +162,7 @@ func TestRunWritesTheSameBytesTwice(t *testing.T) {
 	out := t.TempDir()
 	var log bytes.Buffer
 	for i := 0; i < 2; i++ {
-		if err := run([]string{"testdata/sample-sermons.jsonl"}, "sample-logos", out, "", false, "", false, &log); err != nil {
+		if err := run([]string{"testdata/sample-sermons.jsonl"}, "sample-logos", out, "", Options{}, &log); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -192,7 +192,7 @@ func TestRunWritesTheSameBytesTwice(t *testing.T) {
 	// A second run over the same input writes the same bytes.
 	b := &bytes.Buffer{}
 	out2 := t.TempDir()
-	if err := run([]string{"testdata/sample-sermons.jsonl"}, "sample-logos", out2, "", false, "", false, b); err != nil {
+	if err := run([]string{"testdata/sample-sermons.jsonl"}, "sample-logos", out2, "", Options{}, b); err != nil {
 		t.Fatal(err)
 	}
 	a2, _ := os.ReadFile(filepath.Join(out2, "rows.jsonl"))
@@ -429,7 +429,7 @@ func TestRunManyInputs(t *testing.T) {
 	out := t.TempDir()
 	var log bytes.Buffer
 	ins := []string{"testdata/wesley-a-sermons.jsonl", "testdata/wesley-b-sermons.jsonl"}
-	if err := run(ins, "wesley-test-logos", out, "", true, "", false, &log); err != nil {
+	if err := run(ins, "wesley-test-logos", out, "", Options{Dedupe: true}, &log); err != nil {
 		t.Fatal(err)
 	}
 	a, _ := os.ReadFile(filepath.Join(out, "rows.jsonl"))
@@ -447,7 +447,7 @@ func TestRunManyInputs(t *testing.T) {
 	}
 	// Same bytes again.
 	out2 := t.TempDir()
-	if err := run(ins, "wesley-test-logos", out2, "", true, "", false, &bytes.Buffer{}); err != nil {
+	if err := run(ins, "wesley-test-logos", out2, "", Options{Dedupe: true}, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
 	a2, _ := os.ReadFile(filepath.Join(out2, "rows.jsonl"))
@@ -753,7 +753,7 @@ func TestBatch3RowsPassTheChecker(t *testing.T) {
 // follows them.
 func TestRunRecordsPreacherAndRefsFromTitle(t *testing.T) {
 	out := t.TempDir()
-	if err := run([]string{"testdata/augustine-sermons.jsonl"}, "augustine-test-logos", out, "", false, "Augustine", true, &bytes.Buffer{}); err != nil {
+	if err := run([]string{"testdata/augustine-sermons.jsonl"}, "augustine-test-logos", out, "", Options{Preacher: "Augustine", RefsFromTitle: true}, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
 	rep, _ := os.ReadFile(filepath.Join(out, "REPORT.md"))
@@ -792,6 +792,21 @@ func TestNonSermonFrontMatter(t *testing.T) {
 		"Contentment", "The Table of the Lord",
 		"The First Sermon (July the 6th, 1645)",
 	} {
+		if why := NonSermon(title); why != "" {
+			t.Errorf("NonSermon(%q) = %q, want none", title, why)
+		}
+	}
+}
+
+// Batch 4b: the World's Great Sermons end with a General Index, Strong's with
+// a heading over the closing addresses; neither is a sermon.
+func TestNonSermonIndexAndCatchAll(t *testing.T) {
+	for _, title := range []string{"General Index", "L: Addresses to Successive Graduating Classes of the Rochester Theological Seminary"} {
+		if NonSermon(title) == "" {
+			t.Errorf("NonSermon(%q) is empty, want a reason", title)
+		}
+	}
+	for _, title := range []string{"The Index of the Heart", "Addresses to the Class of 1900", "Indexing the Scriptures"} {
 		if why := NonSermon(title); why != "" {
 			t.Errorf("NonSermon(%q) = %q, want none", title, why)
 		}
@@ -969,5 +984,280 @@ func TestRefLessReportWithCitedPassages(t *testing.T) {
 		if !strings.Contains(md, want) {
 			t.Errorf("REPORT.md lacks %q:\n%s", want, md)
 		}
+	}
+}
+
+// Batch 4b: one test for each rule that reads more out of a title.
+
+// "Basil (329–379): The Creation of the World" is the preacher Basil, the
+// years 329–379 and the title alone; Volume 2 prints the preacher after the
+// title, after a dash; a later volume gives "Born in 1851".
+func TestParseTitlePreacherYears(t *testing.T) {
+	for _, c := range []struct {
+		title, words, preacher, years string
+	}{
+		{"Basil (329–379): The Creation of the World", "The Creation of the World", "Basil", "329–379"},
+		{"H. W. Beecher (1813–1887): Immortality", "Immortality", "H. W. Beecher", "1813–1887"},
+		{"Chapin (1814–1880): Nicodemus: The Seeker after Religion", "Nicodemus: The Seeker after Religion", "Chapin", "1814–1880"},
+		{"Wagner (Born in 1851): I Am a Voice", "I Am a Voice", "Wagner", "born 1851"},
+		{"MacArthur (Born in 1841): Christ—The Question of the Centuries", "Christ—The Question of the Centuries", "MacArthur", "born 1841"},
+		{"The Activity of Faith; or, Abraham’s Imitators—Hooker (1586–1647)", "The Activity of Faith; or, Abraham’s Imitators", "Hooker", "1586–1647"},
+		{"Christ’s Advent to Judgment—Jeremy Taylor (1613–1667)", "Christ’s Advent to Judgment", "Jeremy Taylor", "1613–1667"},
+	} {
+		p, ok := ParseTitle(FormPreacherYears, c.title)
+		if !ok || p.Title != c.words || p.Preacher != c.preacher || p.Years != c.years || p.Label != "" || p.Numeral != "" {
+			t.Errorf("ParseTitle(%q) = %+v, %v; want %q by %q, years %q", c.title, p, ok, c.words, c.preacher, c.years)
+		}
+	}
+	for _, title := range []string{"General Index", "Excessive Grief at the Death of Friends", "Sermon 3 (1700–1750)"} {
+		if p, ok := ParseTitle(FormPreacherYears, title); ok {
+			t.Errorf("ParseTitle(%q) = %+v, want it refused", title, p)
+		}
+	}
+}
+
+// Princeton: "Christ’s Desire for His People—By William Henry Green (John
+// 17:24)" is the title, the preacher and the passage; a stray comma in a
+// name ("William, Paxton") is mended, a suffix ("Jr.") is not.
+func TestParseTitleByPreacherRef(t *testing.T) {
+	for _, c := range []struct {
+		title, words, preacher, label string
+	}{
+		{"Christ’s Desire for His People—By William Henry Green (John 17:24)", "Christ’s Desire for His People", "William Henry Green", "John 17:24"},
+		{"The Letter and the Spirit—By Francis L. Patton (2 Cor. 3:6)", "The Letter and the Spirit", "Francis L. Patton", "2 Cor. 3:6"},
+		{"Salvation as a Work—By William, Paxton (Philippians 1:6)", "Salvation as a Work", "William Paxton", "Philippians 1:6"},
+		{"A Title—With a Dash—By John Smith, Jr. (Psalms 90:9)", "A Title—With a Dash", "John Smith, Jr.", "Psalms 90:9"},
+	} {
+		p, ok := ParseTitle(FormByPreacherRef, c.title)
+		if !ok || p.Title != c.words || p.Preacher != c.preacher || p.Label != c.label || p.Years != "" {
+			t.Errorf("ParseTitle(%q) = %+v, %v; want %q by %q (%s)", c.title, p, ok, c.words, c.preacher, c.label)
+		}
+	}
+	if p, ok := ParseTitle(FormByPreacherRef, "Drifting (Hebrews 2:1)"); ok {
+		t.Errorf("a title with no By is read: %+v", p)
+	}
+}
+
+// Strong: "XXIII: The Claims of ..." is numbered; the number is kept apart.
+func TestCleanTitleLabel(t *testing.T) {
+	for in, want := range map[string]string{"2 Cor. 3:6": "2 Corinthians 3:6", "1 Cor. 16:13": "1 Corinthians 16:13", "Psalms 90:9": "Psalms 90:9", "John 17:24": "John 17:24"} {
+		if got := CleanTitleLabel(in); got != want {
+			t.Errorf("CleanTitleLabel(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestParseTitleNumbered(t *testing.T) {
+	for _, c := range []struct{ title, words, numeral string }{
+		{"I: Philosophy and Religion", "Philosophy and Religion", "I"},
+		{"VII: The Will in Theology, or, an Earlier View of the Will", "The Will in Theology, or, an Earlier View of the Will", "VII"},
+		{"XLVIII: Dante and the Divine Comedy", "Dante and the Divine Comedy", "XLVIII"},
+	} {
+		p, ok := ParseTitle(FormNumbered, c.title)
+		if !ok || p.Title != c.words || p.Numeral != c.numeral || p.Preacher != "" {
+			t.Errorf("ParseTitle(%q) = %+v, %v; want %q numbered %s", c.title, p, ok, c.words, c.numeral)
+		}
+	}
+	for _, title := range []string{"Philosophy and Religion", "Sermon III: Faith", "Mix: Not a Numeral"} {
+		if p, ok := ParseTitle(FormNumbered, title); ok {
+			t.Errorf("ParseTitle(%q) = %+v, want it refused", title, p)
+		}
+	}
+}
+
+// The World's Great Sermons: the preacher is the one the title names, the
+// editor the index names on every line is the book's credit in the notes,
+// and the General Index is not a sermon.
+func TestWorldsGreatSermonsPreacherAndYearsFromTitle(t *testing.T) {
+	var files []File
+	for _, n := range []string{"worlds-great-a", "worlds-great-b", "worlds-great-c"} {
+		files = append(files, File{Name: n, Inputs: readFile(t, "testdata/"+n+"-sermons.jsonl"), TitleForm: FormPreacherYears})
+	}
+	rows, rep := BuildSource(files, false)
+	if rep.Input != 32 || len(rows) != 31 || len(rep.NonSermon) != 1 || !strings.Contains(rep.NonSermon[0], "General Index") || len(rep.Unparsed) != 0 {
+		t.Fatalf("lines %d, rows %d, non-sermons %v, unparsed %v; want 32, 31, the General Index, none", rep.Input, len(rows), rep.NonSermon, rep.Unparsed)
+	}
+	r := byID(rows, "WRLDGRTSERM01.1-5589")
+	if r == nil || r.Title != "The Creation of the World" || str(r.Preacher) != "Basil" || r.Ref != nil || str(r.Date) != "<nil>" {
+		t.Fatalf("Basil: %+v", r)
+	}
+	if n := str(r.Notes); !strings.Contains(n, "Preacher’s years: 329–379.") || !strings.Contains(n, "Book credit: Grenville Kleiser.") {
+		t.Errorf("Basil notes: %q", n)
+	}
+	if got := strings.Join(r.Cited, " "); got != "Gen.1.2" {
+		t.Errorf("Basil cited: %q", got)
+	}
+	if r := byID(rows, "WRLDGRTSERM02.1-1004"); r == nil || str(r.Preacher) != "Hooker" || r.Title != "The Activity of Faith; or, Abraham’s Imitators" || !strings.Contains(str(r.Notes), "1586–1647") {
+		t.Errorf("Hooker: %+v", r)
+	}
+	if r := byID(rows, "WRLDGRTSERM10.1-46019"); r == nil || str(r.Preacher) != "Wagner" || !strings.Contains(str(r.Notes), "Preacher born 1851.") {
+		t.Errorf("Wagner: %+v", r)
+	}
+	for _, r := range rows {
+		if str(r.Preacher) == "Grenville Kleiser" || r.Ref != nil {
+			t.Errorf("%s: preacher %s, ref %s", r.ID, str(r.Preacher), str(r.Ref))
+		}
+	}
+}
+
+// Princeton: title, preacher, ref and the passages the sermon cites besides.
+func TestPrincetonSermonsTitlePreacherRef(t *testing.T) {
+	rows, rep := BuildSource([]File{{Name: "princeton-sermons", Inputs: readFile(t, "testdata/princeton-sermons.jsonl"), TitleForm: FormByPreacherRef}}, false)
+	if len(rows) != 16 || len(rep.Unparsed) != 0 || len(rep.Refused) != 0 || rep.WithRef != 16 || rep.FromTitle != 16 {
+		t.Fatalf("rows %d, unparsed %v, refused %v, with ref %d, from title %d", len(rows), rep.Unparsed, rep.Refused, rep.WithRef, rep.FromTitle)
+	}
+	r := byID(rows, "PRINCESERMON.1-5790")
+	if r == nil || r.Title != "Christ’s Desire for His People" || str(r.Preacher) != "William Henry Green" || str(r.Ref) != "John.17.24" || len(r.Cited) != 0 {
+		t.Fatalf("Green: %+v", r)
+	}
+	if n := str(r.Notes); !strings.Contains(n, "Book credit: Princeton Theological Seminary.") || !strings.Contains(n, "read from the title") {
+		t.Errorf("Green notes: %q", n)
+	}
+	// Logos's first cited reference of "Religion in College" is 1 John 2:13,
+	// the title's is John 2:13: the row takes the title's and the report lists it.
+	if len(rep.TitleDisagree) != 1 || !strings.Contains(rep.TitleDisagree[0], "PRINCESERMON.1-170527") || !strings.Contains(rep.TitleDisagree[0], "1John.2.13") || !strings.Contains(rep.TitleDisagree[0], "John.2.13") {
+		t.Errorf("title and Logos disagree: %v", rep.TitleDisagree)
+	}
+	rep.TitleForm = FormByPreacherRef
+	if md := rep.Markdown("princeton-test-logos", []string{"princeton-sermons.jsonl"}); !strings.Contains(md, "The title and Logos disagree (1)") {
+		t.Errorf("REPORT.md lacks the disagreement:\n%s", md)
+	}
+	if r := byID(rows, "PRINCESERMON.1-42127"); r == nil || str(r.Ref) != "John.16.12-John.16.15" || strings.Join(r.Cited, " ") != "John.14.25 John.14.26" {
+		t.Errorf("Hodge: %+v", r)
+	}
+	if r := byID(rows, "PRINCESERMON.1-207437"); r == nil || str(r.Ref) != "2Cor.3.6" || str(r.Preacher) != "Francis L. Patton" {
+		t.Errorf("Patton: %+v", r)
+	}
+	if r := byID(rows, "PRINCESERMON.1-100592"); r == nil || str(r.Preacher) != "William Paxton" || str(r.Ref) != "Phil.1.6" {
+		t.Errorf("Paxton: %+v", r)
+	}
+	for _, r := range rows {
+		if r.Ref == nil || strings.Contains(r.Title, "—By") {
+			t.Errorf("%s: ref %s, title %q", r.ID, str(r.Ref), r.Title)
+		}
+	}
+}
+
+// Strong: the numbers come off the titles and are kept in the notes, with
+// the kind of piece; the last line, a heading over the addresses to the
+// graduating classes, is dropped; the essays and addresses stay.
+func TestStrongEssaysKeptAndKindNoted(t *testing.T) {
+	const kind = "An address, essay or sermon in a collection; the index does not say which."
+	rows, rep := BuildSource([]File{{Name: "strong", Inputs: readFile(t, "testdata/strong-sermons.jsonl"), TitleForm: FormNumbered, Note: kind}}, false)
+	if rep.Input != 50 || len(rows) != 49 || len(rep.NonSermon) != 1 || !strings.Contains(rep.NonSermon[0], "Addresses to Successive Graduating Classes") || len(rep.Unparsed) != 0 {
+		t.Fatalf("lines %d, rows %d, non-sermons %v, unparsed %v; want 50, 49, the catch-all, none", rep.Input, len(rows), rep.NonSermon, rep.Unparsed)
+	}
+	r := byID(rows, "PHILANDREL.1-1485859")
+	if r == nil || r.Title != "Christianity and Political Economy" || str(r.Preacher) != "Augustus Hopkins Strong" || r.Ref != nil {
+		t.Fatalf("XLIV: %+v", r)
+	}
+	if n := str(r.Notes); !strings.Contains(n, "Number XLIV of the collection.") || !strings.Contains(n, kind) {
+		t.Errorf("XLIV notes: %q", n)
+	}
+	if r := byID(rows, "PHILANDREL.1-1447259"); r == nil || strings.Join(r.Cited, " ") != "Matt.19.9 1Cor.7.15 1Cor.7.10 Mark.10.12 Rom.7.3" || r.Ref != nil {
+		t.Errorf("XLIII: %+v", r)
+	}
+	for _, r := range rows {
+		if strings.Contains(r.Title, ": ") && isRoman(strings.ToLower(strings.SplitN(r.Title, ":", 2)[0])) {
+			t.Errorf("%s keeps its number: %q", r.ID, r.Title)
+		}
+	}
+}
+
+// A title that does not have the named form is kept as it is and listed.
+func TestUnparsedTitleIsKeptAndListed(t *testing.T) {
+	in := []Input{{ID: "1~10", Title: "Excessive Grief", Preacher: "Editor", URL: "https://ref.ly/logosres/LLS:X?off=10"}}
+	rows, rep := BuildSource([]File{{Name: "x", Inputs: in, TitleForm: FormPreacherYears}}, false)
+	if len(rows) != 1 || rows[0].Title != "Excessive Grief" || str(rows[0].Preacher) != "Editor" || len(rep.Unparsed) != 1 {
+		t.Fatalf("rows %+v, unparsed %v", rows, rep.Unparsed)
+	}
+	rep.TitleForm = FormPreacherYears
+	md := rep.Markdown("x-logos", []string{"x-sermons.jsonl"})
+	for _, want := range []string{"--title-form \"preacher-years\"", "Titles that did not have the form (1)", "X.1-10"} {
+		if !strings.Contains(md, want) {
+			t.Errorf("REPORT.md lacks %q:\n%s", want, md)
+		}
+	}
+}
+
+// McPherson's Divine Healing Sermons needs no rule: eight lines, eight rows,
+// the preacher as the index names her, the passages cited and no text.
+func TestMcPhersonDivineHealingSermons(t *testing.T) {
+	rows, rep := BuildRows(readFile(t, "testdata/mcpherson-sermons.jsonl"))
+	if len(rows) != 8 || len(rep.NonSermon) != 0 || rep.WithRef != 0 || rep.Cited != 2 || len(rep.Multipart) != 6 {
+		t.Fatalf("rows %d, non-sermons %v, with ref %d, cited %d, multipart %d", len(rows), rep.NonSermon, rep.WithRef, rep.Cited, len(rep.Multipart))
+	}
+	if r := byID(rows, "DVNHLNGSRMNS.1-21041"); r == nil || str(r.Preacher) != "Aimee Semple McPherson" || r.Title != "A Double Cure for a Double Curse" || r.Ref != nil || len(r.Cited) == 0 {
+		t.Errorf("A Double Cure: %+v", r)
+	}
+}
+
+// The batch 4b fixtures make rows the checker accepts, and the same bytes twice.
+func TestBatch4bRunPassesTheChecker(t *testing.T) {
+	for _, c := range []struct {
+		ins  []string
+		opts Options
+		rows int
+	}{
+		{[]string{"testdata/worlds-great-a-sermons.jsonl", "testdata/worlds-great-b-sermons.jsonl", "testdata/worlds-great-c-sermons.jsonl"}, Options{TitleForm: FormPreacherYears}, 31},
+		{[]string{"testdata/princeton-sermons.jsonl"}, Options{TitleForm: FormByPreacherRef}, 16},
+		{[]string{"testdata/mcpherson-sermons.jsonl"}, Options{}, 8},
+		{[]string{"testdata/strong-sermons.jsonl"}, Options{TitleForm: FormNumbered, Note: "A note."}, 49},
+	} {
+		out := t.TempDir()
+		var log bytes.Buffer
+		if err := run(c.ins, filepath.Base(out), out, "", c.opts, &log); err != nil {
+			t.Fatal(err)
+		}
+		rows1, _ := os.ReadFile(filepath.Join(out, "rows.jsonl"))
+		if n := bytes.Count(rows1, []byte("\n")); n != c.rows {
+			t.Errorf("%v: %d rows, want %d", c.ins, n, c.rows)
+		}
+		out2 := t.TempDir()
+		if err := run(c.ins, filepath.Base(out), out2, "", c.opts, &bytes.Buffer{}); err != nil {
+			t.Fatal(err)
+		}
+		rows2, _ := os.ReadFile(filepath.Join(out2, "rows.jsonl"))
+		if !bytes.Equal(rows1, rows2) {
+			t.Errorf("%v: two runs differ", c.ins)
+		}
+		toml := "id = \"" + filepath.Base(out) + "\"\nname = \"t\"\nkind = \"sermons\"\nlicence = \"x\"\ncredit = \"x\"\nhomepage = \"https://example.org\"\nterms_url = \"https://example.org\"\nadded = 2026-11-06\non_by_default = false\n"
+		if err := os.WriteFile(filepath.Join(out, "source.toml"), []byte(toml), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if faults, warnings := sources.CheckReport(out); len(faults) != 0 || len(warnings) != 0 {
+			t.Errorf("%v: faults %v, warnings %v", c.ins, sources.Faults(faults), sources.Faults(warnings))
+		}
+	}
+}
+
+func TestRunRefusesAnUnknownTitleForm(t *testing.T) {
+	err := run([]string{"testdata/sample-sermons.jsonl"}, "x-logos", t.TempDir(), "", Options{TitleForm: "nonsense"}, &bytes.Buffer{})
+	if err == nil || !strings.Contains(err.Error(), "--title-form") {
+		t.Errorf("err = %v", err)
+	}
+}
+
+// A book of the order that gives no rows is named in REPORT.md with why.
+func TestNotImportedBooksAreNamedInTheReport(t *testing.T) {
+	out := t.TempDir()
+	opts := Options{NotImported: []string{"Scofield, Things New and Old (LLS:NWOLDSCOFLD): lesson commentary", "McPherson, This Is That (LLS:THSSMCPHRVNGLST): autobiography"}}
+	if err := run([]string{"testdata/mcpherson-sermons.jsonl"}, "mcpherson-test-logos", out, "", opts, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	rep, _ := os.ReadFile(filepath.Join(out, "REPORT.md"))
+	for _, want := range []string{"## Books not imported (2)", "- Scofield, Things New and Old (LLS:NWOLDSCOFLD): lesson commentary", "- McPherson, This Is That (LLS:THSSMCPHRVNGLST): autobiography", `--not-imported "Scofield, Things New`} {
+		if !strings.Contains(string(rep), want) {
+			t.Errorf("REPORT.md lacks %q:\n%s", want, rep)
+		}
+	}
+	// With none given the report has no such section (earlier sources are unchanged).
+	out2 := t.TempDir()
+	if err := run([]string{"testdata/mcpherson-sermons.jsonl"}, "mcpherson-test-logos", out2, "", Options{}, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	rep2, _ := os.ReadFile(filepath.Join(out2, "REPORT.md"))
+	if strings.Contains(string(rep2), "Books not imported") {
+		t.Errorf("REPORT.md names books not imported with none given")
 	}
 }
