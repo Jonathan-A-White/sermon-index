@@ -538,6 +538,10 @@ func TestLoadLogosArchives(t *testing.T) {
 		{"maclaren-logos", 30, 0, 0, 30},
 		{"kuyper-logos", 7, 0, 0, 7},
 		{"broadus-logos", 21, 0, 0, 21},
+		{"worlds-great-sermons-logos", 113, 0, 0, 113},
+		{"princeton-sermons-logos", 16, 16, 0, 0},
+		{"mcpherson-logos", 8, 0, 0, 8},
+		{"strong-logos", 49, 0, 0, 49},
 	}
 	ctx := context.Background()
 	db := migrated(t)
@@ -678,5 +682,32 @@ func TestLoadLogosArchives(t *testing.T) {
 		if n := count(t, db, "select count(*) from sermons where source_id = $1 and (title ~ '^Chapter [IVXLC0-9]+: ' or title ~* '(^|[^a-z])(preface|epistle to the reader|contents of|alphabetical table|table of the chief heads)')", id); n != 0 {
 			t.Errorf("%s: %d rows that are front matter or keep a Chapter prefix", id, n)
 		}
+	}
+
+	// Batch 4b: the World's Great Sermons name the preacher in the title, not
+	// the editor Grenville Kleiser (kept in the notes); Princeton's title
+	// prints the preacher and the text; Strong's numbers are off the titles and
+	// his index's General Index and catch-all heading are not rows.
+	if n := count(t, db, "select count(*) from sermons where source_id = 'worlds-great-sermons-logos' and id = 'WRLDGRTSERM01.1-5589' and title = 'The Creation of the World' and preacher = 'Basil' and notes like '%Preacher’s years: 329–379.%' and notes like '%Book credit: Grenville Kleiser.%'"); n != 1 {
+		t.Errorf("Basil's Creation of the World: %d, want once", n)
+	}
+	if n := count(t, db, "select count(*) from sermons where source_id = 'worlds-great-sermons-logos' and (preacher = 'Grenville Kleiser' or title ~ '\\([0-9]{3,4}–' or title ~ '^General Index')"); n != 0 {
+		t.Errorf("World's Great Sermons: %d rows with the editor as preacher, years in the title or the General Index", n)
+	}
+	rg, err = passage.Parse("John.17.24")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := count(t, db, "select count(*) from sermon_passages p join sermons s on s.source_id = p.source_id and s.id = p.sermon_id where p.role = 'text' and p.source_id = 'princeton-sermons-logos' and s.id = 'PRINCESERMON.1-5790' and s.title = 'Christ’s Desire for His People' and s.preacher = 'William Henry Green' and p.span && $1::int4range", rg.PG()); n != 1 {
+		t.Errorf("Princeton's Christ's Desire for His People under John 17:24: %d, want once", n)
+	}
+	if n := count(t, db, "select count(*) from sermons where source_id = 'princeton-sermons-logos' and title like '%—By %'"); n != 0 {
+		t.Errorf("Princeton: %d titles that keep the preacher", n)
+	}
+	if n := count(t, db, "select count(*) from sermons where source_id = 'strong-logos' and id = 'PHILANDREL.1-1485859' and title = 'Christianity and Political Economy' and notes like '%Number XLIV of the collection.%'"); n != 1 {
+		t.Errorf("Strong's XLIV: %d, want once", n)
+	}
+	if n := count(t, db, "select count(*) from sermons where source_id = 'strong-logos' and (title ~ '^[IVXLC]+: ' or title ~* '^addresses to successive')"); n != 0 {
+		t.Errorf("Strong: %d titles that keep a number or are the catch-all heading", n)
 	}
 }
