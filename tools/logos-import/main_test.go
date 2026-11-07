@@ -841,6 +841,28 @@ func TestBurroughsFrontMatterDropped(t *testing.T) {
 	}
 }
 
+// Burroughs, The Saints' Happiness, Sermon XIX: Logos's own reference is Psalm
+// 5:6 where the label and the title say "Math . 5:6" (Matthew 5:6). The label
+// is read, so the disagreement is listed in REPORT.md; the row keeps Logos's
+// reference.
+func TestBurroughsOldAbbreviationLabelDisagrees(t *testing.T) {
+	rows, rep := BuildRows(readFile(t, "testdata/burroughs-c-sermons.jsonl"))
+	r := byID(rows, "WRKSBURROUGHS04.1-620841")
+	if r == nil || r.Ref == nil || *r.Ref != "Ps.5.6" {
+		t.Fatalf("Sermon XIX: %+v; want it to keep Logos's Ps.5.6", r)
+	}
+	if got, err := LabelToOSIS("Math . 5:6"); err != nil || len(got) != 1 || got[0] != "Matt.5.6" {
+		t.Errorf(`LabelToOSIS("Math . 5:6") = %v, %v; want Matt.5.6`, got, err)
+	}
+	if len(rep.Disagree) != 1 || !strings.Contains(rep.Disagree[0], "WRKSBURROUGHS04.1-620841") || !strings.Contains(rep.Disagree[0], "Ps.5.6") || !strings.Contains(rep.Disagree[0], "Matt.5.6") {
+		t.Errorf("disagreements %v; want Sermon XIX listed (Logos Ps.5.6, label Matt.5.6)", rep.Disagree)
+	}
+	md := rep.Markdown("burroughs-test-logos", []string{"burroughs-c-sermons.jsonl"})
+	if !strings.Contains(md, "Logos and the label disagree (1)") || !strings.Contains(md, "WRKSBURROUGHS04.1-620841") {
+		t.Errorf("REPORT.md does not list Sermon XIX under the disagreements:\n%s", md)
+	}
+}
+
 // Keach and Kuyper: the table of heads, the Epistle to the Reader and the
 // Author's Preface (which has a ref of its own, the text of the whole book)
 // are front matter.

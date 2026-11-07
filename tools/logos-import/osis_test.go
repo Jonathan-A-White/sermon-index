@@ -108,6 +108,29 @@ func TestLabelToOSIS(t *testing.T) {
 		{"Exodus, 20:8", []string{"Exod.20.8"}},
 		{"Psalm l9:1", []string{"Ps.19.1"}},
 		{"Acts 1:12–15; 2:1, l7", []string{"Acts.1.12-Acts.1.15", "Acts.2.1", "Acts.2.17"}},
+		// Old abbreviations, with a stray space or colon before the chapter
+		// (Burroughs's "Math . 5:6", "Math : 5:4") and a point after the book.
+		{"Math . 5:6", []string{"Matt.5.6"}},
+		{"Math : 5:4", []string{"Matt.5.4"}},
+		{"Math. 5:3", []string{"Matt.5.3"}},
+		{"Matth. 5:3", []string{"Matt.5.3"}},
+		{"Colos 3:1", []string{"Col.3.1"}},
+		{"Colos. 3:1", []string{"Col.3.1"}},
+		{"Hebr. 11:1", []string{"Heb.11.1"}},
+		{"Hebr 11:1", []string{"Heb.11.1"}},
+		{"Philippians . 4:11", []string{"Phil.4.11"}},
+		// The ordinary abbreviations, and a leading St.
+		{"Matt. 6:22", []string{"Matt.6.22"}},
+		{"ROM. 8:12", []string{"Rom.8.12"}},
+		{"ISA. 54:10", []string{"Isa.54.10"}},
+		{"1 Cor. 15:35", []string{"1Cor.15.35"}},
+		{"2 Chron. 7:14", []string{"2Chr.7.14"}},
+		{"Ex. 12:3", []string{"Exod.12.3"}},
+		{"Philip. 3:13", []string{"Phil.3.13"}},
+		{"Jam 1:5", []string{"Jas.1.5"}},
+		{"St. Matthew 5:10", []string{"Matt.5.10"}},
+		{"ST. JOHN 13:18", []string{"John.13.18"}},
+		{"Matt. 5:3; Luke 6:20", []string{"Matt.5.3", "Luke.6.20"}},
 	}
 	for _, c := range cases {
 		got, err := LabelToOSIS(c.in)
@@ -115,7 +138,7 @@ func TestLabelToOSIS(t *testing.T) {
 			t.Errorf("LabelToOSIS(%q) = %v, %v; want %v", c.in, got, err, c.want)
 		}
 	}
-	for _, in := range []string{"", "Exodus 3 and 4", "Tobit 3", "Romans 99", "Romans 5:99", "Crusade July 4", "Romans x"} {
+	for _, in := range []string{"", "Exodus 3 and 4", "Tobit 3", "Romans 99", "Romans 5:99", "Crusade July 4", "Romans x", "Mathematics 5:6", "Exam 3:4"} {
 		if got, err := LabelToOSIS(in); err == nil {
 			t.Errorf("LabelToOSIS(%q) = %v; want an error", in, got)
 		}
