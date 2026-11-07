@@ -557,6 +557,12 @@ func TestLoadLogosArchives(t *testing.T) {
 		{"sermon-outlines-for-special-days-logos", 28, 28, 0, 0},
 		{"sermon-outlines-on-1-corinthians-logos", 28, 28, 0, 0},
 		{"sermon-outlines-on-acts-logos", 38, 37, 1, 0},
+		{"sermon-outlines-on-christian-living-logos", 30, 30, 0, 0},
+		{"sermon-outlines-on-ephesians-logos", 26, 26, 0, 0},
+		{"sermon-outlines-on-galatians-ephesians-philippians-colossians-logos", 30, 30, 0, 0},
+		{"sermon-outlines-on-romans-logos", 28, 28, 0, 0},
+		{"sermon-outlines-on-the-gospels-logos", 26, 26, 0, 0},
+		{"sermon-starters-volume-1-logos", 200, 200, 0, 0},
 	}
 	ctx := context.Background()
 	db := migrated(t)
@@ -600,13 +606,15 @@ func TestLoadLogosArchives(t *testing.T) {
 	// Romans 5:8: Greg Laurie preached on Romans 5 three times (YEAR.2000.8,
 	// YEAR.2006.30, YEAR.2010.2); the only other texts there are two Sermon
 	// Outlines (Special Days' Memorial Day, Romans 5:6-8, and Seekers' The
-	// Great Therefore, Romans 5:1-10).
+	// Great Therefore, Romans 5:1-10), two Sermon Outlines on Romans (Peace
+	// on Earth? How?, 5:1-11, and The Verdict Changed, 5:6-11) and Sermon
+	// Starters' God's Love (5:8).
 	rom58, err := passage.Parse("Rom.5.8")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if n := count(t, db, "select count(distinct (p.source_id, p.sermon_id)) from sermon_passages p where p.role = 'text' and p.source_id like '%-logos' and p.span && $1::int4range", rom58.PG()); n != 5 {
-		t.Errorf("%d Logos rows on Romans 5:8, want 5", n)
+	if n := count(t, db, "select count(distinct (p.source_id, p.sermon_id)) from sermon_passages p where p.role = 'text' and p.source_id like '%-logos' and p.span && $1::int4range", rom58.PG()); n != 8 {
+		t.Errorf("%d Logos rows on Romans 5:8, want 8", n)
 	}
 	if n := count(t, db, "select count(*) from sermon_passages p where p.role = 'text' and p.source_id like '%-logos' and p.sermon_id in ('YEAR.2000.8', 'YEAR.2006.30', 'YEAR.2010.2') and p.span && $1::int4range", rom58.PG()); n != 3 {
 		t.Errorf("YEAR.2000.8, YEAR.2006.30 and YEAR.2010.2 on Romans 5:8: %d, want 3", n)
@@ -810,5 +818,35 @@ func TestLoadLogosArchives(t *testing.T) {
 	}
 	if n := count(t, db, "select count(*) from sermons where source_id like '%soul-winning%'"); n != 0 {
 		t.Errorf("%d rows of the Soul Winning book, which is not imported", n)
+	}
+
+	// Batch 6b (five more Sermon Outlines books and Sermon Starters, Volume
+	// 1): the passage in a title is the ref and is off the title, a bracketed
+	// text over two chapters ("Galatians 1:1-2:21") included; a title's
+	// "10a" is read to verse 10; the Scripture Index of Sermon Starters is not
+	// a row (201 lines, 200 rows).
+	for _, c := range []struct {
+		source, id, title, ref, preacher string
+	}{
+		{"sermon-outlines-on-galatians-ephesians-philippians-colossians-logos", "SOGEPC.2-2070", "Paul and the Gospel", "Gal.1.1-Gal.2.21", "Sam E. Stone"},
+		{"sermon-outlines-on-romans-logos", "SOROM.1-3975", "Condition? Critical!", "Rom.1.18-Rom.2.2", "Marshall W. Hayden"},
+		{"sermon-outlines-on-christian-living-logos", "SOCHRLIV.1-25496", "Faithfulness in Hard Places", "2Pet.2.1-2Pet.2.10", "Burris Butler"},
+		{"sermon-outlines-on-the-gospels-logos", "SOGOSP.1-7483", "The Best of the Good News", "John.3.16-John.3.17", "Mark Scott"},
+		{"sermon-outlines-on-ephesians-logos", "SOEPH.1-7468", "Marks of the Church: Part 1", "Eph.1.15-Eph.1.23", "Floyd Strater"},
+		{"sermon-starters-volume-1-logos", "SERMONSTARTERS01.2-7635", "Disinterest in God", "Gen.4.16", "John G. Butler"},
+	} {
+		rg, err := passage.Parse(c.ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if n := count(t, db, "select count(*) from sermon_passages p join sermons s on s.source_id = p.source_id and s.id = p.sermon_id where p.role = 'text' and p.source_id = $1 and s.id = $2 and s.title = $3 and s.preacher = $4 and s.url like 'https://ref.ly/logosres/LLS:%?off=%' and p.span = $5::int4range", c.source, c.id, c.title, c.preacher, rg.PG()); n != 1 {
+			t.Errorf("%s %s %q exactly %s: %d, want once", c.source, c.id, c.title, c.ref, n)
+		}
+	}
+	if n := count(t, db, "select count(*) from sermons where source_id in ('sermon-outlines-on-christian-living-logos', 'sermon-outlines-on-ephesians-logos', 'sermon-outlines-on-galatians-ephesians-philippians-colossians-logos', 'sermon-outlines-on-romans-logos', 'sermon-outlines-on-the-gospels-logos', 'sermon-starters-volume-1-logos') and title ~ '\\((1 |2 )?[A-Z][a-z]+ [0-9]+[:0-9,–a-b ]*\\)$'"); n != 1 {
+		t.Errorf("%d batch 6b rows that keep a bracketed passage, want the one with two passages (Pears or Prickle?)", n)
+	}
+	if n := count(t, db, "select count(*) from sermons where source_id = 'sermon-starters-volume-1-logos' and title ilike '%index%'"); n != 0 {
+		t.Errorf("%d Sermon Starters rows that are the Scripture Index", n)
 	}
 }
