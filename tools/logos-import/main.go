@@ -22,7 +22,10 @@
 // World", "Christ’s Desire for His People—By William Henry Green (John 17:24)",
 // "XXIII: The Claims of the Christian Ministry" (see titles.go);
 // "I. Primeiro Sermão: Gênesis 25.12–22" (pt-ref: Calvin in Portuguese, the
-// title kept whole); --title-from-ref adds a row's ref to a title that is only "Sermon N". It writes REPORT.md beside rows.jsonl
+// title kept whole); --title-from-ref adds a row's ref to a title that is only "Sermon N";
+// --chapter-outlines keeps only the "Chapter N: Title" lines that have a passage
+// (Sermon Outlines on Acts, which lists numbered sub-points beside its chapters);
+// --skipped names a book of the order left out, with its titles. It writes REPORT.md beside rows.jsonl
 // (what it dropped and what it could not place). A run over the same input
 // writes the same bytes. source.toml is by hand (docs/adding-a-source.md).
 package main
@@ -52,16 +55,19 @@ func main() {
 	titleForm := flag.String("title-form", "", "read preacher, years, passage or number from each title: "+strings.Join(TitleForms, ", "))
 	var notImported stringList
 	flag.Var(&notImported, "not-imported", "a book of the order this source leaves out and why, \"<book>: <why>\" (more than once); REPORT.md names it")
+	var skipped stringList
+	flag.Var(&skipped, "skipped", "a book of the order this source leaves out, with its titles, \"<book>: <why> || <title> || <title>\" (more than once); REPORT.md has a Skipped section")
+	chapterOutlines := flag.Bool("chapter-outlines", false, "the book is chapters, each an outline on a passage, with numbered sub-points beside them: only a \"Chapter N: Title\" line with a passage is a row (Sermon Outlines on Acts)")
 	note := flag.String("note", "", "a sentence added to the notes of every row (the kind of the book's pieces, where the index does not say)")
 	titleFromRef := flag.Bool("title-from-ref", false, "a title that is only \"Sermon N\" becomes \"Sermon N: <its ref>\" (Moberly's)")
 	refsFromTitle := flag.Bool("refs-from-title", false, "a line with no Logos reference and no label that reads takes its ref from the passages its title names (Augustine's titles)")
 	report := flag.String("report", "", "where to write the report (default <out>/REPORT.md)")
 	flag.Parse()
 	if len(ins) == 0 || *id == "" || *out == "" || flag.NArg() != 0 {
-		fmt.Fprintln(os.Stderr, "usage: logos-import --in <slug>-sermons.jsonl [--in <more>] [--dedupe-titles] [--preacher <name>] [--refs-from-title] [--title-form <form>] [--title-from-ref] [--note <text>] [--not-imported <book: why>] --id <source id> --out <source dir> [--report <file>]")
+		fmt.Fprintln(os.Stderr, "usage: logos-import --in <slug>-sermons.jsonl [--in <more>] [--dedupe-titles] [--preacher <name>] [--refs-from-title] [--title-form <form>] [--title-from-ref] [--note <text>] [--not-imported <book: why>] [--skipped <book: why || title ...>] [--chapter-outlines] --id <source id> --out <source dir> [--report <file>]")
 		os.Exit(2)
 	}
-	opts := Options{Dedupe: *dedupe, Preacher: *preacher, RefsFromTitle: *refsFromTitle, TitleForm: *titleForm, Note: *note, NotImported: notImported, TitleFromRef: *titleFromRef}
+	opts := Options{Dedupe: *dedupe, Preacher: *preacher, RefsFromTitle: *refsFromTitle, TitleForm: *titleForm, Note: *note, NotImported: notImported, TitleFromRef: *titleFromRef, Skipped: skipped, ChapterOutlines: *chapterOutlines}
 	if err := run(ins, *id, *out, *report, opts, os.Stdout); err != nil {
 		fmt.Fprintln(os.Stderr, "logos-import:", err)
 		os.Exit(1)
@@ -70,13 +76,15 @@ func main() {
 
 // Options are the flags that shape the rows, as the report repeats them.
 type Options struct {
-	Dedupe        bool     // --dedupe-titles
-	Preacher      string   // --preacher
-	RefsFromTitle bool     // --refs-from-title
-	TitleForm     string   // --title-form
-	Note          string   // --note
-	NotImported   []string // --not-imported
-	TitleFromRef  bool     // --title-from-ref
+	Dedupe          bool     // --dedupe-titles
+	Preacher        string   // --preacher
+	RefsFromTitle   bool     // --refs-from-title
+	TitleForm       string   // --title-form
+	Note            string   // --note
+	NotImported     []string // --not-imported
+	TitleFromRef    bool     // --title-from-ref
+	Skipped         []string // --skipped
+	ChapterOutlines bool     // --chapter-outlines
 }
 
 func run(ins []string, id, out, reportPath string, opts Options, stdout io.Writer) error {
@@ -97,11 +105,11 @@ func run(ins []string, id, out, reportPath string, opts Options, stdout io.Write
 		}
 		base := filepath.Base(in)
 		names = append(names, base)
-		files = append(files, File{Name: strings.TrimSuffix(base, "-sermons.jsonl"), Inputs: inputs, Preacher: opts.Preacher, RefsFromTitle: opts.RefsFromTitle, TitleForm: opts.TitleForm, Note: opts.Note, TitleFromRef: opts.TitleFromRef})
+		files = append(files, File{Name: strings.TrimSuffix(base, "-sermons.jsonl"), Inputs: inputs, Preacher: opts.Preacher, RefsFromTitle: opts.RefsFromTitle, TitleForm: opts.TitleForm, Note: opts.Note, TitleFromRef: opts.TitleFromRef, ChapterOutlines: opts.ChapterOutlines})
 	}
 	rows, rep := BuildSource(files, opts.Dedupe)
 	rep.Preacher, rep.RefsFromTitle, rep.TitleForm, rep.Note, rep.NotImported = opts.Preacher, opts.RefsFromTitle, opts.TitleForm, opts.Note, opts.NotImported
-	rep.TitleFromRef = opts.TitleFromRef
+	rep.TitleFromRef, rep.Skipped, rep.ChapterOutlines = opts.TitleFromRef, opts.Skipped, opts.ChapterOutlines
 	if len(rows) == 0 {
 		return fmt.Errorf("%s: no row to write (%d lines read)", strings.Join(ins, ", "), rep.Input)
 	}

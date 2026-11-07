@@ -83,29 +83,32 @@ type Report struct {
 	DatedFromTitle int // rows whose own date was read from a date in the title (a subset of Dated)
 	Series         int // rows marked series (a ref over more than 3 chapters)
 
-	Preacher      string      // --preacher, if given
-	RefsFromTitle bool        // --refs-from-title
-	TitleForm     string      // --title-form
-	TitleFromRef  bool        // --title-from-ref
-	TitledByRef   int         // rows whose bare "Sermon N" title took the row's ref
-	BareNoRef     []string    // "ID: "title"", bare "Sermon N" titles with no ref to take: kept as they are
-	Note          string      // --note
-	NotImported   []string    // --not-imported: "book: why", books of the order left out
-	TitleDisagree []string    // "ID: ...", the text a title prints is not Logos's first cited reference
-	Unparsed      []string    // "ID: "title"", titles that did not have the form --title-form names: kept as they are
-	Dedupe        bool        // titles of an earlier input were dropped
-	Files         []FileCount // one for each input, in order
-	Duplicates    []string    // "ID: "title" repeats ID", rows dropped for a title already in an earlier input
-	Retitled      int         // rows whose title was made readable
-	Multipart     []string    // ids of entries the contents list splits into parts
+	Preacher        string      // --preacher, if given
+	RefsFromTitle   bool        // --refs-from-title
+	TitleForm       string      // --title-form
+	TitleFromRef    bool        // --title-from-ref
+	ChapterOutlines bool        // --chapter-outlines
+	TitledByRef     int         // rows whose bare "Sermon N" title took the row's ref
+	BareNoRef       []string    // "ID: "title"", bare "Sermon N" titles with no ref to take: kept as they are
+	Note            string      // --note
+	NotImported     []string    // --not-imported: "book: why", books of the order left out
+	TitleDisagree   []string    // "ID: ...", the text a title prints is not Logos's first cited reference
+	Unparsed        []string    // "ID: "title"", titles that did not have the form --title-form names: kept as they are
+	Dedupe          bool        // titles of an earlier input were dropped
+	Files           []FileCount // one for each input, in order
+	Duplicates      []string    // "ID: "title" repeats ID", rows dropped for a title already in an earlier input
+	Retitled        int         // rows whose title was made readable
+	Multipart       []string    // ids of entries the contents list splits into parts
 
-	Dropped   []string // "ID: why", lines not written
-	NonSermon []string // "ID: "title" (why)", lines that are not sermons (a table, an index, an introduction): not written
-	NoRef     []string // ids of rows written with no ref
-	NoDate    []string // ids of rows written with no date of their own (the year alone, or none)
-	Refused   []string // "ID: why", references the book table refused
-	Disagree  []string // "ID: Logos says X, the label says Y"
-	Wide      []string // "ID ref (N chapters)"
+	Dropped    []string // "ID: why", lines not written
+	NotOutline []string // "ID: "title" (why)", lines --chapter-outlines drops: a sub-point, a chapter with no passage, a line that is no chapter
+	Skipped    []string // --skipped: "book: why || title || title", books of the order left out, with their titles
+	NonSermon  []string // "ID: "title" (why)", lines that are not sermons (a table, an index, an introduction): not written
+	NoRef      []string // ids of rows written with no ref
+	NoDate     []string // ids of rows written with no date of their own (the year alone, or none)
+	Refused    []string // "ID: why", references the book table refused
+	Disagree   []string // "ID: Logos says X, the label says Y"
+	Wide       []string // "ID ref (N chapters)"
 }
 
 // FileCount is what one input file gave: its lines, the rows it would give
@@ -127,6 +130,11 @@ type File struct {
 	TitleForm     string // if set, one of TitleForms: what each title carries besides its words
 	Note          string // if set, a sentence added to the notes of every row of this input
 	TitleFromRef  bool   // a title that is only "Sermon N" becomes "Sermon N: <its ref>"
+	// ChapterOutlines: the book is chapters, each an outline on a passage,
+	// with the numbered sub-points of other chapters listed beside them
+	// (Sermon Outlines on Acts). Only a "Chapter N: Title" line that has a
+	// passage is a row.
+	ChapterOutlines bool
 }
 
 var (
@@ -259,6 +267,12 @@ func BuildSource(files []File, dedupeTitles bool) ([]sources.Row, *Report) {
 					continue
 				}
 			}
+			if file.ChapterOutlines {
+				if why := notChapterOutline(title, label != "" || len(x.BibleRefs) > 0); why != "" {
+					rep.NotOutline = append(rep.NotOutline, nonSermonNote(id, title, why))
+					continue
+				}
+			}
 			fc.Before++
 			norm := NormTitle(title)
 			if dedupeTitles && norm != "" {
@@ -359,7 +373,7 @@ func BuildSource(files []File, dedupeTitles bool) ([]sources.Row, *Report) {
 					rep.FromTitle++
 					readFromTitle = true
 					labelErr = nil
-				case file.TitleForm == FormRefInBrackets && len(osis) > 0 && holdsAll(refs[0], osis):
+				case file.TitleForm == FormRefInBrackets && len(osis) > 0 && holdsAll(refs[0], osis) && !(len(osis) == 1 && osis[0] == refs[0]):
 					osis, fromTitle = refs[:1], refs[1:]
 					notes = append(notes, "The ref is read from the title, which prints the whole text; Logos lists its verses one by one.")
 					rep.FromTitle++
@@ -512,6 +526,25 @@ func BuildSource(files []File, dedupeTitles bool) ([]sources.Row, *Report) {
 	return rows, rep
 }
 
+var subPointRE = regexp.MustCompile(`^\d+\.\s`)
+
+// notChapterOutline says why a line of a --chapter-outlines book is not an
+// outline of its own, or "" when it is one: a "Chapter N: Title" line that has
+// a passage. The book lists beside its chapters the numbered sub-points of
+// other chapters ("3. The Duties of Deacons"), a chapter or two with no
+// passage (an introduction, an essay) and its afterword.
+func notChapterOutline(title string, hasPassage bool) string {
+	switch {
+	case subPointRE.MatchString(title):
+		return "a numbered sub-point of a chapter, not an outline of its own"
+	case chapterRE.FindStringSubmatch(title) == nil:
+		return "not a chapter of the book"
+	case !hasPassage:
+		return "a chapter with no passage, an introduction or an essay and not an outline"
+	}
+	return ""
+}
+
 // holdsAll says whether the first reference is a range that holds every one
 // of the others.
 func holdsAll(first string, others []string) bool {
@@ -589,6 +622,9 @@ func (r *Report) Summary() string {
 	fmt.Fprintf(&b, "rows dated by the year alone:        %d\n", r.YearOnly)
 	fmt.Fprintf(&b, "references the book table refused:   %d\n", len(r.Refused))
 	fmt.Fprintf(&b, "Logos and the label disagree:        %d\n", len(r.Disagree))
+	if len(r.NotOutline) > 0 {
+		fmt.Fprintf(&b, "lines dropped as not a chapter outline: %d\n", len(r.NotOutline))
+	}
 	if r.Dedupe {
 		fmt.Fprintf(&b, "duplicates dropped (earlier input):  %d\n", len(r.Duplicates))
 	}
@@ -629,11 +665,17 @@ func (r *Report) Markdown(id string, inNames []string) string {
 	if r.TitleFromRef {
 		cmd += " --title-from-ref"
 	}
+	if r.ChapterOutlines {
+		cmd += " --chapter-outlines"
+	}
 	if r.Note != "" {
 		cmd += fmt.Sprintf(" --note %q", r.Note)
 	}
 	for _, n := range r.NotImported {
 		cmd += fmt.Sprintf(" --not-imported %q", n)
+	}
+	for _, n := range r.Skipped {
+		cmd += fmt.Sprintf(" --skipped %q", n)
 	}
 	fmt.Fprintf(&b, "Written by `%s --id %s --out sources/%s`; do not edit by hand. Only ids, titles, references and addresses are listed.\n\n", cmd, id, id)
 	b.WriteString("## Counts\n\n```\n" + r.Summary() + "```\n\n")
@@ -663,9 +705,23 @@ func (r *Report) Markdown(id string, inNames []string) string {
 	if len(r.NotImported) > 0 {
 		list("Books not imported", "Books of the Governor's order that give this batch no sermon rows, and why (named by hand with --not-imported; the tool did not read them).", r.NotImported)
 	}
+	if len(r.Skipped) > 0 {
+		b.WriteString(fmt.Sprintf("## Skipped (%d)\n\nBooks of the Governor's order this source leaves out, with the titles the Mayor's index found in each (named by hand with --skipped; the tool did not read them). A decision for later.\n\n", len(r.Skipped)))
+		for _, sk := range r.Skipped {
+			parts := strings.Split(sk, " || ")
+			fmt.Fprintf(&b, "- %s\n", parts[0])
+			for _, t := range parts[1:] {
+				fmt.Fprintf(&b, "  - %s\n", t)
+			}
+		}
+		b.WriteString("\n")
+	}
 	list("Lines dropped", "A line with neither a ref nor a title, or with no id, no title, no address or an id already used, is not a row.", r.Dropped)
 	if len(r.NonSermon) > 0 {
 		list("Non-sermon lines dropped", "The archive's index lists them with the sermons, but they are a table, an index of Scripture, an introduction or a book's argument (prolegomena), not a sermon: not written, and not counted in \"rows before\".", r.NonSermon)
+	}
+	if r.ChapterOutlines {
+		list("Chapter and sub-point lines dropped", "The book lists chapters, each an outline on a passage, and beside them the numbered sub-points of other chapters, a chapter or two with no passage and an afterword. The rule: a \"Chapter N: Title\" line with a passage is a row, one row for each outline; every other line is dropped here and not counted in \"rows before\".", r.NotOutline)
 	}
 	if r.Dedupe {
 		list("Duplicates dropped", "The title is the title of a row of an earlier input (the first input is the one kept).", r.Duplicates)

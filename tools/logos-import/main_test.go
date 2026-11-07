@@ -1716,3 +1716,199 @@ func TestBatch5bRunPassesTheChecker(t *testing.T) {
 		}
 	}
 }
+
+// ---- batch 6a: the Sermon Outlines books (mw-qtu3zvz.28) ----
+
+// Sermon Outlines on Acts is mixed: chapters, each an outline on a passage,
+// and the numbered sub-points of other chapters. --chapter-outlines keeps one
+// row for each chapter that has a passage and drops the rest.
+func TestActsKeepsOneRowForEachChapterOutline(t *testing.T) {
+	in := readFile(t, "testdata/sermon-outlines-on-acts-sermons.jsonl")
+	if len(in) != 86 {
+		t.Fatalf("fixture has %d lines, want 86", len(in))
+	}
+	files := []File{{Inputs: in, ChapterOutlines: true}}
+	rows, rep := BuildSource(files, false)
+	if len(rows) != 38 || rep.Rows != 38 || len(rep.NotOutline) != 48 || rep.Input != 86 {
+		t.Fatalf("rows %d, dropped %d, lines %d: want 38, 48, 86", len(rows), len(rep.NotOutline), rep.Input)
+	}
+	for _, r := range rows {
+		if r.Ref == nil {
+			t.Errorf("%s %q has no ref; a kept chapter has a passage", r.ID, r.Title)
+		}
+		if len(r.Title) > 0 && r.Title[0] >= '0' && r.Title[0] <= '9' {
+			t.Errorf("sub-point kept: %q", r.Title)
+		}
+	}
+	// A chapter keeps its passage, loses its "Chapter N: ", and notes the chapter.
+	r := byID(rows, "SOACTS.1-129186")
+	if r == nil || r.Title != "The Holy Spirit in Conversion" || str(r.Ref) != "Acts.7.51-Acts.7.53" || !strings.Contains(str(r.Notes), "Chapter XIX.") {
+		t.Errorf("Chapter XIX: %+v", r)
+	}
+	// A chapter whose passage is not in Acts is an outline of the book too.
+	if r := byID(rows, "SOACTS.1-33015"); r == nil || str(r.Ref) != "Matt.3.11" {
+		t.Errorf("Chapter V: %+v", r)
+	}
+	// What was dropped, and why: a sub-point, a chapter with no passage, the afterword.
+	want := map[string]string{
+		"SOACTS.2-88511":  "sub-point",
+		"SOACTS.1-9251":   "no passage",
+		"SOACTS.1-275413": "no passage",
+		"SOACTS.1-372551": "not a chapter",
+	}
+	got := map[string]string{}
+	for _, d := range rep.NotOutline {
+		id := strings.SplitN(d, ":", 2)[0]
+		got[id] = d
+	}
+	for id, why := range want {
+		if d, ok := got[id]; !ok || !strings.Contains(d, why) {
+			t.Errorf("%s: dropped as %q, want mention of %q", id, d, why)
+		}
+	}
+	// Without the flag every line is a row, as before.
+	all, rep2 := BuildRows(in)
+	if len(all) != 86 || len(rep2.NotOutline) != 0 {
+		t.Errorf("without --chapter-outlines: %d rows, %d dropped", len(all), len(rep2.NotOutline))
+	}
+	// The report says the rule and the count.
+	rep.ChapterOutlines = true
+	md := rep.Markdown("sermon-outlines-on-acts-logos", []string{"sermon-outlines-on-acts-sermons.jsonl"})
+	for _, s := range []string{"## Chapter and sub-point lines dropped (48)", "lines dropped as not a chapter outline: 48\n", "- SOACTS.2-88511:"} {
+		if !strings.Contains(md, s) && !strings.Contains(rep.Summary(), s) {
+			t.Errorf("report lacks %q", s)
+		}
+	}
+}
+
+// The ref in each title parses (ref-in-brackets), and it is the ref the row
+// carries: five rows across the series, one with a chapter-spanning text.
+func TestOutlineTitleRefsAreParsed(t *testing.T) {
+	for _, c := range []struct{ file, id, title, ref string }{
+		{"growing-christians", "SOGROWCHR.1-1913", "So Help Me, Me", "Heb.6.13-Heb.6.20"},
+		{"seekers", "SOSEEKERS.1-9766", "Seven Secrets to Spiritual Success", "Luke.5.1-Luke.5.11"},
+		{"seekers", "SOSEEKERS.1-15704", "Prayer Pointers", "Matt.6"},
+		{"special-days", "SOSPECDAYS.1-8396", "Maundy Thursday: The Example of Jesus at Communion", "Luke.22.7-Luke.22.16"},
+		{"1-corinthians", "SO1COR.1-2867", "Paul and the Corinthians", "1Cor.1.1-1Cor.1.9"},
+	} {
+		name := "sermon-outlines-" + c.file
+		if c.file == "growing-christians" || c.file == "seekers" || c.file == "special-days" {
+			name = "sermon-outlines-for-" + c.file
+		} else {
+			name = "sermon-outlines-on-" + c.file
+		}
+		rows, _ := BuildSource([]File{{Inputs: readFile(t, "testdata/"+name+"-sermons.jsonl"), TitleForm: FormRefInBrackets}}, false)
+		r := byID(rows, c.id)
+		if r == nil || r.Title != c.title || str(r.Ref) != c.ref {
+			t.Errorf("%s %s: %+v", name, c.id, r)
+		}
+	}
+	// A bracketed text over two chapters: 'Title (Galatians 1:1–2:21)'.
+	x := Input{ID: "1~10", Title: "Freedom in Christ (Galatians 1:1–2:21)", Preacher: "A. Preacher",
+		Ref: ptr("Galatians 1:1–2:21"), BibleRefs: []string{"bible.69.1.1-69.2.21"}, URL: "https://ref.ly/logosres/LLS:SOGAL?off=10"}
+	rows, rep := BuildSource([]File{{Inputs: []Input{x}, TitleForm: FormRefInBrackets}}, false)
+	if len(rows) != 1 || rows[0].Title != "Freedom in Christ" || str(rows[0].Ref) != "Gal.1.1-Gal.2.21" || len(rep.Unparsed) != 0 {
+		t.Errorf("Galatians: %+v %v", rows, rep.Unparsed)
+	}
+	// A title with no Logos reference takes the one it prints.
+	x.BibleRefs, x.Ref = nil, nil
+	rows, rep = BuildSource([]File{{Inputs: []Input{x}, TitleForm: FormRefInBrackets}}, false)
+	if len(rows) != 1 || str(rows[0].Ref) != "Gal.1.1-Gal.2.21" || rep.FromTitle != 1 {
+		t.Errorf("Galatians without Logos's ref: %+v (from title %d)", rows, rep.FromTitle)
+	}
+}
+
+// A title that prints exactly the ref Logos has is not "read from the title":
+// nothing was settled by it, so the row has no such note and the report no count.
+func TestTitleRefThatEqualsLogosIsNotNoted(t *testing.T) {
+	rows, rep := BuildSource([]File{{Inputs: readFile(t, "testdata/sermon-outlines-on-1-corinthians-sermons.jsonl"), TitleForm: FormRefInBrackets}}, false)
+	if len(rows) != 28 || rep.FromTitle != 0 {
+		t.Fatalf("%d rows, %d read from the title; want 28 and 0", len(rows), rep.FromTitle)
+	}
+	for _, r := range rows {
+		if strings.Contains(str(r.Notes), "read from the title") {
+			t.Errorf("%s: %s", r.ID, str(r.Notes))
+		}
+	}
+	// Where Logos lists the verses one by one, the title's range still replaces them.
+	x := Input{ID: "1~10", Title: "Sermon on Worry (Matthew 6:25–34)", Ref: ptr("Matthew 6:25"), URL: "https://ref.ly/logosres/LLS:SOX?off=10",
+		BibleRefs: []string{"bible.61.6.25", "bible.61.6.26-61.6.33", "bible.61.6.34"}}
+	rows, rep = BuildSource([]File{{Inputs: []Input{x}, TitleForm: FormRefInBrackets}}, false)
+	if r := rows[0]; str(r.Ref) != "Matt.6.25-Matt.6.34" || !strings.Contains(str(r.Notes), "prints the whole text") || rep.FromTitle != 1 {
+		t.Errorf("Worry: %+v (from title %d)", r, rep.FromTitle)
+	}
+}
+
+// A book of the order that is not imported is named in a "Skipped" section
+// with its titles.
+func TestSkippedBookIsNamedWithItsTitles(t *testing.T) {
+	_, rep := BuildRows(readFile(t, "testdata/evangelistic-sermon-outlines-sermons.jsonl"))
+	rep.Skipped = []string{"Sermon Outlines: Soul Winning! Church Building! (LLS:SOSOULWIN): no title carries a ref, so none can be found by a verse || Preaching with Purpose || Authority"}
+	md := rep.Markdown("evangelistic-sermon-outlines-logos", []string{"evangelistic-sermon-outlines-sermons.jsonl"})
+	for _, s := range []string{
+		"## Skipped (1)",
+		"- Sermon Outlines: Soul Winning! Church Building! (LLS:SOSOULWIN): no title carries a ref, so none can be found by a verse\n  - Preaching with Purpose\n  - Authority\n",
+		"--skipped \"Sermon Outlines: Soul Winning!",
+	} {
+		if !strings.Contains(md, s) {
+			t.Errorf("REPORT.md lacks %q", s)
+		}
+	}
+}
+
+// The batch 6a fixtures make rows the checker accepts, with the counts the
+// Mayor kept (the lines of each index, minus what the rules drop), and the
+// same bytes twice.
+func TestBatch6aRunPassesTheChecker(t *testing.T) {
+	for _, c := range []struct {
+		in           string
+		opts         Options
+		lines, rows  int
+		reportHas    []string
+		reportHasNot []string
+	}{
+		{"testdata/evangelistic-sermon-outlines-sermons.jsonl", Options{Skipped: []string{"Sermon Outlines: Soul Winning! Church Building! (LLS:SOSOULWIN): no ref || Authority"}}, 29, 29, []string{"## Skipped (1)", "  - Authority"}, nil},
+		{"testdata/sermon-outlines-for-growing-christians-sermons.jsonl", Options{TitleForm: FormRefInBrackets}, 27, 27, nil, []string{"## Skipped"}},
+		{"testdata/sermon-outlines-for-seekers-sermons.jsonl", Options{TitleForm: FormRefInBrackets}, 26, 26, nil, nil},
+		{"testdata/sermon-outlines-for-special-days-sermons.jsonl", Options{TitleForm: FormRefInBrackets}, 28, 28, nil, nil},
+		{"testdata/sermon-outlines-on-1-corinthians-sermons.jsonl", Options{TitleForm: FormRefInBrackets}, 28, 28, nil, nil},
+		{"testdata/sermon-outlines-on-acts-sermons.jsonl", Options{ChapterOutlines: true}, 86, 38, []string{"lines dropped as not a chapter outline: 48\n", "--chapter-outlines"}, nil},
+	} {
+		out := t.TempDir()
+		if err := run([]string{c.in}, filepath.Base(out), out, "", c.opts, &bytes.Buffer{}); err != nil {
+			t.Fatal(err)
+		}
+		rows1, _ := os.ReadFile(filepath.Join(out, "rows.jsonl"))
+		if n := bytes.Count(rows1, []byte("\n")); n != c.rows {
+			t.Errorf("%s: %d rows, want %d", c.in, n, c.rows)
+		}
+		md, _ := os.ReadFile(filepath.Join(out, "REPORT.md"))
+		for _, want := range append([]string{
+			fmt.Sprintf("lines read:                          %d\n", c.lines),
+			fmt.Sprintf("rows written:                        %d\n", c.rows),
+		}, c.reportHas...) {
+			if !bytes.Contains(md, []byte(want)) {
+				t.Errorf("%s: REPORT.md lacks %q", c.in, want)
+			}
+		}
+		for _, not := range c.reportHasNot {
+			if bytes.Contains(md, []byte(not)) {
+				t.Errorf("%s: REPORT.md has %q", c.in, not)
+			}
+		}
+		out2 := t.TempDir()
+		if err := run([]string{c.in}, filepath.Base(out), out2, "", c.opts, &bytes.Buffer{}); err != nil {
+			t.Fatal(err)
+		}
+		if rows2, _ := os.ReadFile(filepath.Join(out2, "rows.jsonl")); !bytes.Equal(rows1, rows2) {
+			t.Errorf("%s: two runs differ", c.in)
+		}
+		toml := "id = \"" + filepath.Base(out) + "\"\nname = \"t\"\nkind = \"sermons\"\nlicence = \"x\"\ncredit = \"x\"\nhomepage = \"https://example.org\"\nterms_url = \"https://example.org\"\nadded = 2026-11-06\non_by_default = false\n"
+		if err := os.WriteFile(filepath.Join(out, "source.toml"), []byte(toml), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if faults, warnings := sources.CheckReport(out); len(faults) != 0 || len(warnings) != 0 {
+			t.Errorf("%s: faults %v, warnings %v", c.in, sources.Faults(faults), sources.Faults(warnings))
+		}
+	}
+}
