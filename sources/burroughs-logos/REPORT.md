@@ -20,7 +20,7 @@ rows with their own date:            4
   of them dates read from the title: 4
 rows dated by the year alone:        0
 references the book table refused:   0
-Logos and the label disagree:        1
+Logos and the label disagree:        4
 contents entries split in parts:     4
 ```
 
@@ -62,11 +62,14 @@ The ref spans more than three chapters (a whole book or a long text): the row is
 
 None.
 
-## Logos and the label disagree (1)
+## Logos and the label disagree (4)
 
 Both were read and differ; the row carries Logos's reference.
 
 - WRKSBURROUGHS01.1-478132: Logos says Exod.14; Exod.14.13, the label "Exodus 14" says Exod.14
+- WRKSBURROUGHS04.1-620841: Logos says Ps.5.6, the label "Math . 5:6" says Matt.5.6
+- WRKSBURROUGHS04.1-1285739: Logos says Matt.5; Matt.5.12, the label "Math . 5" says Matt.5
+- WRKSBURROUGHS04.1-1369924: Logos says Matt.5.14; Matt.5.15, the label "Math . 5:14" says Matt.5.14
 
 ## Contents entries split in parts (4)
 

@@ -18,7 +18,7 @@ series rows (ref over >3 chapters):  0
 rows with their own date:            0
 rows dated by the year alone:        0
 references the book table refused:   0
-Logos and the label disagree:        0
+Logos and the label disagree:        2
 contents entries split in parts:     1
 ```
 
@@ -48,11 +48,12 @@ The ref spans more than three chapters (a whole book or a long text): the row is
 
 None.
 
-## Logos and the label disagree (0)
+## Logos and the label disagree (2)
 
 Both were read and differ; the row carries Logos's reference.
 
-None.
+- SERMSCWESLEY.1-162030: Logos says Matt.6.22; Matt.6.23, the label "Matt. 6:22" says Matt.6.22
+- SERMSCWESLEY.1-225350: Logos says Phil.3.13; Phil.3.14, the label "Philip. 3:13" says Phil.3.13
 
 ## Contents entries split in parts (1)
 

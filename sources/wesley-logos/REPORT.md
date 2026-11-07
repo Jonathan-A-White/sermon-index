@@ -18,7 +18,7 @@ series rows (ref over >3 chapters):  0
 rows with their own date:            0
 rows dated by the year alone:        0
 references the book table refused:   2
-Logos and the label disagree:        3
+Logos and the label disagree:        8
 duplicates dropped (earlier input):  117
 ```
 
@@ -175,13 +175,18 @@ The ref spans more than three chapters (a whole book or a long text): the row is
 
 None.
 
-## Logos and the label disagree (3)
+## Logos and the label disagree (8)
 
 Both were read and differ; the row carries Logos's reference.
 
+- 36.0.11.2-975148: Logos says Matt.7.13; Matt.7.14, the label "Mat. 7:13" says Matt.7.13
 - 36.0.11.2-1149015: Logos says Mark.9.38; Mark.9.39, the label "Mark 9:38" says Mark.9.38
 - 36.0.11.2-1721890: Logos says Rom.8.29; Rom.8.30, the label "Romans 8:29" says Rom.8.29
+- 36.0.11.2-2279440: Logos says 2Cor.6.17; 2Cor.6.18, the label "2 Cor. 6:17" says 2Cor.6.17
+- 36.0.11.2-2395822: Logos says Ps.77.7; Ps.77.8, the label "Ps. 77:7" says Ps.77.7
+- 36.0.11.2-2460132: Logos says 1Pet.3.3; 1Pet.3.4, the label "1 Pet. 3:3" says 1Pet.3.3
 - 36.0.11.2-2813847: Logos says Ps.8.3; Ps.8.4, the label "Psalm 8:3" says Ps.8.3
+- 36.0.11.2-3108952: Logos says Matt.6.22; Matt.6.23, the label "Matt. 6:22" says Matt.6.22
 
 ## Rows with no ref (27)
 

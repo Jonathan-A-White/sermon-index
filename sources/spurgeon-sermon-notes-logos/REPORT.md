@@ -18,7 +18,7 @@ series rows (ref over >3 chapters):  0
 rows with their own date:            0
 rows dated by the year alone:        0
 references the book table refused:   0
-Logos and the label disagree:        24
+Logos and the label disagree:        37
 titles made readable:                264
 ```
 
@@ -48,13 +48,17 @@ The ref spans more than three chapters (a whole book or a long text): the row is
 
 None.
 
-## Logos and the label disagree (24)
+## Logos and the label disagree (37)
 
 Both were read and differ; the row carries Logos's reference.
 
+- MYSRMNOTES01.2-34232: Logos says Gen.33.9; Gen.33.11, the label "Gen. 33:9" says Gen.33.9
+- MYSRMNOTES01.2-58464: Logos says Exod.12.3; Exod.12.4, the label "Ex. 12:3" says Exod.12.3
 - MYSRMNOTES01.2-124881: Logos says 1Sam.18.3; 1Sam.20.17, the label "1 Samuel 18:3" says 1Sam.18.3
 - MYSRMNOTES01.2-145495: Logos says 1Kgs.2.28; 1Kgs.2.30, the label "1 Kings 2:28" says 1Kgs.2.28
 - MYSRMNOTES01.2-197468: Logos says 2Kgs.17.25; 2Kgs.17.33; 2Kgs.17.34, the label "2 Kings 17:25" says 2Kgs.17.25
+- MYSRMNOTES01.2-201473: Logos says 1Chr.13.8; 1Chr.13.12; 1Chr.15.25, the label "1 Chron. 13:8" says 1Chr.13.8
+- MYSRMNOTES01.2-235659: Logos says Neh.8.10; Neh.12.43, the label "Neh. 8:10" says Neh.8.10
 - MYSRMNOTES01.2-339008: Logos says Ps.115.17; Ps.115.18, the label "Psalm 115:17" says Ps.115.17
 - MYSRMNOTES01.2-504542: Logos says Isa.49.20; Isa.49.21, the label "Isaiah 49:20" says Isa.49.20
 - MYSRMNOTES01.2-557165: Logos says Jer.3.12; Jer.3.14; Jer.3.22, the label "Jeremiah 3:12" says Jer.3.12
@@ -74,8 +78,17 @@ Both were read and differ; the row carries Logos's reference.
 - MYSRMNOTES03.2-215385: Logos says Luke.22.19; Luke.22.20, the label "Luke 22:19" says Luke.22.19
 - MYSRMNOTES03.2-312450: Logos says John.10.22; John.10.23, the label "John 10:22" says John.10.22
 - MYSRMNOTES03.2-429082: Logos says Rom.6.11; Rom.6.12, the label "Romans 6:11" says Rom.6.11
+- MYSRMNOTES03.2-460480: Logos says 1Cor.6.19; 1Cor.6.20, the label "1 Cor. 6:19" says 1Cor.6.19
+- MYSRMNOTES03.2-482947: Logos says 2Cor.1.3; 2Cor.1.4, the label "2 Cor. 1:3" says 2Cor.1.3
+- MYSRMNOTES03.2-538380: Logos says Gal.6.2; Gal.6.5, the label "Gal. 6:2" says Gal.6.2
+- MYSRMNOTES03.2-557758: Logos says Eph.1.13; Eph.1.14, the label "Eph. 1:13" says Eph.1.13
+- MYSRMNOTES03.2-570154: Logos says Eph.3.16; Eph.3.17; Eph.3.18; Eph.3.19, the label "Eph. 3:16" says Eph.3.16
+- MYSRMNOTES03.2-576433: Logos says Eph.4.15; Eph.4.16, the label "Eph. 4:15" says Eph.4.15
+- MYSRMNOTES03.2-582782: Logos says Eph.4.20; Eph.4.21, the label "Eph. 4:20" says Eph.4.20
+- MYSRMNOTES03.2-629854: Logos says 1Thess.2.13; 1Thess.2.14, the label "1 Thess. 2:13" says 1Thess.2.13
 - MYSRMNOTES03.2-765563: Logos says John.3.3, the label "1 John 3:3" says 1John.3.3
 - MYSRMNOTES03.2-777406: Logos says 1John.3.20; 1John.3.21, the label "1 John 3:20" says 1John.3.20
+- MYSRMNOTES03.2-813514: Logos says Rev.16.8; Rev.16.9, the label "Rev. 16:8" says Rev.16.8
 
 ## Rows with no ref (0)
 

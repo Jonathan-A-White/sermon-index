@@ -18,7 +18,7 @@ series rows (ref over >3 chapters):  1
 rows with their own date:            0
 rows dated by the year alone:        0
 references the book table refused:   1
-Logos and the label disagree:        10
+Logos and the label disagree:        11
 lines dropped as not a chapter outline: 48
 titles made readable:                38
 contents entries split in parts:     22
@@ -95,10 +95,11 @@ The ref spans more than three chapters (a whole book or a long text): the row is
 
 - SOACTS.1-102303 Acts.1-Acts.7 (7 chapters)
 
-## Logos and the label disagree (10)
+## Logos and the label disagree (11)
 
 Both were read and differ; the row carries Logos's reference.
 
+- SOACTS.1-33015: Logos says Matt.3.11; Matt.3.12; Acts.1.4; Acts.1.5; Acts.11.1-Acts.11.4; Acts.2.38-Acts.2.42; Acts.8.36-Acts.8.39; Acts.10.44-Acts.10.48; Acts.19.1-Acts.19.5, the label "Matt. 3:11" says Matt.3.11
 - SOACTS.1-129186: Logos says Acts.7.51-Acts.7.53; Acts.8.26-Acts.8.40, the label "Acts 7:51–53" says Acts.7.51-Acts.7.53
 - SOACTS.1-136277: Logos says Acts.8.5-Acts.8.25; Acts.19.1-Acts.19.12, the label "Acts 8:5–25" says Acts.8.5-Acts.8.25
 - SOACTS.1-171217: Logos says Acts.9.1-Acts.9.22; Acts.22; Acts.26, the label "Acts 9:1–22" says Acts.9.1-Acts.9.22

@@ -18,7 +18,7 @@ series rows (ref over >3 chapters):  0
 rows with their own date:            0
 rows dated by the year alone:        0
 references the book table refused:   0
-Logos and the label disagree:        0
+Logos and the label disagree:        1
 ```
 
 ## Lines dropped (0)
@@ -39,11 +39,11 @@ The ref spans more than three chapters (a whole book or a long text): the row is
 
 None.
 
-## Logos and the label disagree (0)
+## Logos and the label disagree (1)
 
 Both were read and differ; the row carries Logos's reference.
 
-None.
+- SRMNSBTTDWATSON.1-136566: Logos says Matt.5.10; Matt.5.11; Matt.5.12, the label "St. Matthew 5:10" says Matt.5.10
 
 ## Rows with no ref (0)
 

@@ -19,7 +19,7 @@ series rows (ref over >3 chapters):  0
 rows with their own date:            0
 rows dated by the year alone:        0
 references the book table refused:   16
-Logos and the label disagree:        107
+Logos and the label disagree:        166
 ```
 
 ## Rows before and after, by input
@@ -57,7 +57,7 @@ The archive's index lists them with the sermons, but they are a table, an index 
 A Logos reference to a book outside the sixty-six, or a chapter or verse past the end; it is left out of the row, and the row stays.
 
 - 6.60.11.3-2879551: "bible.47.1.15": Logos book 47 is not one of the 66; "bible.47.1.16": Logos book 47 is not one of the 66
-- 6.60.11.3-3054772: "bible.66.16.25-66.16.27": ref 'Rom.16.25-Rom.16.27': verse past the chapter; "Rom. 16:25–27": no book
+- 6.60.11.3-3054772: "bible.66.16.25-66.16.27": ref 'Rom.16.25-Rom.16.27': verse past the chapter; "Rom. 16:25–27": ref 'Rom.16.25-Rom.16.27': verse past the chapter
 - 6.60.12.3-363224: "bible.44.16.12": Logos book 44 is not one of the 66
 - 6.60.12.3-507781: "bible.44.15.16": Logos book 44 is not one of the 66
 - 6.60.12.3-533621: "bible.44.9.15": Logos book 44 is not one of the 66
@@ -79,10 +79,40 @@ The ref spans more than three chapters (a whole book or a long text): the row is
 
 None.
 
-## Logos and the label disagree (107)
+## Logos and the label disagree (166)
 
 Both were read and differ; the row carries Logos's reference.
 
+- 6.60.10.3-367656: Logos says Matt.1.22; Matt.1.23, the label "Matt. 1:22" says Matt.1.22
+- 6.60.10.3-390842: Logos says Matt.2.1; Matt.2.2, the label "Matt. 2:1" says Matt.2.1
+- 6.60.10.3-425359: Logos says Matt.2.4; Matt.2.5, the label "Matt. 2:4" says Matt.2.4
+- 6.60.10.3-506372: Logos says Matt.3.1; Matt.3.2, the label "Matt. 3:1" says Matt.3.1
+- 6.60.10.3-641214: Logos says Matt.5.1; Matt.5.2, the label "Matt. 5:1" says Matt.5.1
+- 6.60.10.3-754721: Logos says Matt.5.27; Matt.5.28, the label "Matt. 5:27" says Matt.5.27
+- 6.60.10.3-790508: Logos says Matt.5.38; Matt.5.39; Matt.5.40, the label "Matt. 5:38" says Matt.5.38
+- 6.60.10.3-911901: Logos says Matt.6.28; Matt.6.29, the label "Matt. 6:28" says Matt.6.28
+- 6.60.10.3-1066121: Logos says Matt.8.14; Matt.8.15, the label "Matt. 8:14" says Matt.8.14
+- 6.60.10.3-1087789: Logos says Matt.8.23; Matt.8.24, the label "Matt. 8:23" says Matt.8.23
+- 6.60.10.3-1113837: Logos says Matt.9.1; Matt.9.2, the label "Matt. 9:1" says Matt.9.1
+- 6.60.10.3-1328681: Logos says Matt.10.7; Matt.10.8; Matt.10.9, the label "Matt. 10:7" says Matt.10.7
+- 6.60.10.3-1362795: Logos says Matt.11.25; Matt.11.26, the label "Matt 11:25" says Matt.11.25
+- 6.60.10.3-1398422: Logos says Matt.12.9; Matt.12.10, the label "Matt. 12:9" says Matt.12.9
+- 6.60.10.3-1420962: Logos says Matt.12.25; Matt.12.26, the label "Matt. 12:25" says Matt.12.25
+- 6.60.10.3-1460318: Logos says Matt.12.38; Matt.12.39, the label "Matt. 12:38" says Matt.12.38
+- 6.60.10.3-1513714: Logos says Matt.13.10; Matt.13.11, the label "Matt. 13:10" says Matt.13.10
+- 6.60.10.3-1547578: Logos says Matt.13.34; Matt.13.35, the label "Matt. 13:34" says Matt.13.34
+- 6.60.10.3-1627159: Logos says Matt.14.23; Matt.14.24, the label "Matt. 14:23" says Matt.14.23
+- 6.60.10.3-1676063: Logos says Matt.15.21; Matt.15.22, the label "Matt. 15:21" says Matt.15.21
+- 6.60.10.3-1842560: Logos says Matt.17.22; Matt.17.23, the label "Matt. 17:22" says Matt.17.22
+- 6.60.10.3-2053010: Logos says Matt.20.29; Matt.20.30, the label "Matt. 20:29" says Matt.20.29
+- 6.60.10.3-2076924: Logos says Matt.21.12; Matt.21.13, the label "Matt. 21:12" says Matt.21.12
+- 6.60.10.3-2238362: Logos says Matt.23.29; Matt.23.30, the label "Matt. 23:29" says Matt.23.29
+- 6.60.10.3-2263000: Logos says Matt.24.1; Matt.24.2, the label "Matt. 24:1" says Matt.24.1
+- 6.60.10.3-2317371: Logos says Matt.24.32; Matt.24.33, the label "Matt. 24:32" says Matt.24.32
+- 6.60.10.3-2397597: Logos says Matt.26.6; Matt.26.7, the label "Matt. 26:6" says Matt.26.6
+- 6.60.10.3-2420180: Logos says Matt.26.17; Matt.26.18, the label "Matt. 26:17" says Matt.26.17
+- 6.60.10.3-2513873: Logos says Matt.26.67; Matt.26.68, the label "Matt. 26:67" says Matt.26.67
+- 6.60.10.3-2535169: Logos says Matt.27.11; Matt.27.12, the label "Matt. 27:11" says Matt.27.11
 - 6.60.11.3-763153: Logos says Acts.1.1; Acts.1.2; Acts.1.1-Acts.1.2, the label "Acts 1:1" says Acts.1.1
 - 6.60.11.3-863563: Logos says Acts.2.1; Acts.2.2; Acts.2.1-Acts.2.2, the label "Acts 2:1" says Acts.2.1
 - 6.60.11.3-1073984: Logos says Acts.4.36; Acts.4.37; Acts.4.36-Acts.4.37, the label "Acts 4:36" says Acts.4.36
@@ -110,6 +140,35 @@ Both were read and differ; the row carries Logos's reference.
 - 6.60.11.3-1909284: Logos says Acts.21.39; Acts.21.40; Acts.21.39-Acts.21.40, the label "Acts 21:39" says Acts.21.39
 - 6.60.11.3-1971700: Logos says Acts.23.31; Acts.23.32; Acts.23.33; Acts.23.31-Acts.23.33, the label "Acts 23:31" says Acts.23.31
 - 6.60.11.3-1997454: Logos says Acts.24.22; Acts.24.23; Acts.24.22-Acts.24.23, the label "Acts 24:22" says Acts.24.22
+- 6.60.11.3-2137404: Logos says Rom.1.1; Rom.1.2; Rom.1.1-Rom.1.2, the label "Rom. 1:1" says Rom.1.1
+- 6.60.11.3-2356781: Logos says Rom.4.1; Rom.4.2; Rom.4.1-Rom.4.2, the label "Rom. 4:1" says Rom.4.1
+- 6.60.11.3-2613563: Logos says Rom.8.12; Rom.8.13; Rom.8.12-Rom.8.13, the label "ROM. 8:12" says Rom.8.12
+- 6.60.11.3-2795611: Logos says Rom.10.14; Rom.10.15; Rom.10.14-Rom.10.15, the label "ROM. 10:14" says Rom.10.14
+- 6.60.11.3-2903313: Logos says Rom.12.4; Rom.12.5; Rom.12.4-Rom.12.5, the label "ROM. 12:4" says Rom.12.4
+- 6.60.11.3-2998421: Logos says Rom.14.1; Rom.14.2; Rom.14.1-Rom.14.2, the label "ROM. 14:1" says Rom.14.1
+- 6.60.11.3-3169640: Logos says Rom.16.17; Rom.16.18; Rom.16.17-Rom.16.18, the label "Rom. 16:17" says Rom.16.17
+- 6.60.12.3-147678: Logos says 1Cor.1.4; 1Cor.1.5, the label "1 Cor. 1:4" says 1Cor.1.4
+- 6.60.12.3-229198: Logos says 1Cor.1.26; 1Cor.1.27, the label "1 Cor. 1:26" says 1Cor.1.26
+- 6.60.12.3-261564: Logos says 1Cor.2.1; 1Cor.2.2, the label "1 Cor. 2:1" says 1Cor.2.1
+- 6.60.12.3-284147: Logos says 1Cor.2.6; 1Cor.2.7, the label "1 Cor. 2:6" says 1Cor.2.6
+- 6.60.12.3-386992: Logos says 1Cor.3.18; 1Cor.3.19, the label "1 Cor. 3:18" says 1Cor.3.18
+- 6.60.12.3-409402: Logos says 1Cor.4.3; 1Cor.4.4, the label "1 Cor. 4:3" says 1Cor.4.3
+- 6.60.12.3-533621: Logos says 1Cor.5.1; 1Cor.5.2, the label "1 Cor. 5:1" says 1Cor.5.1
+- 6.60.12.3-645519: Logos says 1Cor.7.1; 1Cor.7.2, the label "1 Cor. 7:1" says 1Cor.7.1
+- 6.60.12.3-752303: Logos says 1Cor.9.13; 1Cor.9.14, the label "1 Cor. 9:13" says 1Cor.9.13
+- 6.60.12.3-965559: Logos says 1Cor.12.1; 1Cor.12.2, the label "1 Cor. 12:1" says 1Cor.12.1
+- 6.60.12.3-1252842: Logos says 1Cor.15.1; 1Cor.15.2, the label "1 Cor. 15:1" says 1Cor.15.1
+- 6.60.12.3-1366805: Logos says 1Cor.15.35; 1Cor.15.36, the label "1 Cor. 15:35" says 1Cor.15.35
+- 6.60.12.3-1463521: Logos says 2Cor.1.1; 2Cor.1.4, the label "2 Cor. 1:1" says 2Cor.1.1
+- 6.60.12.3-1491223: Logos says 2Cor.1.6; 2Cor.1.7, the label "2 Cor. 1:6" says 2Cor.1.6
+- 6.60.12.3-1602315: Logos says 2Cor.2.12; 2Cor.2.13, the label "2 Cor. 2:12" says 2Cor.2.12
+- 6.60.12.3-1646110: Logos says 2Cor.3.7; 2Cor.3.8, the label "2 Cor. 3:7" says 2Cor.3.7
+- 6.60.12.3-1685271: Logos says 2Cor.4.1; 2Cor.4.2, the label "2 Cor. 4:1" says 2Cor.4.1
+- 6.60.12.3-1702814: Logos says 2Cor.4.8; 2Cor.4.9, the label "2 Cor. 4:8" says 2Cor.4.8
+- 6.60.12.3-1772210: Logos says 2Cor.6.1; 2Cor.6.2, the label "2 Cor. 6:1" says 2Cor.6.1
+- 6.60.12.3-1801893: Logos says 2Cor.6.11; 2Cor.6.12, the label "2 Cor. 6:11" says 2Cor.6.11
+- 6.60.12.3-1824532: Logos says 2Cor.7.2; 2Cor.7.3, the label "2 Cor. 7:2" says 2Cor.7.2
+- 6.60.12.3-1961391: Logos says 2Cor.10.1; 2Cor.10.2, the label "2 Cor. 10:1" says 2Cor.10.1
 - 6.60.13.4-267181: Logos says Gal.1.1-Gal.1.3; Gal.1, the label "Galatians 1:1–3" says Gal.1.1-Gal.1.3
 - 6.60.13.4-329308: Logos says Gal.2.1-Gal.2.2; Gal.2, the label "Galatians 2:1–2" says Gal.2.1-Gal.2.2
 - 6.60.13.4-374209: Logos says Gal.3.1; Gal.3, the label "Galatians 3:1" says Gal.3.1
