@@ -6,6 +6,7 @@ Adding a preacher or a collection is a **data add**: a new directory under `sour
 
 <!-- toc -->
 
+- [Before any crawl or download from a web host](#before-any-crawl-or-download-from-a-web-host)
 - [1. Find the catalogue, and read its terms first](#1-find-the-catalogue-and-read-its-terms-first)
 - [2. Decide: link-out or not at all](#2-decide-link-out-or-not-at-all)
 - [3. Write source.toml and rows.jsonl](#3-write-sourcetoml-and-rowsjsonl)
@@ -19,6 +20,16 @@ Adding a preacher or a collection is a **data add**: a new directory under `sour
 - [The shapes already here](#the-shapes-already-here)
 
 <!-- /toc -->
+
+## Before any crawl or download from a web host
+
+This comes first, before step 1 and before any tool is written, for any new source that is fetched from a web host (a crawl of a site, a download of a file or an archive).
+
+1. **Read the host's terms of use and its `robots.txt`** (the way step 1(b) says: those two pages first, a named User-Agent, one request at a time).
+2. **Quote the clause that allows, or forbids, automated download** word for word on the story's bead before it is released, with the address and the day it was read. Where the terms are silent, say "not addressed"; silence is not a permission. A `robots.txt` that allows a path does not outweigh terms that forbid it.
+3. **A host whose terms forbid automated download is not crawled** without the Governor's or the owner's word. Stop, comment on the bead with the quoted clause and hand back; do not write a tool, fetch the catalogue, or write rows from memory. A link a person found is another matter.
+
+**The worked example: Subsplash (mw-qtu3zvz.13).** A story to crawl Brookfield First's site, which Subsplash hosts, was filed and released with no one having read the host's terms. The Builder read them at `https://subsplash.com/legal/terms-and-conditions` and found that clauses **A.5** and **A.6** forbid "automated means, including spiders, robots, crawlers, data mining tools" to download data from the Services and the Site, although `robots.txt` allows the crawl (and the lists page shows only 12 items by GET; the rest is a POST). It stopped with no commits, and the Governor was given a decision card. Had the clauses been quoted on the bead before release, the story would not have been released. (The wording is as the Builder of mw-qtu3zvz.13 recorded it on that bead; the terms page is drawn by script, so quote it afresh from a copy that has the text if you rely on it.)
 
 ## 1. Find the catalogue, and read its terms first
 

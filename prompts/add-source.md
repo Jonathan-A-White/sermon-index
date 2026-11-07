@@ -25,7 +25,7 @@ Size: {{.Size}}
 Description:
 Add {{.Preacher}} to the sermon index as a source directory, sources/{{.ID}}/: a data add, no change of code. Read first: docs/adding-a-source.md (the recipe: follow its steps in order), docs/sources.md (the format), and sources/spurgeon-ccel (written by a tool, tools/ccel-spurgeon) and sources/henry-sermons (written by hand) as the two shapes.
 
-The catalogue: {{.CatalogueURL}}. The terms: {{.TermsURL}}. Read the terms and the site's robots.txt BEFORE anything else and quote what they say; fetch nothing else until you have. The Governor's rule: an index of facts only (a title, a passage and an address, never a sentence of a sermon), link-out, every term quoted, and a key or money is his: if the catalogue needs a key or a payment, or forbids an index of facts, stop and say so on the bead; do not add the source.
+The catalogue: {{.CatalogueURL}}. The terms: {{.TermsURL}}. Read the terms and the site's robots.txt BEFORE anything else and quote what they say; fetch nothing else until you have. The clause that allows or forbids automated download is quoted on this bead before it is released (docs/adding-a-source.md, "Before any crawl or download from a web host"); a host whose terms forbid it is not crawled without the Governor's or the owner's word. The Governor's rule: an index of facts only (a title, a passage and an address, never a sentence of a sermon), link-out, every term quoted, and a key or money is his: if the catalogue needs a key or a payment, or forbids an index of facts, stop and say so on the bead; do not add the source.
 
 What the source has now: {{.RowsText}} ({{.WithTextText}}), credited to {{.Credit}}.
 

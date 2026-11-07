@@ -79,9 +79,23 @@ func TestRecipeAndTemplateNameTheSteps(t *testing.T) {
 		"robots.txt", "BEFORE anything else", "link-out", "tools/<source>", "by hand", "sermons check --urls",
 		"sermons load", "sermons propose", "What's new", "Outside this repo", "data/sermons/sources.json",
 		"Truth For Life", "Content-Signal", "the terms it could not read", "series", "expect_title", "host_rules",
+		"Before any crawl or download from a web host", "on the story's bead before it is released",
+		"Governor's or the owner's word", "mw-qtu3zvz.13", "A.5", "A.6", "automated means, including spiders, robots, crawlers, data mining tools",
 	} {
 		if !strings.Contains(recipe, want) {
 			t.Errorf("docs/adding-a-source.md lacks %q", want)
+		}
+	}
+	// Every other doc that tells a Builder how to add a web source states the
+	// step or points at the recipe that does.
+	for _, p := range []string{"../../README.md", "../../prompts/add-source.md", "../../sources/_template/README.md", "../../docs/candidates.md"} {
+		if !strings.Contains(read(p), "adding-a-source.md") {
+			t.Errorf("%s does not point at docs/adding-a-source.md", p)
+		}
+	}
+	for _, p := range []string{"../../README.md", "../../prompts/add-source.md"} {
+		if !strings.Contains(read(p), "before it is released") {
+			t.Errorf("%s does not state the rule: clause quoted on the bead before release", p)
 		}
 	}
 	tmpl := read("../../sources/_template/source.toml")

@@ -1,6 +1,6 @@
 # The next sources
 
-Three modern catalogues, in the order the recipe ([adding-a-source.md](adding-a-source.md)) would take them, with their terms quoted and a recommendation each. Read on 2026-11-05 (mw-hxztgfo.8): for each, only its `robots.txt` and its terms or copyright pages (and, for SermonAudio, the one news page that says where an API key comes from). No sermon page, passage page or API call was fetched. None of this is legal advice or a licence: what is quoted is what the pages say.
+Three modern catalogues, in the order the recipe ([adding-a-source.md](adding-a-source.md)) would take them, with their terms quoted and a recommendation each (its first rule, [before any crawl or download from a web host](adding-a-source.md#before-any-crawl-or-download-from-a-web-host), is why each host's terms are quoted here). Read on 2026-11-05 (mw-hxztgfo.8): for each, only its `robots.txt` and its terms or copyright pages (and, for SermonAudio, the one news page that says where an API key comes from). No sermon page, passage page or API call was fetched. None of this is legal advice or a licence: what is quoted is what the pages say.
 
 <!-- toc -->
 
