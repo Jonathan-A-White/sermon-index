@@ -2032,3 +2032,126 @@ func TestBatch6bRunPassesTheChecker(t *testing.T) {
 		}
 	}
 }
+
+// Batch 6c: Sermon Starters, Volumes 2 to 5. Each index ends with the book's
+// Scripture Index; volume 4 also lists four sub-points of one outline.
+var batch6c = []struct {
+	name        string // the jsonl stem
+	lines, rows int
+}{
+	{"sermon-starters-volume-2", 199, 198},
+	{"sermon-starters-volume-3", 200, 199},
+	{"sermon-starters-volume-4", 203, 198},
+	{"sermon-starters-volume-5", 200, 199},
+}
+
+// "First—The Purpose in the Message" is a numbered point of an outline the
+// index lists beside the outlines, not an outline.
+func TestNonSermonSubPoint(t *testing.T) {
+	for _, title := range []string{
+		"First—The Purpose in the Message",
+		"Second—The Precept in the Message",
+		"Third—The Person Ordering the Message",
+		"Fourth—The Particulars of the Message",
+	} {
+		if NonSermon(title) == "" {
+			t.Errorf("NonSermon(%q) is empty, want a reason", title)
+		}
+	}
+	for _, title := range []string{
+		"First Things First", "Judgment First", "“Me First”", "Second Chances", "Third Day Faith",
+		"First-Century Faith", "Fourth of July", "The First Commandment",
+	} {
+		if why := NonSermon(title); why != "" {
+			t.Errorf("NonSermon(%q) = %q, want none", title, why)
+		}
+	}
+}
+
+// Volume 4's four sub-point rows and every volume's Scripture Index are
+// dropped and counted; what is left all have a ref.
+func TestSermonStartersTwoToFiveDropIndexAndSubPoints(t *testing.T) {
+	for _, c := range batch6c {
+		rows, rep := BuildSource([]File{{Inputs: readFile(t, "testdata/"+c.name+"-sermons.jsonl"), TitleForm: FormRefInBrackets}}, false)
+		if rep.Input != c.lines || len(rows) != c.rows || rep.Rows != c.rows || rep.WithRef != c.rows || len(rep.NoRef) != 0 {
+			t.Errorf("%s: lines %d, rows %d, with a ref %d, no ref %v; want %d, %d, %d, none", c.name, rep.Input, len(rows), rep.WithRef, rep.NoRef, c.lines, c.rows, c.rows)
+		}
+		wantDropped := c.lines - c.rows
+		if len(rep.NonSermon) != wantDropped {
+			t.Errorf("%s: non-sermons %v; want %d", c.name, rep.NonSermon, wantDropped)
+		}
+		if !strings.Contains(strings.Join(rep.NonSermon, "\n"), "Scripture Index") {
+			t.Errorf("%s: non-sermons %v lack the Scripture Index", c.name, rep.NonSermon)
+		}
+		for _, r := range rows {
+			if r.Ref == nil || strings.Contains(r.Title, "Scripture Index") || strings.Contains(r.Title, "(") || strings.HasSuffix(r.Title, "in the Message") {
+				t.Errorf("%s %s: %q ref %v", c.name, r.ID, r.Title, r.Ref)
+			}
+		}
+	}
+	_, rep := BuildSource([]File{{Inputs: readFile(t, "testdata/sermon-starters-volume-4-sermons.jsonl"), TitleForm: FormRefInBrackets}}, false)
+	if got := strings.Join(rep.NonSermon, "\n"); strings.Count(got, "—") < 4 {
+		t.Errorf("volume 4: the four sub-points are not listed: %v", rep.NonSermon)
+	}
+}
+
+// Spot rows of the four volumes: the ref in each title is parsed (the bracket
+// is taken off the title) and agrees with the row's ref.
+func TestBatch6cTitleRefsAreParsed(t *testing.T) {
+	for _, c := range []struct{ file, id, title, ref string }{
+		{"sermon-starters-volume-2", "SERMONSTARTERS02.2-7101", "God", "Gen.1.1"},
+		{"sermon-starters-volume-2", "SERMONSTARTERS02.2-576657", "Nosey", "John.21.21"},
+		{"sermon-starters-volume-3", "SERMONSTARTERS03.2-567840", "Giving", "Rom.15.27"},
+		{"sermon-starters-volume-4", "SERMONSTARTERS04.2-562939", "Encouragement", "Rev.1.9"},
+		{"sermon-starters-volume-5", "SERMONSTARTERS05.2-20122", "Judgment First", "Isa.2.6"},
+	} {
+		rows, _ := BuildSource([]File{{Inputs: readFile(t, "testdata/"+c.file+"-sermons.jsonl"), TitleForm: FormRefInBrackets}}, false)
+		r := byID(rows, c.id)
+		if r == nil || r.Title != c.title || str(r.Ref) != c.ref {
+			t.Errorf("%s %s: %+v", c.file, c.id, r)
+		}
+	}
+}
+
+// The batch 6c fixtures make rows the checker accepts, with the counts the
+// Mayor kept minus what the rules drop, and the same bytes twice.
+func TestBatch6cRunPassesTheChecker(t *testing.T) {
+	for _, c := range batch6c {
+		in := "testdata/" + c.name + "-sermons.jsonl"
+		opts := Options{TitleForm: FormRefInBrackets}
+		out := t.TempDir()
+		if err := run([]string{in}, filepath.Base(out), out, "", opts, &bytes.Buffer{}); err != nil {
+			t.Fatal(err)
+		}
+		rows1, _ := os.ReadFile(filepath.Join(out, "rows.jsonl"))
+		if n := bytes.Count(rows1, []byte("\n")); n != c.rows {
+			t.Errorf("%s: %d rows, want %d", c.name, n, c.rows)
+		}
+		md, _ := os.ReadFile(filepath.Join(out, "REPORT.md"))
+		for _, want := range []string{
+			fmt.Sprintf("lines read:                          %d\n", c.lines),
+			fmt.Sprintf("rows written:                        %d\n", c.rows),
+			fmt.Sprintf("non-sermon lines dropped:            %d\n", c.lines-c.rows),
+			fmt.Sprintf("rows with a ref:                     %d\n", c.rows),
+			"rows with no ref:                    0\n",
+		} {
+			if !bytes.Contains(md, []byte(want)) {
+				t.Errorf("%s: REPORT.md lacks %q", c.name, want)
+			}
+		}
+		out2 := t.TempDir()
+		if err := run([]string{in}, filepath.Base(out), out2, "", opts, &bytes.Buffer{}); err != nil {
+			t.Fatal(err)
+		}
+		if rows2, _ := os.ReadFile(filepath.Join(out2, "rows.jsonl")); !bytes.Equal(rows1, rows2) {
+			t.Errorf("%s: two runs differ", c.name)
+		}
+		toml := "id = \"" + filepath.Base(out) + "\"\nname = \"t\"\nkind = \"sermons\"\nlicence = \"x\"\ncredit = \"x\"\nhomepage = \"https://example.org\"\nterms_url = \"https://example.org\"\nadded = 2026-11-06\non_by_default = false\n"
+		if err := os.WriteFile(filepath.Join(out, "source.toml"), []byte(toml), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if faults, warnings := sources.CheckReport(out); len(faults) != 0 || len(warnings) != 0 {
+			t.Errorf("%s: faults %v, warnings %v", c.name, sources.Faults(faults), sources.Faults(warnings))
+		}
+	}
+}

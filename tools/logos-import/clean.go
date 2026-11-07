@@ -77,11 +77,20 @@ func RefsInTitle(title string) []string {
 	return out
 }
 
+// outlinePointRE is a numbered point of an outline that a book's contents list
+// beside its outlines: "First—The Purpose in the Message" (Sermon Starters,
+// Volume 4). The dash after the ordinal is what marks it; "First Things First"
+// and "Fourth of July" are titles.
+var outlinePointRE = regexp.MustCompile(`^(First|Second|Third|Fourth|Fifth|Sixth)\s*[—–]\s*\S`)
+
 // NonSermon says why a line of an archive's index is not a sermon (a table,
 // an index, the translator's introduction, a book's argument, a preface or an
 // epistle to the reader, a list of contents), or "" when it may be one. Titles are compared as NormTitle reads them: lower case, a
 // leading Roman numeral off, marks ignored.
 func NonSermon(title string) string {
+	if outlinePointRE.MatchString(strings.TrimSpace(title)) {
+		return "a numbered point of an outline, not an outline"
+	}
 	n := NormTitle(foldAccents(title))
 	switch n {
 	case "chronological table":
