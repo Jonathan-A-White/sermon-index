@@ -563,6 +563,10 @@ func TestLoadLogosArchives(t *testing.T) {
 		{"sermon-outlines-on-romans-logos", 28, 28, 0, 0},
 		{"sermon-outlines-on-the-gospels-logos", 26, 26, 0, 0},
 		{"sermon-starters-volume-1-logos", 200, 200, 0, 0},
+		{"sermon-starters-volume-2-logos", 198, 198, 0, 0},
+		{"sermon-starters-volume-3-logos", 199, 199, 0, 0},
+		{"sermon-starters-volume-4-logos", 198, 198, 0, 0},
+		{"sermon-starters-volume-5-logos", 199, 199, 0, 0},
 	}
 	ctx := context.Background()
 	db := migrated(t)
@@ -848,5 +852,33 @@ func TestLoadLogosArchives(t *testing.T) {
 	}
 	if n := count(t, db, "select count(*) from sermons where source_id = 'sermon-starters-volume-1-logos' and title ilike '%index%'"); n != 0 {
 		t.Errorf("%d Sermon Starters rows that are the Scripture Index", n)
+	}
+
+	// Batch 6c (Sermon Starters, Volumes 2 to 5): the passage in a title is
+	// the ref and is off the title; the Scripture Index of each volume and
+	// volume 4's four numbered points ("First—The Purpose in the Message")
+	// are not rows (199, 200, 203 and 200 lines; 198, 199, 198 and 199 rows).
+	for _, c := range []struct {
+		source, id, title, ref string
+	}{
+		{"sermon-starters-volume-2-logos", "SERMONSTARTERS02.2-7101", "God", "Gen.1.1"},
+		{"sermon-starters-volume-2-logos", "SERMONSTARTERS02.2-576657", "Nosey", "John.21.21"},
+		{"sermon-starters-volume-3-logos", "SERMONSTARTERS03.2-567840", "Giving", "Rom.15.27"},
+		{"sermon-starters-volume-4-logos", "SERMONSTARTERS04.2-562939", "Encouragement", "Rev.1.9"},
+		{"sermon-starters-volume-5-logos", "SERMONSTARTERS05.2-20122", "Judgment First", "Isa.2.6"},
+	} {
+		rg, err := passage.Parse(c.ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if n := count(t, db, "select count(*) from sermon_passages p join sermons s on s.source_id = p.source_id and s.id = p.sermon_id where p.role = 'text' and p.source_id = $1 and s.id = $2 and s.title = $3 and s.preacher = 'John G. Butler' and s.url like 'https://ref.ly/logosres/LLS:SERMONSTARTERS0_?off=%' and p.span = $4::int4range", c.source, c.id, c.title, rg.PG()); n != 1 {
+			t.Errorf("%s %s %q exactly %s: %d, want once", c.source, c.id, c.title, c.ref, n)
+		}
+	}
+	if n := count(t, db, "select count(*) from sermons where source_id like 'sermon-starters-volume-%-logos' and (title ilike '%index%' or title ~ '^(First|Second|Third|Fourth)—' or title like '%(%)')"); n != 0 {
+		t.Errorf("%d Sermon Starters rows that are an index, a numbered point or keep a bracket", n)
+	}
+	if n := count(t, db, "select count(*) from sermons s where source_id like 'sermon-starters-volume-%-logos' and not exists (select 1 from sermon_passages p where p.source_id = s.source_id and p.sermon_id = s.id and p.role = 'text')"); n != 0 {
+		t.Errorf("%d Sermon Starters rows with no preaching text, want none", n)
 	}
 }
