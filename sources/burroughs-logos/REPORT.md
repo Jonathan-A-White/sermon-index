@@ -2,7 +2,7 @@
 
 <!-- toc: none -->
 
-Written by `go run ./tools/logos-import --in <vault>/plans/sermons-2026-11-05/the-rare-jewel-of-christian-contentment-sermons.jsonl --in <vault>/plans/sermons-2026-11-05/the-saints-treasury-sermons.jsonl --in <vault>/plans/sermons-2026-11-05/the-saints-happiness-sermons.jsonl --in <vault>/plans/sermons-2026-11-05/the-difference-between-the-spots-of-the-godly-and-of-the-wicked-sermons.jsonl --id burroughs-logos --out sources/burroughs-logos`; do not edit by hand. Only ids, titles, references and addresses are listed.
+Written by `go run ./tools/logos-import --in <vault>/plans/sermons-2026-11-05/the-rare-jewel-of-christian-contentment-sermons.jsonl --in <vault>/plans/sermons-2026-11-05/the-saints-treasury-sermons.jsonl --in <vault>/plans/sermons-2026-11-05/the-saints-happiness-sermons.jsonl --in <vault>/plans/sermons-2026-11-05/the-difference-between-the-spots-of-the-godly-and-of-the-wicked-sermons.jsonl --infer-text --id burroughs-logos --out sources/burroughs-logos`; do not edit by hand. Only ids, titles, references and addresses are listed.
 
 ## Counts
 
@@ -11,10 +11,11 @@ lines read:                          67
 rows written:                        62
 lines dropped:                       0
 non-sermon lines dropped:            5
-rows with a ref:                     57
+rows with a ref:                     58
   of them read from the label:       0
   of them with cited references:     60
-rows with no ref:                    5
+  of them an inferred text (cited):  1
+rows with no ref:                    4
 series rows (ref over >3 chapters):  0
 rows with their own date:            4
   of them dates read from the title: 4
@@ -56,6 +57,12 @@ A Logos reference to a book outside the sixty-six, or a chapter or verse past th
 
 None.
 
+## Rows given an inferred text (1)
+
+The archive's index names no text for these. Each takes the first passage it cites as its text (the only passage it cites, a passage its title names, or the passage the sermons beside it are on); the row's notes say it is inferred, and the passage is the row's ref and no longer among its cited ones. A sermon that cites several passages with none of these has no text.
+
+- WRKSBURROUGHS01.1-15584: Phil.4.11 (the 10 sermons next to it in the book are on the first passage it cites)
+
 ## Series rows (0)
 
 The ref spans more than three chapters (a whole book or a long text): the row is kept, found by its title and listed by its source, and matched by no passage.
@@ -80,8 +87,8 @@ The book's contents list splits the entry into parts, so the link opens the book
 - WRKSBURROUGHS01.1-431135
 - WRKSBURROUGHS07.1-109402
 
-## Rows with no ref (5)
+## Rows with no ref (4)
 
 Neither a Logos reference nor a label that could be read: the row is kept, found by its title and its source, and by no passage. Ids, in the file's order:
 
-WRKSBURROUGHS01.1-15584, WRKSBURROUGHS04.1-46109, WRKSBURROUGHS07.1-34656, WRKSBURROUGHS07.1-74468, WRKSBURROUGHS07.1-109402
+WRKSBURROUGHS04.1-46109, WRKSBURROUGHS07.1-34656, WRKSBURROUGHS07.1-74468, WRKSBURROUGHS07.1-109402

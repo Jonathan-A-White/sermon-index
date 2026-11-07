@@ -3,7 +3,7 @@
 # Happiness (WRKSBURROUGHS04, 41) and The Difference between the Spots of the Godly and of the Wicked
 # (WRKSBURROUGHS07, 4), made by
 #
-#   go run ./tools/logos-import --in <vault>/plans/sermons-2026-11-05/the-rare-jewel-of-christian-contentment-sermons.jsonl --in <vault>/plans/sermons-2026-11-05/the-saints-treasury-sermons.jsonl --in <vault>/plans/sermons-2026-11-05/the-saints-happiness-sermons.jsonl --in <vault>/plans/sermons-2026-11-05/the-difference-between-the-spots-of-the-godly-and-of-the-wicked-sermons.jsonl --id burroughs-logos --out sources/burroughs-logos
+#   go run ./tools/logos-import --in <vault>/plans/sermons-2026-11-05/the-rare-jewel-of-christian-contentment-sermons.jsonl --in <vault>/plans/sermons-2026-11-05/the-saints-treasury-sermons.jsonl --in <vault>/plans/sermons-2026-11-05/the-saints-happiness-sermons.jsonl --in <vault>/plans/sermons-2026-11-05/the-difference-between-the-spots-of-the-godly-and-of-the-wicked-sermons.jsonl --infer-text --id burroughs-logos --out sources/burroughs-logos
 #
 # from the index file the Mayor made of each book on 2026-11-06 (the parser's
 # book-archive form). The index keeps facts only: a title, the passage, the cited
@@ -12,7 +12,9 @@
 #
 # What the tool counted (REPORT.md lists what it could not place): 67 lines read, 62 rows, none dropped as unusable. Five lines are not sermons (three "Contents"
 # lists and two alphabetical tables; REPORT.md names each) and are dropped. 57 rows have a preaching
-# text and 60 cite further passages; 5 have none (REPORT.md). The four sermons of the Spots book
+# text from the index; with --infer-text (mw-qtu3zvz.35) Sermon I of the Rare Jewel takes
+# Philippians 4:11, which it cites first and the ten sermons after it are on (the notes say it is
+# inferred), so 58 have one; 60 cite further passages; 4 have none (REPORT.md). The four sermons of the Spots book
 # carry a date in their title, "(July the 6th, 1645)", read as 1645-07-06 and so on.
 # The link (https://ref.ly/logosres/LLS:<resource>?off=<offset>) opens the book at
 # the sermon in Logos for an owner of the book and for no one else. It is
