@@ -1,0 +1,45 @@
+# Augustus Hopkins Strong's Philosophy and Religion: A Series of Addresses, Essays, and
+# Sermons Designed to Set Forth Great Truths in Popular Form (PHILANDREL) in the Governor's
+# Logos library, 49 rows, made by
+#
+#   go run ./tools/logos-import --in <vault>/plans/sermons-2026-11-05/philosophy-and-religion-a-series-of-addresses-essays-and-sermons-designed-to-set-forth-great-truths-in-popular-form-sermons.jsonl --title-form "numbered" --note "An address, essay or sermon in a collection of all three; the index does not say which." --id strong-logos --out sources/strong-logos
+#
+# from the index file the Mayor made of each book on 2026-11-06 (the parser's
+# book-archive form). The index keeps facts only: a title, the passage, the cited
+# passages and the ref.ly address. No sentence of a sermon, and no Logos text, is
+# written anywhere.
+#
+# What the tool counted (REPORT.md lists what it could not place): 50 lines read, 49 rows, none dropped as unusable. The last line, "L: Addresses to
+# Successive Graduating Classes of the Rochester Theological Seminary", is a heading
+# over closing addresses the index does not list one by one and is dropped
+# (REPORT.md). The book is addresses, essays and sermons, and the index does not say
+# which each is: all 49 are kept, each with its number in the book ("XLIV:" is taken
+# off the title) and a note that the kind is not known. The index names no preaching
+# text, so none has a `ref`; two (Remarriage after Divorce, Dante) cite passages. They are found by title and
+# source and by no verse.
+# The link (https://ref.ly/logosres/LLS:<resource>?off=<offset>) opens the book at
+# the sermon in Logos for an owner of the book and for no one else. It is
+# UNVERIFIED: no one has tapped one yet (sermons check --urls was not run on it).
+
+
+id = "strong-logos"
+name = "A. H. Strong's Philosophy and Religion (his Logos library)"
+kind = "sermons"
+
+# No terms page was read or quoted: the Governor's library is his own, and the
+# words below are his, given to the Mayor in the Postern general channel on
+# 2026-11-06 (about 14:52Z), quoted verbatim, with his word "links" for what
+# this index holds.
+licence = """
+index these sermons so that you can add it to your sermon index with links"""
+
+licence_note = """
+From the Governor's own Logos library at his word (2026-11-06, mw-qtu3zvz); the index keeps titles, passages and ref.ly links only; a link opens the sermon only for a Logos owner of the archive. Same footing as the Logos Atlas index (mw-zbjgn3r.9).
+Faithlife's terms bind the books the links open, not these rows; no terms page was read."""
+
+credit = "Augustus Hopkins Strong, Philosophy and Religion, in Logos (Faithlife)"
+homepage = "https://www.logos.com/"
+# Faithlife's terms of service, named for the reader; they were not read or quoted for this source.
+terms_url = "https://faithlife.com/terms"
+added = 2026-11-06
+on_by_default = false
