@@ -1,18 +1,20 @@
-# Matthew Henry's sermons, 52 rows made by hand from the Internet Archive's
+# Matthew Henry's sermons, 51 rows made by hand from the Internet Archive's
 # page scans: the OCR (`_djvu.txt`, `_djvu.xml`) of
 #
 #   miscellaneouswor00henr     The Miscellaneous Works of the Rev. Matthew
-#                              Henry, J. O. Robinson, London, 1830 (45 rows)
+#                              Henry, J. O. Robinson, London, 1830 (44 rows)
 #   completeworksofr0001revm   The Complete Works of the Rev. Matthew Henry,
 #                              vol. 1, A. Fullarton, Edinburgh, 1847 (7 rows)
 #
 # read on 2026-11-05. A row is a title as printed, the preaching text read from
 # the printed head of the sermon (no row names one the head does not print:
 # those carry the note "no text printed" and no ref) and the Archive's reader
-# page where the sermon begins (https://archive.org/details/<id>/page/n<N>, N
-# the scan leaf, counted from 0). No sentence of a sermon is written anywhere.
-# REPORT.md lists what was read, what was left out and what the OCR could not
-# place. There is no tool for this source: the files are the work.
+# leaf where the sermon's head is printed (https://archive.org/details/<id>/page/n<N>,
+# N the reader's leaf, counted from 0; found in the Archive's OCR and checked
+# by TestHenryLeavesHoldTheirHeads). No sentence of a sermon is written
+# anywhere. REPORT.md lists the leaf of every row, what was read, what was left
+# out (one sermon whose leaves are missing from the scan) and what the OCR
+# could not place. There is no tool for this source: the files are the work.
 #
 # Not used: Philip Henry's 41 sermons in the 1830 Appendix (the father's, not
 # Matthew's); the 1979 Baker reprint of the Complete Works (a lending copy of
