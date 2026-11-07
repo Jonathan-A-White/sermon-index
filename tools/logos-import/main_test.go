@@ -527,6 +527,8 @@ func TestNonSermon(t *testing.T) {
 		"II. Extent and Character of Chrysostom’s Exegetical Labors",
 		"Introductory Discourse",
 		"Prolegomena",
+		"Scripture Index",
+		"Subject Index",
 	} {
 		if NonSermon(title) == "" {
 			t.Errorf("NonSermon(%q) is empty, want a reason", title)
@@ -1909,6 +1911,124 @@ func TestBatch6aRunPassesTheChecker(t *testing.T) {
 		}
 		if faults, warnings := sources.CheckReport(out); len(faults) != 0 || len(warnings) != 0 {
 			t.Errorf("%s: faults %v, warnings %v", c.in, sources.Faults(faults), sources.Faults(warnings))
+		}
+	}
+}
+
+// Batch 6b: the Sermon Outlines books whose titles print the passage
+// ("Title (Galatians 1:1–2:21)") and Sermon Starters, Volume 1.
+var batch6b = []struct {
+	name        string // the jsonl stem
+	lines, rows int
+}{
+	{"sermon-outlines-on-christian-living", 30, 30},
+	{"sermon-outlines-on-ephesians", 26, 26},
+	{"sermon-outlines-on-galatians-ephesians-philippians-colossians", 30, 30},
+	{"sermon-outlines-on-romans", 28, 28},
+	{"sermon-outlines-on-the-gospels", 26, 26},
+	{"sermon-starters-volume-1", 201, 200},
+}
+
+// A verse printed with a part-of-verse letter in a title ("2 Peter 2:1–10a")
+// is read to the whole verse; Logos writes the same passage with a letter the
+// book table refuses, so the title's reading is the row's ref.
+func TestTitleRefWithPartOfVerseLetterIsRead(t *testing.T) {
+	for label, want := range map[string]string{
+		"2 Peter 2:1–10a":  "2Pet.2.1-2Pet.2.10",
+		"Romans 8:28b":     "Rom.8.28",
+		"Romans 2:17b–21a": "Rom.2.17-Rom.2.21",
+		"1 Kings 18:21":    "1Kgs.18.21",
+	} {
+		refs, err := TitleLabelToOSIS(label)
+		if err != nil || len(refs) != 1 || refs[0] != want {
+			t.Errorf("TitleLabelToOSIS(%q) = %v, %v; want %s", label, refs, err, want)
+		}
+	}
+	rows, rep := BuildSource([]File{{Inputs: readFile(t, "testdata/sermon-outlines-on-christian-living-sermons.jsonl"), TitleForm: FormRefInBrackets}}, false)
+	r := byID(rows, "SOCHRLIV.1-25496")
+	if r == nil || r.Title != "Faithfulness in Hard Places" || str(r.Ref) != "2Pet.2.1-2Pet.2.10" || !strings.Contains(str(r.Notes), "read from the title") {
+		t.Errorf("2 Peter 2:1–10a: %+v", r)
+	}
+	if len(rep.Unparsed) != 0 || len(rep.NoRef) != 0 {
+		t.Errorf("unparsed %v, no ref %v; want none", rep.Unparsed, rep.NoRef)
+	}
+}
+
+// The Scripture index at the end of Sermon Starters is not a sermon: 201
+// lines, 200 outlines, every one with a ref.
+func TestSermonStartersKeepsTwoHundredOutlinesWithARef(t *testing.T) {
+	rows, rep := BuildSource([]File{{Inputs: readFile(t, "testdata/sermon-starters-volume-1-sermons.jsonl"), TitleForm: FormRefInBrackets}}, false)
+	if rep.Input != 201 || len(rows) != 200 || rep.Rows != 200 || rep.WithRef != 200 || len(rep.NoRef) != 0 {
+		t.Fatalf("lines %d, rows %d, with a ref %d, no ref %v; want 201, 200, 200, none", rep.Input, len(rows), rep.WithRef, rep.NoRef)
+	}
+	if len(rep.NonSermon) != 1 || !strings.Contains(rep.NonSermon[0], "Scripture Index") {
+		t.Errorf("non-sermons %v; want the Scripture Index", rep.NonSermon)
+	}
+	for _, r := range rows {
+		if r.Ref == nil || strings.Contains(r.Title, "Scripture Index") || strings.Contains(r.Title, "(") {
+			t.Errorf("%s: %q ref %v", r.ID, r.Title, r.Ref)
+		}
+	}
+}
+
+// Spot rows of the series: the ref in each title is parsed (the bracket is
+// taken off the title) and agrees with the row's ref.
+func TestBatch6bTitleRefsAreParsed(t *testing.T) {
+	for _, c := range []struct{ file, id, title, ref string }{
+		{"sermon-outlines-on-galatians-ephesians-philippians-colossians", "SOGEPC.2-2070", "Paul and the Gospel", "Gal.1.1-Gal.2.21"}, // 'Galatians 1:1–2:21'
+		{"sermon-outlines-on-romans", "SOROM.1-3975", "Condition? Critical!", "Rom.1.18-Rom.2.2"},
+		{"sermon-outlines-on-christian-living", "SOCHRLIV.1-959", "Present Your Bodies a Living Sacrifice", "Rom.12.1-Rom.12.2"},
+		{"sermon-outlines-on-the-gospels", "SOGOSP.1-7483", "The Best of the Good News", "John.3.16-John.3.17"},
+		{"sermon-outlines-on-ephesians", "SOEPH.1-7468", "Marks of the Church: Part 1", "Eph.1.15-Eph.1.23"},
+		{"sermon-starters-volume-1", "SERMONSTARTERS01.2-7635", "Disinterest in God", "Gen.4.16"},
+	} {
+		rows, _ := BuildSource([]File{{Inputs: readFile(t, "testdata/"+c.file+"-sermons.jsonl"), TitleForm: FormRefInBrackets}}, false)
+		r := byID(rows, c.id)
+		if r == nil || r.Title != c.title || str(r.Ref) != c.ref {
+			t.Errorf("%s %s: %+v", c.file, c.id, r)
+		}
+	}
+}
+
+// The batch 6b fixtures make rows the checker accepts, with the counts the
+// Mayor kept (the lines of each index, minus what the rules drop), and the
+// same bytes twice.
+func TestBatch6bRunPassesTheChecker(t *testing.T) {
+	for _, c := range batch6b {
+		in := "testdata/" + c.name + "-sermons.jsonl"
+		opts := Options{TitleForm: FormRefInBrackets}
+		out := t.TempDir()
+		if err := run([]string{in}, filepath.Base(out), out, "", opts, &bytes.Buffer{}); err != nil {
+			t.Fatal(err)
+		}
+		rows1, _ := os.ReadFile(filepath.Join(out, "rows.jsonl"))
+		if n := bytes.Count(rows1, []byte("\n")); n != c.rows {
+			t.Errorf("%s: %d rows, want %d", c.name, n, c.rows)
+		}
+		md, _ := os.ReadFile(filepath.Join(out, "REPORT.md"))
+		for _, want := range []string{
+			fmt.Sprintf("lines read:                          %d\n", c.lines),
+			fmt.Sprintf("rows written:                        %d\n", c.rows),
+			fmt.Sprintf("rows with a ref:                     %d\n", c.rows),
+			"rows with no ref:                    0\n",
+		} {
+			if !bytes.Contains(md, []byte(want)) {
+				t.Errorf("%s: REPORT.md lacks %q", c.name, want)
+			}
+		}
+		out2 := t.TempDir()
+		if err := run([]string{in}, filepath.Base(out), out2, "", opts, &bytes.Buffer{}); err != nil {
+			t.Fatal(err)
+		}
+		if rows2, _ := os.ReadFile(filepath.Join(out2, "rows.jsonl")); !bytes.Equal(rows1, rows2) {
+			t.Errorf("%s: two runs differ", c.name)
+		}
+		toml := "id = \"" + filepath.Base(out) + "\"\nname = \"t\"\nkind = \"sermons\"\nlicence = \"x\"\ncredit = \"x\"\nhomepage = \"https://example.org\"\nterms_url = \"https://example.org\"\nadded = 2026-11-06\non_by_default = false\n"
+		if err := os.WriteFile(filepath.Join(out, "source.toml"), []byte(toml), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if faults, warnings := sources.CheckReport(out); len(faults) != 0 || len(warnings) != 0 {
+			t.Errorf("%s: faults %v, warnings %v", c.name, sources.Faults(faults), sources.Faults(warnings))
 		}
 	}
 }

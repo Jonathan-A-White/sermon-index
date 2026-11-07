@@ -362,7 +362,7 @@ func BuildSource(files []File, dedupeTitles bool) ([]sources.Row, *Report) {
 				case err != nil && len(osis) == 0 && label == "":
 					problems = append(problems, err.Error())
 				case err != nil:
-				case len(osis) == 0 && label == "":
+				case len(osis) == 0 && (label == "" || labelErr != nil):
 					osis, fromTitle = refs[:1], refs[1:]
 					if len(x.Cited) > 0 {
 						if first, err := LogosToOSIS(x.Cited[0]); err == nil && first != refs[0] && !holdsAll(refs[0], []string{first}) {

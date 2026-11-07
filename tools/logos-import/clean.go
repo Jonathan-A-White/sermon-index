@@ -103,6 +103,8 @@ func NonSermon(title string) string {
 		return "front matter"
 	case "resposta a certas calunias e blasfemias":
 		return "an appendix, a reply to slanders, not a sermon"
+	case "scripture index", "subject index", "topical index":
+		return "an index"
 	case "contents", "table of contents":
 		return "a table of contents"
 	}

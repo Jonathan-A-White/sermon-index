@@ -228,8 +228,13 @@ func years(s string) string {
 // the Corinthians, written out before the passage is read.
 var corRE = regexp.MustCompile(`\b([12]) Cor\.`)
 
+// partOfVerseRE is the letter after a verse that names a part of it
+// ("2 Peter 2:1–10a", "Romans 8:28b"): the title's reading is the whole verse.
+var partOfVerseRE = regexp.MustCompile(`(\d)[a-d]\b`)
+
 // CleanTitleLabel writes out the abbreviation of a passage printed in a
-// title ("2 Cor. 3:6" is "2 Corinthians 3:6"); the book table reads the rest
+// title ("2 Cor. 3:6" is "2 Corinthians 3:6") and drops the part-of-verse
+// letter after a verse ("10a" is verse 10); the book table reads the rest
 // as it stands.
 func CleanTitleLabel(label string) string {
 	label = strings.TrimSpace(label)
@@ -237,6 +242,7 @@ func CleanTitleLabel(label string) string {
 		return oldSpellings[strings.ToLower(strings.TrimRight(strings.TrimSpace(w), " ."))]
 	})
 	label = strings.TrimRight(label, ". ")
+	label = partOfVerseRE.ReplaceAllString(label, "$1")
 	return corRE.ReplaceAllString(label, "$1 Corinthians")
 }
 
