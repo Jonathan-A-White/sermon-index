@@ -46,6 +46,22 @@ echo "mw $*" >> "$FAKE_LOG"
 echo "fake-key-for-test-7731"
 `
 
+// fakeSermons answers "sermons load --all <dir>" the way the command does, and
+// logs what it saw: whether the commit was already on the remote, whether the
+// stamp was already written, whether DATABASE_URL (from the service's env file)
+// and YOUTUBE_API_KEY were in its environment. FAKE_LOAD=fail makes it fail as
+// it does when the database refuses.
+const fakeSermons = `#!/bin/sh
+echo "sermons $*" >> "$FAKE_LOG"
+[ "$1 $2" = "load --all" ] || exit 2
+[ -n "$DATABASE_URL" ] && echo "database-url-in-environment" >> "$FAKE_LOG"
+[ -n "$YOUTUBE_API_KEY" ] && echo "key-reached-load" >> "$FAKE_LOG"
+[ "$(git -C "$REFRESH_ROOT" rev-parse HEAD)" = "$(git -C "$REFRESH_ROOT" rev-parse origin/main)" ] && echo "load-after-push" >> "$FAKE_LOG"
+[ -e "$SERMON_INDEX_HOME/.local/state/sermon-index/brookfield-refreshed" ] && echo "stamp-before-load" >> "$FAKE_LOG"
+if [ "$FAKE_LOAD" = fail ]; then echo "sermons: load: the database refused" >&2; exit 1; fi
+echo "loaded"
+`
+
 type refreshRig struct {
 	t      *testing.T
 	script string // the repo's scripts directory
@@ -80,10 +96,17 @@ func newRefreshRig(t *testing.T) *refreshRig {
 			t.Fatal(err)
 		}
 	}
-	for name, body := range map[string]string{"go": fakeGoRefresh, "mw": fakeMw} {
+	for name, body := range map[string]string{"go": fakeGoRefresh, "mw": fakeMw, "sermons": fakeSermons} {
 		if err := os.WriteFile(filepath.Join(stubs, name), []byte(body), 0o755); err != nil {
 			t.Fatal(err)
 		}
+	}
+	conf := filepath.Join(r.home, ".config/sermon-index")
+	if err := os.MkdirAll(conf, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(conf, "env"), []byte("DATABASE_URL=postgres://fake\n"), 0o644); err != nil {
+		t.Fatal(err)
 	}
 	git(t, tmp, "init", "--bare", "-b", "main", r.origin)
 	git(t, r.clone, "init", "-b", "main")
@@ -315,6 +338,91 @@ func TestRefreshPushesAnEarlierCommitThatNeverLeft(t *testing.T) {
 	}
 }
 
+func (r *refreshRig) calls() string {
+	b, _ := os.ReadFile(r.log)
+	return string(b)
+}
+
+func TestRefreshLoadsTheSourcesAfterThePushAndBeforeTheStamp(t *testing.T) {
+	for name, rows := range map[string]string{"changed": "new row", "unchanged": "old row"} {
+		t.Run(name, func(t *testing.T) {
+			r := newRefreshRig(t)
+			out, code := r.run("scripts/refresh-brookfield.sh", "FAKE_ROWS="+rows)
+			if code != 0 {
+				t.Fatalf("exit %d:\n%s", code, out)
+			}
+			log := r.calls()
+			if want := "sermons load --all " + r.clone + "/sources"; !strings.Contains(log, want) {
+				t.Errorf("no %q in the calls:\n%s", want, log)
+			}
+			if n := strings.Count(log, "sermons load"); n != 1 {
+				t.Errorf("load ran %d times, want 1:\n%s", n, log)
+			}
+			if !strings.Contains(log, "database-url-in-environment") {
+				t.Errorf("the load did not get the service's env file:\n%s", log)
+			}
+			if strings.Contains(log, "key-reached-load") {
+				t.Errorf("the YouTube key reached the load:\n%s", log)
+			}
+			if !strings.Contains(log, "load-after-push") {
+				t.Errorf("the load ran before the commit was on the remote:\n%s", log)
+			}
+			if strings.Contains(log, "stamp-before-load") {
+				t.Errorf("the stamp was written before the load:\n%s", log)
+			}
+			if _, err := os.Stat(r.stamp()); err != nil {
+				t.Errorf("no stamp after a good run: %v", err)
+			}
+		})
+	}
+}
+
+func TestRefreshWhenTheLoadFailsFailsAndLeavesTheStamp(t *testing.T) {
+	r := newRefreshRig(t)
+	old := time.Now().Add(-10 * 24 * time.Hour)
+	r.writeStamp(old)
+	out, code := r.run("scripts/refresh-brookfield.sh", "FAKE_ROWS=new row", "FAKE_LOAD=fail")
+	if code == 0 {
+		t.Fatalf("exit 0 though the load failed:\n%s", out)
+	}
+	if !strings.Contains(out, "load") {
+		t.Errorf("the failure does not say the load failed:\n%s", out)
+	}
+	b, _ := os.ReadFile(r.stamp())
+	if strings.TrimSpace(string(b)) != strconv.FormatInt(old.Unix(), 10) {
+		t.Errorf("a failed load moved the stamp to %q", b)
+	}
+	// The commit was made and pushed before the load: it is kept.
+	if head, remote := git(t, r.clone, "rev-parse", "HEAD"), git(t, r.origin, "rev-parse", "main"); head != remote {
+		t.Errorf("the commit was not pushed: HEAD %s, origin %s", head, remote)
+	}
+	// The next run, with the database back, loads and writes the stamp.
+	if out, code := r.run("scripts/refresh-brookfield.sh", "FAKE_ROWS=new row"); code != 0 {
+		t.Fatalf("second run exit %d:\n%s", code, out)
+	}
+	b, _ = os.ReadFile(r.stamp())
+	if strings.TrimSpace(string(b)) == strconv.FormatInt(old.Unix(), 10) {
+		t.Error("the stamp was not moved by the good run after the failed load")
+	}
+}
+
+func TestRefreshWithoutTheServiceEnvFileDoesNotLoadOrStamp(t *testing.T) {
+	r := newRefreshRig(t)
+	if err := os.Remove(filepath.Join(r.home, ".config/sermon-index/env")); err != nil {
+		t.Fatal(err)
+	}
+	out, code := r.run("scripts/refresh-brookfield.sh", "FAKE_ROWS=new row")
+	if code == 0 {
+		t.Fatalf("exit 0 with no env file:\n%s", out)
+	}
+	if strings.Contains(r.calls(), "sermons load") {
+		t.Error("load ran without the env file")
+	}
+	if _, err := os.Stat(r.stamp()); err == nil {
+		t.Error("the stamp was written though the load could not run")
+	}
+}
+
 func TestStaleCheck(t *testing.T) {
 	r := newRefreshRig(t)
 	day := 24 * time.Hour
@@ -361,7 +469,7 @@ func TestRefreshUnits(t *testing.T) {
 		"sermon-index-brookfield-refresh.service": {
 			"Description=", "OnFailure=mw-unit-failed@%n.service", "Type=oneshot",
 			"ExecStart=/bin/sh %h/sermon-index/scripts/refresh-brookfield.sh", "TimeoutStartSec=",
-			"EnvironmentFile=-%h/.config/mw/dispatch.env",
+			"EnvironmentFile=-%h/.config/mw/dispatch.env", "Environment=SERMONS=%h/.local/bin/sermons",
 		},
 		"sermon-index-brookfield-stale.service": {
 			"Description=", "OnFailure=mw-unit-failed@%n.service", "Type=oneshot",

@@ -3,7 +3,9 @@
 #
 # It reads the YouTube key from the vault (mw secrets get youtube_api_key) into
 # the environment of one go run, regenerates sources/brookfield-first and
-# data/morning-rephil.jsonl, and commits and pushes them only if they changed.
+# data/morning-rephil.jsonl, commits and pushes them only if they changed, then
+# loads sources/ into the live database (sermons load --all) and only then
+# writes the stamp.
 # The key is in no file and no unit. A failed run is mailed to the Mayor by
 # OnFailure=.
 [Unit]
@@ -14,8 +16,11 @@ OnFailure=mw-unit-failed@%n.service
 
 [Service]
 Type=oneshot
-# PATH only (mw, go and git are found through it).
+# PATH only (mw, go and git are found through it). The sermons command is not
+# on it; the script reads the service's env file itself (DATABASE_URL) for the
+# load, in a subshell the YouTube key never enters.
 EnvironmentFile=-%h/.config/mw/dispatch.env
+Environment=SERMONS=%h/.local/bin/sermons
 WorkingDirectory=%h/sermon-index
 ExecStart=/bin/sh %h/sermon-index/scripts/refresh-brookfield.sh
 
