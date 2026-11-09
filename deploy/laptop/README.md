@@ -9,6 +9,16 @@ Two user units for the service, and four more for the Brookfield First refresh (
 | The data | `~/.local/state/sermon-index/pg` (the Postgres data directory) |
 | The secrets | `~/.config/sermon-index/pg.env` and `env`, mode 0600 |
 
+<!-- toc -->
+
+- [sermon-index-pg.service](#sermon-index-pgservice)
+  - [Why `sg docker -c`](#why-sg-docker--c)
+- [sermon-index.service](#sermon-indexservice)
+- [The env files](#the-env-files)
+- [The Brookfield First refresh](#the-brookfield-first-refresh)
+
+<!-- /toc -->
+
 ## sermon-index-pg.service
 
 ```ini
