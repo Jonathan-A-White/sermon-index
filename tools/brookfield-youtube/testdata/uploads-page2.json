@@ -1,0 +1,130 @@
+{
+  "kind": "youtube#playlistItemListResponse",
+  "etag": "p2",
+  "items": [
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "x",
+      "id": "UIgenSodom001",
+      "snippet": {
+        "publishedAt": "2020-08-24T03:00:00Z",
+        "channelId": "UCYJE6WQ5ZJ9vkbWKjrxZGSg",
+        "title": "Brookfield First - Online Service | August 23, 2020",
+        "description": "Sunday morning worship livestream from Brookfield First, Connecticut. Sermon Title: \"Will God Spare Sodom for the Righteous\" (Pastor Phil Morgan) from Genesis 18:16-33",
+        "channelTitle": "Brookfield First",
+        "playlistId": "UUYJE6WQ5ZJ9vkbWKjrxZGSg",
+        "position": 5,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "genSodom001"
+        },
+        "videoOwnerChannelTitle": "Brookfield First",
+        "videoOwnerChannelId": "UCYJE6WQ5ZJ9vkbWKjrxZGSg"
+      },
+      "contentDetails": {
+        "videoId": "genSodom001",
+        "videoPublishedAt": "2020-08-24T03:00:00Z"
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "x",
+      "id": "UIjohnWiley001",
+      "snippet": {
+        "publishedAt": "2020-07-13T03:00:00Z",
+        "channelId": "UCYJE6WQ5ZJ9vkbWKjrxZGSg",
+        "title": "Brookfield First - Online Service | July 12, 2020",
+        "description": "Sunday morning worship livestream from Brookfield First, Connecticut. Sermon Title: \"Do You Want to Get Well\" (Pastor Jim Wiley) from John 5:1-9",
+        "channelTitle": "Brookfield First",
+        "playlistId": "UUYJE6WQ5ZJ9vkbWKjrxZGSg",
+        "position": 6,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "johnWiley001"
+        },
+        "videoOwnerChannelTitle": "Brookfield First",
+        "videoOwnerChannelId": "UCYJE6WQ5ZJ9vkbWKjrxZGSg"
+      },
+      "contentDetails": {
+        "videoId": "johnWiley001",
+        "videoPublishedAt": "2020-07-13T03:00:00Z"
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "x",
+      "id": "UIephSeries001",
+      "snippet": {
+        "publishedAt": "2021-02-01T12:00:00Z",
+        "channelId": "UCYJE6WQ5ZJ9vkbWKjrxZGSg",
+        "title": "Ephesians 1-6 | The Whole Letter",
+        "description": "Brookfield First is a gospel-centered church (fixture boilerplate).",
+        "channelTitle": "Brookfield First",
+        "playlistId": "UUYJE6WQ5ZJ9vkbWKjrxZGSg",
+        "position": 7,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "ephSeries001"
+        },
+        "videoOwnerChannelTitle": "Brookfield First",
+        "videoOwnerChannelId": "UCYJE6WQ5ZJ9vkbWKjrxZGSg"
+      },
+      "contentDetails": {
+        "videoId": "ephSeries001",
+        "videoPublishedAt": "2021-02-01T12:00:00Z"
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "x",
+      "id": "UIrepHilMid012",
+      "snippet": {
+        "publishedAt": "2024-05-02T12:00:00Z",
+        "channelId": "UCYJE6WQ5ZJ9vkbWKjrxZGSg",
+        "title": "MORNING REPHIL #12",
+        "description": "Brookfield First is a gospel-centered church (fixture boilerplate).",
+        "channelTitle": "Brookfield First",
+        "playlistId": "UUYJE6WQ5ZJ9vkbWKjrxZGSg",
+        "position": 8,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "repHilMid012"
+        },
+        "videoOwnerChannelTitle": "Brookfield First",
+        "videoOwnerChannelId": "UCYJE6WQ5ZJ9vkbWKjrxZGSg"
+      },
+      "contentDetails": {
+        "videoId": "repHilMid012",
+        "videoPublishedAt": "2024-05-02T12:00:00Z"
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "x",
+      "id": "UIbadRef000001",
+      "snippet": {
+        "publishedAt": "2022-03-03T12:00:00Z",
+        "channelId": "UCYJE6WQ5ZJ9vkbWKjrxZGSg",
+        "title": "Walking in Romans 99:1 | A Test",
+        "description": "Brookfield First is a gospel-centered church (fixture boilerplate).",
+        "channelTitle": "Brookfield First",
+        "playlistId": "UUYJE6WQ5ZJ9vkbWKjrxZGSg",
+        "position": 9,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "badRef000001"
+        },
+        "videoOwnerChannelTitle": "Brookfield First",
+        "videoOwnerChannelId": "UCYJE6WQ5ZJ9vkbWKjrxZGSg"
+      },
+      "contentDetails": {
+        "videoId": "badRef000001",
+        "videoPublishedAt": "2022-03-03T12:00:00Z"
+      }
+    }
+  ],
+  "pageInfo": {
+    "totalResults": 10,
+    "resultsPerPage": 5
+  }
+}

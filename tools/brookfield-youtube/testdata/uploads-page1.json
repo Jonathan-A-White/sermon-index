@@ -1,0 +1,131 @@
+{
+  "kind": "youtube#playlistItemListResponse",
+  "etag": "p1",
+  "nextPageToken": "PAGE2TOKEN",
+  "items": [
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "x",
+      "id": "UIrepHil477A1",
+      "snippet": {
+        "publishedAt": "2026-11-07T03:25:09Z",
+        "channelId": "UCYJE6WQ5ZJ9vkbWKjrxZGSg",
+        "title": "Morning RePhil #477",
+        "description": "Brookfield First is a gospel-centered church (fixture boilerplate).",
+        "channelTitle": "Brookfield First",
+        "playlistId": "UUYJE6WQ5ZJ9vkbWKjrxZGSg",
+        "position": 0,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "repHil477A1"
+        },
+        "videoOwnerChannelTitle": "Brookfield First",
+        "videoOwnerChannelId": "UCYJE6WQ5ZJ9vkbWKjrxZGSg"
+      },
+      "contentDetails": {
+        "videoId": "repHil477A1",
+        "videoPublishedAt": "2026-11-07T03:25:09Z"
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "x",
+      "id": "UIonlSvc0001A",
+      "snippet": {
+        "publishedAt": "2026-11-02T05:28:42Z",
+        "channelId": "UCYJE6WQ5ZJ9vkbWKjrxZGSg",
+        "title": "Brookfield First - Online Service | November 1, 2026",
+        "description": "Brookfield First is a gospel-centered church (fixture boilerplate).",
+        "channelTitle": "Brookfield First",
+        "playlistId": "UUYJE6WQ5ZJ9vkbWKjrxZGSg",
+        "position": 1,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "onlSvc0001A"
+        },
+        "videoOwnerChannelTitle": "Brookfield First",
+        "videoOwnerChannelId": "UCYJE6WQ5ZJ9vkbWKjrxZGSg"
+      },
+      "contentDetails": {
+        "videoId": "onlSvc0001A",
+        "videoPublishedAt": "2026-11-02T05:28:42Z"
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "x",
+      "id": "UIrepHilNoNo1",
+      "snippet": {
+        "publishedAt": "2026-11-09T01:21:06Z",
+        "channelId": "UCYJE6WQ5ZJ9vkbWKjrxZGSg",
+        "title": "Morning RePhil",
+        "description": "Brookfield First is a gospel-centered church (fixture boilerplate).",
+        "channelTitle": "Brookfield First",
+        "playlistId": "UUYJE6WQ5ZJ9vkbWKjrxZGSg",
+        "position": 2,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "repHilNoNo1"
+        },
+        "videoOwnerChannelTitle": "Brookfield First",
+        "videoOwnerChannelId": "UCYJE6WQ5ZJ9vkbWKjrxZGSg"
+      },
+      "contentDetails": {
+        "videoId": "repHilNoNo1",
+        "videoPublishedAt": "2026-11-09T01:21:06Z"
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "x",
+      "id": "UIprivVid0001",
+      "snippet": {
+        "publishedAt": "2026-10-01T00:00:00Z",
+        "channelId": "UCYJE6WQ5ZJ9vkbWKjrxZGSg",
+        "title": "Private video",
+        "description": "",
+        "channelTitle": "Brookfield First",
+        "playlistId": "UUYJE6WQ5ZJ9vkbWKjrxZGSg",
+        "position": 3,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "privVid0001"
+        },
+        "videoOwnerChannelTitle": "Brookfield First",
+        "videoOwnerChannelId": "UCYJE6WQ5ZJ9vkbWKjrxZGSg"
+      },
+      "contentDetails": {
+        "videoId": "privVid0001",
+        "videoPublishedAt": "2026-10-01T00:00:00Z"
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "x",
+      "id": "UIromans5Ttl1",
+      "snippet": {
+        "publishedAt": "2026-09-15T16:39:49Z",
+        "channelId": "UCYJE6WQ5ZJ9vkbWKjrxZGSg",
+        "title": "Peace with God | Romans 5:1-11",
+        "description": "Brookfield First is a gospel-centered church (fixture boilerplate).",
+        "channelTitle": "Brookfield First",
+        "playlistId": "UUYJE6WQ5ZJ9vkbWKjrxZGSg",
+        "position": 4,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "romans5Ttl1"
+        },
+        "videoOwnerChannelTitle": "Brookfield First",
+        "videoOwnerChannelId": "UCYJE6WQ5ZJ9vkbWKjrxZGSg"
+      },
+      "contentDetails": {
+        "videoId": "romans5Ttl1",
+        "videoPublishedAt": "2026-09-15T16:39:49Z"
+      }
+    }
+  ],
+  "pageInfo": {
+    "totalResults": 10,
+    "resultsPerPage": 5
+  }
+}
