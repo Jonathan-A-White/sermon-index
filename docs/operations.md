@@ -32,6 +32,8 @@ curl -s http://10.88.0.2:8790/v1/health       # {status, version, sources, sermo
   ~/.local/bin/sermons load --all <the clone>/sources     # idempotent: an unchanged row is left alone; prints the counts
   ```
 
+  The Brookfield refresh (`scripts/refresh-brookfield.sh`, README "The Brookfield First refresh") does this load itself: it ends with `sermons load --all <the clone>/sources`, after the commit and push and before the stamp, so Postgres never keeps YouTube API data past the 30 days the Developer Policies allow. A failed load fails the run (the Mayor is mailed) and leaves the stamp as it was.
+
   The service reads the database on every request, so there is nothing to restart; its answers carry an ETag and may be cached for five minutes (docs/api.md).
 - **New code**: `git pull`, `scripts/install-laptop.sh`: it rebuilds, restarts the service if the binary changed, applies migrations and loads every source. A migration that adds a column the loader fills needs the load (the install runs it).
 - **A unit file changed**: the install copies it and runs `daemon-reload`; a changed Postgres unit is left running (the install says so): apply it with `systemctl --user restart sermon-index-pg`.

@@ -22,13 +22,22 @@
 #   4. if the output changed, commits the two paths; pushes any commit the
 #      remote does not have yet (so a push that was refused is retried by the
 #      next run);
-#   5. only then writes the stamp, $SERMON_INDEX_HOME/.local/state/sermon-index/
+#   5. loads the sources into the live database, the step that makes the 30 days
+#      true: Postgres holds the YouTube data too, so a refreshed file alone
+#      leaves the old rows there. In a subshell that reads the service's env
+#      file ($SERMON_INDEX_HOME/.config/sermon-index/env, as the install does)
+#        sermons load --all <checkout>/sources
+#      it runs after an unchanged run as well (the database may lag a landing),
+#      and a failed load, or a missing env file, exits non-zero (the timer's
+#      OnFailure= then tells the Mayor) with the stamp not touched;
+#   6. only then writes the stamp, $SERMON_INDEX_HOME/.local/state/sermon-index/
 #      brookfield-refreshed (the epoch second), which scripts/check-brookfield-stale.sh
 #      reads. A run that found the list unchanged is a good refresh: the 30
 #      days start again.
 #
 # REFRESH_ROOT stands in for the checkout (the tests use it); SERMON_INDEX_HOME
-# for $HOME; MW and GO for the commands.
+# for $HOME; MW, GO and SERMONS for the commands (the unit sets SERMONS to
+# ~/.local/bin/sermons, which is not on its PATH).
 set -eu
 
 ROOT=${REFRESH_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}
@@ -37,6 +46,8 @@ STAMP=$H/.local/state/sermon-index/brookfield-refreshed
 BRANCH=${REFRESH_BRANCH:-main}
 MW=${MW:-mw}
 GO=${GO:-go}
+SERMONS=${SERMONS:-sermons}
+ENVFILE=$H/.config/sermon-index/env
 DATA="sources/brookfield-first data/morning-rephil.jsonl"
 
 die() { echo "refresh-brookfield: $*" >&2; exit 1; }
@@ -75,6 +86,21 @@ if [ -n "$(git rev-list "origin/$BRANCH..HEAD")" ]; then
 	git push -q origin "$BRANCH" || die "git push origin $BRANCH failed; the commit is kept here and the next run pushes it"
 	echo "refresh-brookfield: pushed to origin/$BRANCH"
 fi
+
+# The service's own settings (DATABASE_URL) in a subshell, so they reach the load
+# alone; the key was cleared above and was never exported.
+[ -r "$ENVFILE" ] || die "cannot read $ENVFILE; the sources were not loaded and the stamp is as it was"
+if ! (
+	unset YOUTUBE_API_KEY
+	set -a
+	# shellcheck disable=SC1090
+	. "$ENVFILE"
+	set +a
+	exec "$SERMONS" load --all "$ROOT/sources"
+); then
+	die "sermons load --all $ROOT/sources failed (see above); the commit is kept, the stamp is as it was and the next run loads again"
+fi
+echo "refresh-brookfield: loaded $ROOT/sources into the database"
 
 mkdir -p "$(dirname "$STAMP")"
 date +%s > "$STAMP.new"
