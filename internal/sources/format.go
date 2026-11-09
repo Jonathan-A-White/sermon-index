@@ -51,10 +51,28 @@ type Source struct {
 	TermsURL    string    `toml:"terms_url"`
 	Added       time.Time `toml:"added"`
 	OnByDefault bool      `toml:"on_by_default"`
+	// Language is the language the source's titles are in, a two-letter ISO
+	// 639-1 code from Languages (optional; English when it is left out).
+	Language string `toml:"language"`
 
 	// HostRules are what `sermons check --urls` does for a host, by host
 	// name (optional): see HostRule and DefaultHostRules.
 	HostRules map[string]HostRule `toml:"host_rules"`
+}
+
+// DefaultLanguage is the language of a source that does not say.
+const DefaultLanguage = "en"
+
+// Languages are the codes a source may give as its language, in the order
+// the checker names them. Add a code here when a source needs one.
+var Languages = []string{"en", "pt", "la", "de", "nl", "fr", "el", "he"}
+
+// LanguageOrDefault is the source's language, DefaultLanguage when it is not given.
+func (s Source) LanguageOrDefault() string {
+	if s.Language == "" {
+		return DefaultLanguage
+	}
+	return s.Language
 }
 
 // HostRule is how `sermons check --urls` treats the urls of one host.
@@ -185,6 +203,9 @@ func Read(dir string) (*Dir, []Fault) {
 			if md.IsDefined(f.key) && strings.TrimSpace(f.value) == "" {
 				add(SourceFile, 0, "%s is empty", f.key)
 			}
+		}
+		if md.IsDefined("language") && strings.TrimSpace(s.Language) == "" {
+			add(SourceFile, 0, "language is empty: leave it out for English")
 		}
 		if md.IsDefined("licence_note") && strings.TrimSpace(s.LicenceNote) == "" {
 			add(SourceFile, 0, "licence_note is empty: leave it out instead")

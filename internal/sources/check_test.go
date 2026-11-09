@@ -128,6 +128,28 @@ func TestFaultsInSourceToml(t *testing.T) {
 	}
 }
 
+func TestLanguageKey(t *testing.T) {
+	with := func(lang string) map[string]string {
+		return map[string]string{"source.toml": goodToml + lang, "rows.jsonl": goodRow}
+	}
+	for _, code := range []string{"en", "pt", "la", "de", "nl", "fr", "el", "he"} {
+		if got := faultStrings(Check(writeSource(t, with("language = \""+code+"\"\n")))); len(got) != 0 {
+			t.Errorf("language %q: %q", code, got)
+		}
+	}
+	expectFault(t, with("language = \"xx\"\n"), "source.toml: language 'xx': not one of en, pt, la, de, nl, fr, el, he")
+	expectFault(t, with("language = \"PT\"\n"), "source.toml: language 'PT': not one of en, pt, la, de, nl, fr, el, he")
+	expectFault(t, with("language = \"\"\n"), "source.toml: language is empty: leave it out for English")
+	d, fs := Read(writeSource(t, with("language = \"pt\"\n")))
+	if len(fs) != 0 || d.Source.Language != "pt" || d.Source.LanguageOrDefault() != "pt" {
+		t.Errorf("read: %q %+v", faultStrings(fs), d.Source)
+	}
+	d, _ = Read(writeSource(t, map[string]string{"source.toml": goodToml, "rows.jsonl": goodRow}))
+	if d.Source.Language != "" || d.Source.LanguageOrDefault() != "en" {
+		t.Errorf("no language: %+v", d.Source)
+	}
+}
+
 func TestFaultsInRows(t *testing.T) {
 	src := func(rows string) map[string]string {
 		return map[string]string{"source.toml": goodToml, "rows.jsonl": rows}

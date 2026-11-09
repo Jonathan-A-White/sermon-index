@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -135,6 +136,9 @@ func checkSource(d *Dir) []Fault {
 	}
 	if s.Kind != "" && s.Kind != KindSermons && s.Kind != KindThemes {
 		add("kind '%s': not sermons or themes", s.Kind)
+	}
+	if s.Language != "" && !slices.Contains(Languages, s.Language) {
+		add("language '%s': not one of %s", s.Language, strings.Join(Languages, ", "))
 	}
 	for _, f := range []struct{ name, value string }{{"homepage", s.Homepage}, {"terms_url", s.TermsURL}} {
 		if f.value != "" {

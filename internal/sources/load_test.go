@@ -161,6 +161,48 @@ func copyFixture(t *testing.T) string {
 	return dir
 }
 
+func TestLoadStoresTheSourcesLanguage(t *testing.T) {
+	ctx := context.Background()
+	db := migrated(t)
+	lang := func(id string) string {
+		var l string
+		if err := db.QueryRow(ctx, `SELECT language FROM sources WHERE id = $1`, id).Scan(&l); err != nil {
+			t.Fatal(err)
+		}
+		return l
+	}
+	body := map[string]string{"rows.jsonl": goodRow + "\n"}
+	body["source.toml"] = goodToml
+	en := writeSource(t, body)
+	if _, err := Load(ctx, db, en); err != nil {
+		t.Fatal(err)
+	}
+	if got := lang("demo"); got != "en" {
+		t.Errorf("no language loads as %q, want en", got)
+	}
+	body["source.toml"] = goodToml + "language = \"pt\"\n"
+	if _, err := Load(ctx, db, writeSource(t, body)); err != nil {
+		t.Fatal(err)
+	}
+	if got := lang("demo"); got != "pt" {
+		t.Errorf("language = pt loads as %q", got)
+	}
+	// Taking the key out again puts the source back to English.
+	if _, err := Load(ctx, db, en); err != nil {
+		t.Fatal(err)
+	}
+	if got := lang("demo"); got != "en" {
+		t.Errorf("language left out loads as %q, want en", got)
+	}
+	body["source.toml"] = goodToml + "language = \"xx\"\n"
+	if _, err := Load(ctx, db, writeSource(t, body)); err == nil || !strings.Contains(err.Error(), "language 'xx'") {
+		t.Errorf("language xx: %v", err)
+	}
+	if got := lang("demo"); got != "en" {
+		t.Errorf("a refused load changed the language to %q", got)
+	}
+}
+
 func TestLoadUpdatesAndRemoves(t *testing.T) {
 	ctx := context.Background()
 	db := migrated(t)
@@ -801,6 +843,12 @@ func TestLoadLogosArchives(t *testing.T) {
 	}
 	if n := count(t, db, "select count(*) from sermons where source_id = 'calvin-pt-logos' and (title ~* 'pref[aá]cio' or title ~* 'cal[uú]nias')"); n != 0 {
 		t.Errorf("Calvin: %d rows for the preface or the appendix", n)
+	}
+	if n := count(t, db, "select count(*) from sources where id = 'calvin-pt-logos' and language = 'pt'"); n != 1 {
+		t.Errorf("calvin-pt-logos is not stored with language pt")
+	}
+	if n := count(t, db, "select count(*) from sources where language <> 'en' and id <> 'calvin-pt-logos'"); n != 0 {
+		t.Errorf("%d other sources are not English", n)
 	}
 	rg, err = passage.Parse("1Cor.14")
 	if err != nil {

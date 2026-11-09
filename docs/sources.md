@@ -50,6 +50,7 @@ TOML. Every key is required except `licence_note` and `host_rules`; an unknown k
 | `terms_url` | The page `licence` was quoted from, https. |
 | `added` | The day the source was added, a TOML date (`2026-11-05`, unquoted). |
 | `on_by_default` | `true` or `false`: whether a reader who has never chosen sees the source. Required, so the choice is always made on purpose. |
+| `language` | Optional. The language the source's titles are in, a two-letter ISO 639-1 code in lower case from `en`, `pt`, `la`, `de`, `nl`, `fr`, `el`, `he` (a code outside the list is a fault; add one to `sources.Languages` when a source needs it). Left out, the source is English (`en`). Stored in `sources.language` by `sermons load`; the site does not yet filter or show it. |
 | `host_rules` | Optional table: what `sermons check --urls` does for a host ([Host rules](#host-rules)). |
 
 ## rows.jsonl (a sermon source)

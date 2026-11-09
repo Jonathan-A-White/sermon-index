@@ -48,6 +48,11 @@ added = 2026-11-05
 # source that is free of licence doubt and of the quality the app vouches for.
 on_by_default = false
 
+# Optional: the language the titles are in, a two-letter ISO 639-1 code from
+# en, pt, la, de, nl, fr, el, he. Left out, the source is English ("en"). Stored
+# and checked only; nothing in the site shows or filters by it yet.
+# language = "pt"
+
 # Optional: what `sermons check --urls N` does for a host, by host name (lower
 # case, no scheme, path or port). Leave the table out when the host answers
 # 404 to an address it does not have and asks for no delay: a HEAD that says

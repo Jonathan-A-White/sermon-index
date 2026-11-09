@@ -17,7 +17,7 @@ The sermon index's database, as `internal/migrate/sql/0001_init.sql` makes it, a
 sources                               one directory under sources/
   id  text PK  ─────────────┐         'spurgeon-ccel'  (= the directory's name)
   name, kind ('sermons'|'themes'), licence (verbatim, not empty), licence_note?,
-  credit, homepage, terms_url (https), added (date), on_by_default, loaded_at
+  credit, homepage, terms_url (https), added (date), on_by_default, language ('en' unless source.toml says), loaded_at
   UNIQUE (id, kind)  ◄──────┼─────────────── the kind-checked foreign keys below
                             │
 theme_sources  (a VIEW: the sources whose kind is 'themes')
