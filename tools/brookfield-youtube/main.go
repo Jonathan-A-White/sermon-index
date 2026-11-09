@@ -52,9 +52,10 @@ func main() {
 	out := flag.String("out", "sources/"+sourceID, "the source directory to write source.toml, rows.jsonl and REPORT.md in")
 	rephil := flag.String("rephil", "data/morning-rephil.jsonl", "the Morning RePhil list to write")
 	report := flag.String("report", "", "write the report here (default: REPORT.md in --out)")
+	list := flag.String("passages", "", "the church's list of its sermons, merged by date into the rows (default: passages.tsv in --out; \"none\" merges nothing)")
 	flag.Parse()
 	if flag.NArg() != 0 {
-		fmt.Fprintln(os.Stderr, "usage: "+keyVar+"=<key> brookfield-youtube [--handle @BrookfieldFirst] [--out sources/brookfield-first] [--rephil data/morning-rephil.jsonl] [--report <file>]")
+		fmt.Fprintln(os.Stderr, "usage: "+keyVar+"=<key> brookfield-youtube [--handle @BrookfieldFirst] [--out sources/brookfield-first] [--rephil data/morning-rephil.jsonl] [--report <file>] [--passages <file>|none]")
 		os.Exit(2)
 	}
 	key, err := keyFromEnv(os.Getenv)
@@ -65,8 +66,22 @@ func main() {
 	if *report == "" {
 		*report = filepath.Join(*out, "REPORT.md")
 	}
+	switch *list {
+	case "":
+		// A refresh must not wipe the merged fields, so a list that is
+		// missing from its place is an error and not a run without it.
+		*list = filepath.Join(*out, "passages.tsv")
+	case "none":
+		*list = ""
+	}
+	if *list != "" {
+		if _, err := os.Stat(*list); err != nil {
+			fmt.Fprintln(os.Stderr, "brookfield-youtube:", err, "(--passages none runs without the church's list)")
+			os.Exit(1)
+		}
+	}
 	c := &Client{Key: key, HTTP: &http.Client{Timeout: time.Minute}}
-	if err := run(context.Background(), c, *handle, *out, *rephil, *report, os.Stdout); err != nil {
+	if err := run(context.Background(), c, *handle, *out, *rephil, *report, *list, os.Stdout); err != nil {
 		fmt.Fprintln(os.Stderr, "brookfield-youtube:", err)
 		os.Exit(1)
 	}
@@ -82,7 +97,9 @@ func keyFromEnv(getenv func(string) string) (string, error) {
 	return k, nil
 }
 
-func run(ctx context.Context, c *Client, handle, out, rephilPath, reportPath string, stdout io.Writer) error {
+// run writes the source. listPath is the church's list (passages.tsv) to merge
+// by date into the YouTube rows; empty merges nothing.
+func run(ctx context.Context, c *Client, handle, out, rephilPath, reportPath, listPath string, stdout io.Writer) error {
 	playlist, err := c.UploadsPlaylist(ctx, handle)
 	if err != nil {
 		return err
@@ -94,6 +111,14 @@ func run(ctx context.Context, c *Client, handle, out, rephilPath, reportPath str
 	res := Build(items)
 	res.Units = c.Units
 	res.Handle = handle
+	if listPath != "" {
+		l, err := ReadList(listPath)
+		if err != nil {
+			return err
+		}
+		res.Merge = MergeList(res.Rows, l)
+		res.recount()
+	}
 
 	if err := os.MkdirAll(out, 0o755); err != nil {
 		return err
@@ -176,6 +201,9 @@ type Result struct {
 	Unnumbered                            []string // RePhil ids numbered by position
 	RepeatedNumbers                       []int    // RePhil numbers that two videos carry
 	First, Last                           string   // the dates of the oldest and the newest video
+
+	// Merge is what the church's list did to Rows; nil when none was given.
+	Merge *Merge
 }
 
 var (

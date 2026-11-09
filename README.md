@@ -164,7 +164,7 @@ The tests need **no Docker and no installed Postgres**: they start a real Postgr
 | `internal/sources` | Reading, checking and loading a source directory. |
 | `internal/themes` | A theme source's records and their tables. |
 | `tools/ccel-spurgeon` | The tool that writes `sources/spurgeon-ccel/rows.jsonl` from CCEL's ThML, and its `REPORT.md`. |
-| `tools/brookfield-youtube` | The tool that writes `sources/brookfield-first` and `data/morning-rephil.jsonl` from the church's YouTube channel by the official Data API (the key from `YOUTUBE_API_KEY`), and the source's `REPORT.md`. |
+| `tools/brookfield-youtube` | The tool that writes `sources/brookfield-first` and `data/morning-rephil.jsonl` from the church's YouTube channel by the official Data API (the key from `YOUTUBE_API_KEY`), and the source's `REPORT.md`; it also merges `sources/brookfield-first/passages.tsv` (the church's own list of its sermons, typed by hand from screenshots of its app) by date into the rows, so a refresh keeps the titles, preachers and passages. |
 | `tools/sword-themes` | The tool that writes the two theme sources from CrossWire's SWORD modules, and its `REPORT.md`. |
 | `tools/logos-import` | The tool that writes a Logos sermon-archive source (`rows.jsonl`, `REPORT.md`) from the archive's index file; Logos's book numbering as a tested table. |
 | `sources/` | The source directories; `_template` and `_fixtures` (twenty Spurgeon sermons; a demo theme source) are never loaded by `--all`. |

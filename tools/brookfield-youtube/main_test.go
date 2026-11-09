@@ -333,11 +333,16 @@ func TestTextPreacher(t *testing.T) {
 
 func runFixture(t *testing.T, out, rephil, report string) (string, error) {
 	t.Helper()
+	return runFixtureWith(t, out, rephil, report, "")
+}
+
+func runFixtureWith(t *testing.T, out, rephil, report, list string) (string, error) {
+	t.Helper()
 	var reqs []*http.Request
 	srv := fakeAPI(t, &reqs)
 	c := &Client{Base: srv.URL, Key: testKey, HTTP: srv.Client()}
 	var stdout bytes.Buffer
-	err := run(context.Background(), c, "@BrookfieldFirst", out, rephil, report, &stdout)
+	err := run(context.Background(), c, "@BrookfieldFirst", out, rephil, report, list, &stdout)
 	return stdout.String(), err
 }
 
@@ -427,7 +432,7 @@ func TestRunStopsOnAnAPIError(t *testing.T) {
 	defer srv.Close()
 	c := &Client{Base: srv.URL, Key: testKey, HTTP: srv.Client()}
 	dir := t.TempDir()
-	err := run(context.Background(), c, "@BrookfieldFirst", dir, filepath.Join(dir, "r.jsonl"), "", &bytes.Buffer{})
+	err := run(context.Background(), c, "@BrookfieldFirst", dir, filepath.Join(dir, "r.jsonl"), "", "", &bytes.Buffer{})
 	if err == nil || !strings.Contains(err.Error(), "403") {
 		t.Fatalf("error %v", err)
 	}
