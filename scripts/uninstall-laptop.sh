@@ -1,8 +1,9 @@
 #!/bin/sh
-# The way back from scripts/install-laptop.sh: stop and disable both units,
-# remove them and the binary. The database and the password files are left,
-# so installing again finds the same data; this script names them and says
-# how to remove them. Safe to run again.
+# The way back from scripts/install-laptop.sh: stop and disable both units and
+# the two Brookfield timers, remove them and the binary. The database, the
+# password files and the refresh stamp are left, so installing again finds the
+# same data; this script names them and says how to remove them. Safe to run
+# again.
 #
 # SERMON_INDEX_HOME stands in for $HOME (the tests set it).
 set -eu
@@ -13,9 +14,13 @@ BIN=$H/.local/bin/sermons
 CONF=$H/.config/sermon-index
 DATA=$H/.local/state/sermon-index/pg
 
-# The service first: it Requires Postgres, and stopping Postgres first would
-# stop it anyway.
-for u in sermon-index.service sermon-index-pg.service; do
+# The Brookfield First refresh and its daily check first: the timers, then the
+# services they run.
+# The sermon index service next: it Requires Postgres, and stopping Postgres
+# first would stop it anyway.
+for u in sermon-index-brookfield-refresh.timer sermon-index-brookfield-stale.timer \
+	sermon-index-brookfield-refresh.service sermon-index-brookfield-stale.service \
+	sermon-index.service sermon-index-pg.service; do
 	systemctl --user disable --now "$u" >/dev/null 2>&1 || true
 	if [ -f "$UNITS/$u" ]; then
 		rm -f "$UNITS/$u"
@@ -40,6 +45,7 @@ cat <<LEFT
 Left in place (the install finds them again):
   $DATA   the database (owned by the container's postgres user)
   $CONF    pg.env and env: the database password
+  $H/.local/state/sermon-index/brookfield-refreshed   the refresh stamp
 
 To remove them too, for good, back up first (README, "On the Laptop"), then:
   $DOCKER_RUN

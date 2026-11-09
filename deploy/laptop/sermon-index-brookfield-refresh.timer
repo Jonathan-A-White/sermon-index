@@ -1,0 +1,15 @@
+# Runs sermon-index-brookfield-refresh.service on the 1st and the 26th of every
+# month at 04:00 UTC: never more than 25 days apart (26th to the 1st of a month
+# is 3 to 6 days; the 1st to the 26th is 25), inside YouTube's 30-day limit on
+# keeping API data. For `systemctl --user`.
+[Unit]
+Description=On the 1st and the 26th, regenerate Brookfield First's YouTube list (at most 25 days apart)
+
+[Timer]
+OnCalendar=*-*-01,26 04:00:00 UTC
+# A host that was off at 04:00 runs the refresh when it wakes.
+Persistent=true
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target

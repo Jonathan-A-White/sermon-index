@@ -1,0 +1,16 @@
+# One run of scripts/check-brookfield-stale.sh, then it exits. Started by
+# sermon-index-brookfield-stale.timer. For `systemctl --user`.
+#
+# It exits non-zero when the last good refresh of Brookfield First's YouTube
+# list (the stamp the refresh writes only on success) is more than 27 days old
+# or missing, and OnFailure= then mails the Mayor.
+[Unit]
+Description=Sermon index: fail if Brookfield First's YouTube list was last refreshed over 27 days ago
+OnFailure=mw-unit-failed@%n.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh %h/sermon-index/scripts/check-brookfield-stale.sh
+
+# Type=oneshot has no start timeout by default.
+TimeoutStartSec=1min

@@ -17,6 +17,13 @@
 #   5. enables and starts the service (the service refuses a database with a
 #      migration not applied, so it starts after migrate), then scripts/smoke.sh.
 #
+# It also installs the Brookfield First refresh (deploy/laptop/
+# sermon-index-brookfield-*): a service and a timer that regenerate the YouTube
+# list on the 1st and the 26th of each month, and a daily check that it did.
+# The install enables both timers but fetches nothing; the units run the
+# scripts of the checkout at ~/sermon-index. The first stamp the check wants
+# comes from the first refresh: run scripts/refresh-brookfield.sh once.
+#
 # SERMON_INDEX_HOME stands in for $HOME (the tests set it to a temporary
 # directory); the units themselves say %h, the user's real home.
 set -eu
@@ -30,6 +37,8 @@ DATA=$H/.local/state/sermon-index/pg
 PG_WAIT=${PG_WAIT:-60}
 PG_UNIT=sermon-index-pg.service
 SVC_UNIT=sermon-index.service
+BF_TIMERS="sermon-index-brookfield-refresh.timer sermon-index-brookfield-stale.timer"
+BF_UNITS="sermon-index-brookfield-refresh.service sermon-index-brookfield-stale.service $BF_TIMERS"
 
 CHANGED=0
 changed() { CHANGED=1; echo "$*"; }
@@ -106,7 +115,7 @@ mkdir -p "$UNITS" "$DATA"
 UNITS_CHANGED=0
 PG_UNIT_CHANGED=0
 SVC_UNIT_CHANGED=0
-for u in "$PG_UNIT" "$SVC_UNIT"; do
+for u in "$PG_UNIT" "$SVC_UNIT" $BF_UNITS; do
 	if [ -f "$UNITS/$u" ] && cmp -s "$ROOT/deploy/laptop/$u" "$UNITS/$u"; then
 		continue
 	fi
@@ -160,6 +169,19 @@ else
 	changed "enabled and started $SVC_UNIT"
 fi
 
+# The Brookfield First timers: a timer is enabled and started once; the
+# services they run are never enabled themselves.
+for t in $BF_TIMERS; do
+	if systemctl --user is-enabled "$t" >/dev/null 2>&1 && systemctl --user is-active "$t" >/dev/null 2>&1; then
+		continue
+	fi
+	systemctl --user enable --now "$t"
+	changed "enabled and started $t"
+done
+if [ "$ROOT" != "$H/sermon-index" ]; then
+	echo "note: the Brookfield units run the scripts of $H/sermon-index, not of $ROOT; the refresh fails until that checkout exists"
+fi
+
 SERMONS_URL="http://$ADDR" sh "$ROOT/scripts/smoke.sh" || die "the smoke test failed: journalctl --user -u sermon-index"
 
 if [ "$CHANGED" = 0 ]; then
@@ -171,8 +193,9 @@ cat <<WAYBACK
 
 The way back:
   sh $ROOT/scripts/uninstall-laptop.sh
-stops and disables both units and removes them and $BIN. It leaves, and
-names again when it runs:
+stops and disables both units and the two Brookfield timers and removes them
+and $BIN. It leaves, and names again when it runs:
   $DATA   (the database)
   $CONF    (the password: pg.env and env)
+  $H/.local/state/sermon-index/brookfield-refreshed   (the refresh stamp)
 WAYBACK

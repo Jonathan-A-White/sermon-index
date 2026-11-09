@@ -1,0 +1,24 @@
+# One run of scripts/refresh-brookfield.sh, as the user, then it exits: no
+# daemon. Started by sermon-index-brookfield-refresh.timer. For `systemctl --user`.
+#
+# It reads the YouTube key from the vault (mw secrets get youtube_api_key) into
+# the environment of one go run, regenerates sources/brookfield-first and
+# data/morning-rephil.jsonl, and commits and pushes them only if they changed.
+# The key is in no file and no unit. A failed run is mailed to the Mayor by
+# OnFailure=.
+[Unit]
+Description=Sermon index: regenerate Brookfield First's YouTube list and commit it if it changed
+After=network-online.target
+Wants=network-online.target
+OnFailure=mw-unit-failed@%n.service
+
+[Service]
+Type=oneshot
+# PATH only (mw, go and git are found through it).
+EnvironmentFile=-%h/.config/mw/dispatch.env
+WorkingDirectory=%h/sermon-index
+ExecStart=/bin/sh %h/sermon-index/scripts/refresh-brookfield.sh
+
+# Type=oneshot has no start timeout by default, and a hung fetch would then
+# block every later run.
+TimeoutStartSec=15min

@@ -1,0 +1,13 @@
+# Runs sermon-index-brookfield-stale.service once a day at 13:00 UTC. For
+# `systemctl --user`.
+[Unit]
+Description=Daily at 13:00 UTC, check that Brookfield First's YouTube list was refreshed in the last 27 days
+
+[Timer]
+OnCalendar=*-*-* 13:00:00 UTC
+# A host that was off at 13:00 checks when it wakes.
+Persistent=true
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target
