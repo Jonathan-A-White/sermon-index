@@ -1,5 +1,7 @@
 # Brookfield First on YouTube: report
 
+<!-- toc: none -->
+
 Written by `go run ./tools/brookfield-youtube` from the YouTube Data API v3 (channel @BrookfieldFirst); a re-run rewrites it. Only titles, dates, links, and a preacher or a passage where a title or description names one are kept: no video, audio, caption or description text.
 
 ## Counts

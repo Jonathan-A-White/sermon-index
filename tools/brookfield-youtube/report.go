@@ -16,7 +16,7 @@ func (r *Result) Summary() string {
 func (r *Result) Markdown() string {
 	var b strings.Builder
 	w := func(format string, a ...any) { fmt.Fprintf(&b, format, a...) }
-	w("# Brookfield First on YouTube: report\n\n")
+	w("# Brookfield First on YouTube: report\n\n<!-- toc: none -->\n\n")
 	w("Written by `go run ./tools/brookfield-youtube` from the YouTube Data API v3 (channel %s); a re-run rewrites it. Only titles, dates, links, and a preacher or a passage where a title or description names one are kept: no video, audio, caption or description text.\n\n", r.Handle)
 	w("## Counts\n\n")
 	w("- Videos seen: %d (the entries of the channel's uploads playlist)\n", r.Seen)
