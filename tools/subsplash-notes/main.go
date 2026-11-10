@@ -7,6 +7,7 @@
 //	subsplash-notes keygen [--key <file>]
 //	subsplash-notes address [--key <file>] [--postern <url>]
 //	subsplash-notes fetch [--key <file>] [--postern <url>] [--since n] [--rows rows.jsonl] [--out records.jsonl]
+//	subsplash-notes forward-confirm [--key <file>] [--postern <url>]
 //	subsplash-notes [--alerts <file>|-] [--rows rows.jsonl] [--out records.jsonl]
 //
 // keygen makes the family's key once, at ~/.config/sermon-index/postern-alerts.key
@@ -23,6 +24,13 @@
 // is reported and left unclaimed, and Postern forgets it after 30 days. Every
 // request is signed by the key with a Postern2 proof (Postern's docs/api.md,
 // Authentication). --postern defaults to $POSTERN_URL.
+//
+// forward-confirm lists the family's alerts the same way and prints the link of
+// the newest forward-confirm alert (Gmail's confirmation of a forwarding
+// address), which the Governor opens to confirm the address; with none it says
+// so and exits 1. It prints only a link on https://mail.google.com/mail/vf-
+// (any other host or path is refused and not printed), makes no request but
+// the read of the alerts, and neither visits the link nor claims the alert.
 //
 // With no subcommand the tool reads a saved reply of GET /api/alerts, {"alerts":
 // [...], "next": n} ("-" reads it from standard input), and claims nothing.
@@ -80,6 +88,8 @@ func cli(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			return addressCmd(args[1:], stdout, stderr)
 		case "fetch":
 			return fetchCmd(args[1:], stdout, stderr)
+		case "forward-confirm":
+			return forwardConfirmCmd(args[1:], stdout, stderr)
 		}
 	}
 	return readCmd(args, stdin, stdout, stderr)
@@ -153,6 +163,33 @@ func addressCmd(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
+// forwardConfirmCmd prints the link of the newest forward-confirm alert, so the
+// forwarding address the Governor added in Gmail can be confirmed. It reads
+// the alerts (GET /api/alerts) and nothing else: it does not visit the link,
+// claim the alert or change anything.
+func forwardConfirmCmd(args []string, stdout, stderr io.Writer) int {
+	fs := flags("forward-confirm", stderr)
+	keyPath := fs.String("key", DefaultKeyPath(), "the key keygen wrote")
+	base := fs.String("postern", os.Getenv("POSTERN_URL"), "Postern's backend (default $POSTERN_URL)")
+	if !parse(fs, args, stderr, "subsplash-notes forward-confirm [--key <file>] [--postern <url>]") {
+		return 2
+	}
+	c, err := postern(*base, *keyPath)
+	if err != nil {
+		return fail(stderr, err)
+	}
+	body, err := c.Alerts(context.Background(), 0)
+	if err != nil {
+		return fail(stderr, err)
+	}
+	link, _, err := ForwardConfirmLink(body)
+	if err != nil {
+		return fail(stderr, err)
+	}
+	fmt.Fprintln(stdout, link)
+	return 0
+}
+
 func fetchCmd(args []string, stdout, stderr io.Writer) int {
 	fs := flags("fetch", stderr)
 	keyPath := fs.String("key", DefaultKeyPath(), "the key keygen wrote")
@@ -209,7 +246,7 @@ func readCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	alertsPath := fs.String("alerts", "-", "the alerts JSON (the body of GET /api/alerts); - is standard input")
 	rowsPath := fs.String("rows", defaultRows, "the YouTube rows to match against")
 	out := fs.String("out", defaultOut, "the records file to write; read first and merged with")
-	if !parse(fs, args, stderr, "subsplash-notes [keygen|address|fetch] ... or subsplash-notes [--alerts <file>|-] [--rows rows.jsonl] [--out records.jsonl]") {
+	if !parse(fs, args, stderr, "subsplash-notes [keygen|address|fetch|forward-confirm] ... or subsplash-notes [--alerts <file>|-] [--rows rows.jsonl] [--out records.jsonl]") {
 		return 2
 	}
 	if err := run(*alertsPath, *rowsPath, *out, stdin, stdout, stderr); err != nil {
