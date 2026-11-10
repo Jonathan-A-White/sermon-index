@@ -275,3 +275,86 @@ on_by_default = false
 		t.Errorf("search does not find the series row: %s", b)
 	}
 }
+
+// rawTheme reads target's theme tier as raw JSON objects, so a test sees a
+// key left out (no "direct" on a row reached through its text) and a null.
+func rawTheme(t *testing.T, ts *testServer, target string) (int, []map[string]any) {
+	t.Helper()
+	res := ts.do("GET", target)
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("GET %s: %s: %s", target, res.Status, body(t, res))
+	}
+	var out struct {
+		Theme struct {
+			Total int              `json:"total"`
+			Rows  []map[string]any `json:"rows"`
+		} `json:"theme"`
+	}
+	if err := json.Unmarshal([]byte(body(t, res)), &out); err != nil {
+		t.Fatal(err)
+	}
+	return out.Theme.Total, out.Theme.Rows
+}
+
+// Direct links (sermon-topics.jsonl): the fixture links 12, The Peculiar
+// Sleep of the Beloved (Psalm 127:2), to the demo topic Grace, which links
+// Romans 5:15-21 and Ephesians 2:8. At Ephesians 2:8 its row comes first,
+// marked "direct": true and naming Grace; 37, 330 and 2544, whose texts
+// meet Grace in Romans 5, follow as before, with no "direct" key.
+func TestSermonsDirectLinks(t *testing.T) {
+	ts := newTestServer(t, loadedDB(t))
+	total, rows := rawTheme(t, ts, "/v1/sermons?ref=eph.2.8&tier=theme-only")
+	var ids []string
+	for _, r := range rows {
+		ids = append(ids, r["id"].(string))
+	}
+	if want := []string{"12", "37", "330", "2544"}; total != 4 || !reflect.DeepEqual(ids, want) {
+		t.Fatalf("eph.2.8: total %d, rows %v, want %v", total, ids, want)
+	}
+	d := rows[0]
+	theme, _ := d["theme"].(map[string]any)
+	if d["direct"] != true || d["source"] != "spurgeon-20" || d["ref"] != "Ps.127.2" || d["role"] != "text" || d["width"] != 1.0 ||
+		theme["source"] != "themes-demo" || theme["topic"] != "grace" || theme["label"] != "Grace" || theme["part"] != nil || theme["part_label"] != nil {
+		t.Errorf("the direct row: %v", d)
+	}
+	for _, r := range rows[1:] {
+		if _, has := r["direct"]; has {
+			t.Errorf("a row reached through its text has a direct key: %v", r)
+		}
+	}
+
+	// direct=only: the direct rows alone, and total counts them only.
+	if total, rows := rawTheme(t, ts, "/v1/sermons?ref=eph.2.8&tier=theme&direct=only"); total != 1 || len(rows) != 1 || rows[0]["id"] != "12" {
+		t.Errorf("direct=only: %d %v", total, rows)
+	}
+	// theme= names the direct link's topic, or another.
+	if _, rows := rawTheme(t, ts, "/v1/sermons?ref=Rom.5&tier=theme-only&theme=themes-demo:grace"); len(rows) == 0 || rows[0]["id"] != "12" || rows[0]["direct"] != true {
+		t.Errorf("theme=themes-demo:grace at Rom.5: %v", rows)
+	}
+	if _, rows := rawTheme(t, ts, "/v1/sermons?ref=Rom.5&tier=theme-only&theme=themes-demo:atonement"); len(rows) != 0 {
+		for _, r := range rows {
+			if r["id"] == "12" {
+				t.Errorf("theme=themes-demo:atonement lists the sermon linked to grace: %v", r)
+			}
+		}
+	}
+	// source= leaves a direct row of a source not named out.
+	if total, _ := rawTheme(t, ts, "/v1/sermons?ref=eph.2.8&tier=theme-only&direct=only&source=nosuch"); total != 0 {
+		t.Errorf("source=nosuch: %d", total)
+	}
+
+	// A bad direct is 400 bad_direct; tier=passage ignores a good one.
+	for _, target := range []string{"/v1/sermons?ref=eph.2.8&tier=theme&direct=yes", "/v1/sermons?ref=eph.2.8&tier=theme&direct=", "/v1/sermons?ref=eph.2.8&direct=all"} {
+		res := ts.do("GET", target)
+		if res.StatusCode != 400 {
+			t.Errorf("%s: %d", target, res.StatusCode)
+			continue
+		}
+		if code, detail := errorBody(t, res); code != "bad_direct" || detail != "direct must be only (the theme tier's directly linked sermons alone), or left out" {
+			t.Errorf("%s: {%q, %q}", target, code, detail)
+		}
+	}
+	if a, b := body(t, ts.do("GET", "/v1/sermons?ref=rom.5.8&tier=passage&direct=only")), body(t, ts.do("GET", "/v1/sermons?ref=rom.5.8")); a != b {
+		t.Errorf("tier=passage&direct=only is not the flat answer:\n%s\n%s", a, b)
+	}
+}

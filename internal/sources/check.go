@@ -1,7 +1,10 @@
 package sources
 
 import (
+	"cmp"
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"html"
 	"io"
@@ -15,6 +18,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/BurntSushi/toml"
 
 	"github.com/Jonathan-A-White/sermon-index/internal/passage"
 	"github.com/Jonathan-A-White/sermon-index/internal/themes"
@@ -92,6 +97,7 @@ func checked(dir string) (*Dir, []Fault) {
 	switch d.Source.Kind {
 	case KindSermons:
 		faults = append(faults, checkRows(d)...)
+		faults = append(faults, checkSermonTopics(d)...)
 	case KindThemes:
 		faults = append(faults, checkThemes(d)...)
 	}
@@ -105,7 +111,7 @@ func checked(dir string) (*Dir, []Fault) {
 }
 
 func fileOrder(name string) int {
-	for i, f := range []string{SourceFile, RowsFile, TopicsFile, LinksFile} {
+	for i, f := range []string{SourceFile, RowsFile, SermonTopicsFile, TopicsFile, LinksFile} {
 		if f == name {
 			return i
 		}
@@ -274,6 +280,104 @@ func checkRows(d *Dir) []Fault {
 		}
 	}
 	return fs
+}
+
+// checkSermonTopics checks sermon-topics.jsonl: each line names a row of
+// rows.jsonl, a theme source in a directory beside this one, and a topic in
+// that source's topics.jsonl, and no line repeats another. Each theme source
+// is read once. A link to a `series` row is allowed.
+func checkSermonTopics(d *Dir) []Fault {
+	if len(d.SermonTopics) == 0 {
+		return nil
+	}
+	var fs []Fault
+	rows := map[string]bool{}
+	for _, r := range d.Rows {
+		rows[r.ID] = true
+	}
+	parent := d.Path
+	if abs, err := filepath.Abs(parent); err == nil {
+		parent = abs
+	}
+	parent = filepath.Dir(parent)
+	themeSources := map[string]themeTopics{}
+	seen := map[[3]string]int{}
+	for _, st := range d.SermonTopics {
+		add := func(format string, args ...any) {
+			fs = append(fs, Fault{File: SermonTopicsFile, Line: st.Line, Msg: fmt.Sprintf(format, args...)})
+		}
+		switch {
+		case st.Row == "":
+			add("row is missing")
+		case !rows[st.Row]:
+			add("row '%s': not in %s", st.Row, RowsFile)
+		}
+		switch {
+		case st.Theme == "":
+			add("theme is missing")
+		case !sourceID.MatchString(st.Theme):
+			add("theme '%s': not a source id (lower-case letters, digits and '-')", st.Theme)
+		default:
+			ts, ok := themeSources[st.Theme]
+			if !ok {
+				ts = readThemeTopics(parent, st.Theme)
+				themeSources[st.Theme] = ts
+			}
+			switch {
+			case ts.fault != "":
+				add("theme '%s': %s", st.Theme, ts.fault)
+			case st.Topic == "":
+			case !ts.topics[st.Topic]:
+				add("topic '%s': not in %s/%s", st.Topic, st.Theme, TopicsFile)
+			}
+		}
+		if st.Topic == "" {
+			add("topic is missing")
+		}
+		if st.Row != "" && st.Theme != "" && st.Topic != "" {
+			k := [3]string{st.Row, st.Theme, st.Topic}
+			if prev, dup := seen[k]; dup {
+				add("repeats line %d", prev)
+			} else {
+				seen[k] = st.Line
+			}
+		}
+	}
+	return fs
+}
+
+// themeTopics is a theme source's topic ids, or why it cannot be linked to.
+type themeTopics struct {
+	topics map[string]bool
+	fault  string
+}
+
+// readThemeTopics reads the topic ids of the theme source <parent>/<id>.
+func readThemeTopics(parent, id string) themeTopics {
+	dir := filepath.Join(parent, id)
+	var s Source
+	_, err := toml.DecodeFile(filepath.Join(dir, SourceFile), &s)
+	switch {
+	case errors.Is(err, os.ErrNotExist):
+		return themeTopics{fault: fmt.Sprintf("no theme source beside this directory (no ../%s/%s)", id, SourceFile)}
+	case err != nil:
+		return themeTopics{fault: fmt.Sprintf("../%s/%s: not TOML: %v", id, SourceFile, err)}
+	case s.Kind != KindThemes:
+		return themeTopics{fault: fmt.Sprintf("../%s is a %s source, not a themes source", id, cmp.Or(s.Kind, "kindless"))}
+	}
+	ts := themeTopics{topics: map[string]bool{}}
+	faults := readLines(dir, TopicsFile, func(line int, dec *json.Decoder) error {
+		var t themes.Topic
+		err := dec.Decode(&t)
+		if err == nil {
+			ts.topics[t.ID] = true
+		}
+		return err
+	})
+	if len(faults) > 0 {
+		ts.fault = fmt.Sprintf("../%s/%s", id, faults[0])
+	}
+	return ts
 }
 
 func checkThemes(d *Dir) []Fault {

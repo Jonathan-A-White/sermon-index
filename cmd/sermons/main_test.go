@@ -75,7 +75,7 @@ func TestMigrateAndLoadTwice(t *testing.T) {
 	}
 	for i := 0; i < 2; i++ {
 		code, out, errOut := runCmd(t, env, "load", "../../sources/_fixtures/spurgeon-20")
-		if code != 0 || out != "spurgeon-20: 20 rows, 19 passages, 0 removed\n" {
+		if code != 0 || out != "spurgeon-20: 20 rows, 19 passages, 1 topic links, 0 removed\n" {
 			t.Errorf("load %d: %d %q %q", i+1, code, out, errOut)
 		}
 	}

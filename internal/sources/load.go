@@ -18,8 +18,11 @@ type Counts struct {
 	Source string
 	Kind   string
 	// A sermon source: its rows and their passages (preaching texts and
-	// cited references).
+	// cited references), and its direct links to topics
+	// (sermon-topics.jsonl; HasTopicLinks is whether it has the file).
 	Rows, Passages int
+	TopicLinks     int
+	HasTopicLinks  bool
 	// A theme source: its topics, their parts, and links.
 	Topics, Parts, Links int
 	// Removed: rows of the source in the database that are no longer in its
@@ -32,7 +35,11 @@ func (c Counts) String() string {
 	if c.Kind == KindThemes {
 		return fmt.Sprintf("%s: %d topics, %d parts, %d links, %d removed", c.Source, c.Topics, c.Parts, c.Links, c.Removed)
 	}
-	return fmt.Sprintf("%s: %d rows, %d passages, %d removed", c.Source, c.Rows, c.Passages, c.Removed)
+	links := ""
+	if c.HasTopicLinks {
+		links = fmt.Sprintf(", %d topic links", c.TopicLinks)
+	}
+	return fmt.Sprintf("%s: %d rows, %d passages%s, %d removed", c.Source, c.Rows, c.Passages, links, c.Removed)
 }
 
 // Load checks a source directory and, when it has no fault, makes the
@@ -207,6 +214,26 @@ func writeSermons(ctx context.Context, tx pgx.Tx, d *Dir, c *Counts) error {
 		return fmt.Errorf("writing passages: %w", err)
 	}
 
+	// The direct links to topics: the file's, and none when there is no
+	// file. No key to themes: a topic not loaded (yet) matches nothing.
+	var tSermon, tTheme, tTopic []string
+	for _, st := range d.SermonTopics {
+		tSermon, tTheme, tTopic = append(tSermon, st.Row), append(tTheme, st.Theme), append(tTopic, st.Topic)
+	}
+	if _, err := tx.Exec(ctx, `DELETE FROM sermon_topics s WHERE s.source_id = $1 AND NOT EXISTS (
+			SELECT 1 FROM unnest($2::text[], $3::text[], $4::text[]) AS k(sermon, theme, topic)
+			WHERE k.sermon = s.sermon_id AND k.theme = s.theme_source_id AND k.topic = s.theme_id)`,
+		id, tSermon, tTheme, tTopic); err != nil {
+		return fmt.Errorf("removing topic links: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO sermon_topics (source_id, sermon_id, theme_source_id, theme_id)
+			SELECT $1, k.sermon, k.theme, k.topic FROM unnest($2::text[], $3::text[], $4::text[]) AS k(sermon, theme, topic)
+		ON CONFLICT DO NOTHING`,
+		id, tSermon, tTheme, tTopic); err != nil {
+		return fmt.Errorf("writing topic links: %w", err)
+	}
+
 	c.Rows, c.Passages = len(d.Rows), len(kSermon)
+	c.TopicLinks, c.HasTopicLinks = len(d.SermonTopics), d.HasSermonTopics
 	return nil
 }

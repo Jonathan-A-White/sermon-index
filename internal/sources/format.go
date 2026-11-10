@@ -2,9 +2,10 @@
 // directory under sources/ holding a source.toml and its rows
 // (docs/sources.md).
 //
-// A sermon source has rows.jsonl, one sermon a line. A theme source has
-// topics.jsonl and links.jsonl. The files are the truth; `sermons load` makes
-// the database match them.
+// A sermon source has rows.jsonl, one sermon a line, and may have
+// sermon-topics.jsonl, its sermons linked directly to topics of theme
+// sources. A theme source has topics.jsonl and links.jsonl. The files are the
+// truth; `sermons load` makes the database match them.
 package sources
 
 import (
@@ -31,6 +32,9 @@ const (
 	RowsFile   = "rows.jsonl"
 	TopicsFile = "topics.jsonl"
 	LinksFile  = "links.jsonl"
+	// SermonTopicsFile is a sermon source's direct links from its sermons
+	// to topics (optional).
+	SermonTopicsFile = "sermon-topics.jsonl"
 )
 
 // Kinds of source.
@@ -135,6 +139,17 @@ func (r Row) KindOrDefault() string {
 	return *r.Kind
 }
 
+// SermonTopic is one line of sermon-topics.jsonl: a sermon of this source
+// (Row, its id in rows.jsonl) linked directly to a topic (Topic, its id in
+// the topics.jsonl of the theme source Theme, a directory beside this one).
+type SermonTopic struct {
+	Row   string `json:"row"`
+	Theme string `json:"theme"`
+	Topic string `json:"topic"`
+
+	Line int `json:"-"` // the line of sermon-topics.jsonl it came from
+}
+
 // Dir is a source directory read from disk.
 type Dir struct {
 	Path   string
@@ -142,6 +157,10 @@ type Dir struct {
 	Rows   []Row
 	Topics []themes.Topic
 	Links  []themes.Link
+	// A sermon source's direct links to topics; HasSermonTopics is whether
+	// it has the file at all (a source without it has none).
+	SermonTopics    []SermonTopic
+	HasSermonTopics bool
 }
 
 // Fault is one thing wrong with a source directory, at a file and line
@@ -226,6 +245,17 @@ func Read(dir string) (*Dir, []Fault) {
 			}
 			return err
 		})...)
+		if present(SermonTopicsFile) {
+			d.HasSermonTopics = true
+			faults = append(faults, readLines(dir, SermonTopicsFile, func(line int, dec *json.Decoder) error {
+				st := SermonTopic{Line: line}
+				err := dec.Decode(&st)
+				if err == nil {
+					d.SermonTopics = append(d.SermonTopics, st)
+				}
+				return err
+			})...)
+		}
 		for _, f := range []string{TopicsFile, LinksFile} {
 			if present(f) {
 				add(f, 0, "a sermons source has no %s", f)
@@ -248,8 +278,10 @@ func Read(dir string) (*Dir, []Fault) {
 			}
 			return err
 		})...)
-		if present(RowsFile) {
-			add(RowsFile, 0, "a themes source has no %s", RowsFile)
+		for _, f := range []string{RowsFile, SermonTopicsFile} {
+			if present(f) {
+				add(f, 0, "a themes source has no %s", f)
+			}
 		}
 	}
 	return d, faults

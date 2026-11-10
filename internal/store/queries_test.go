@@ -2,6 +2,7 @@ package store_test
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -41,7 +42,14 @@ func loaded(t *testing.T, dirs ...string) *pgxpool.Pool {
 // with the rows given.
 func sermonSource(t *testing.T, id string, rows ...string) string {
 	t.Helper()
-	dir := filepath.Join(t.TempDir(), id)
+	return sermonSourceIn(t, t.TempDir(), id, rows...)
+}
+
+// sermonSourceIn is sermonSource in the directory parent (beside the theme
+// sources its sermon-topics.jsonl names).
+func sermonSourceIn(t *testing.T, parent, id string, rows ...string) string {
+	t.Helper()
+	dir := filepath.Join(parent, id)
 	if err := os.Mkdir(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -335,7 +343,13 @@ func TestVerses(t *testing.T) {
 // all link Rom.5.8, of 2, 34 and over 1,000 verses.
 func themeSource(t *testing.T, id string) string {
 	t.Helper()
-	dir := filepath.Join(t.TempDir(), id)
+	return themeSourceIn(t, t.TempDir(), id)
+}
+
+// themeSourceIn is themeSource in the directory parent.
+func themeSourceIn(t *testing.T, parent, id string) string {
+	t.Helper()
+	dir := filepath.Join(parent, id)
 	if err := os.Mkdir(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -475,5 +489,217 @@ func TestThemesCarrySermonsAndVerses(t *testing.T) {
 	}
 	if len(want) != 0 {
 		t.Errorf("topics not answered: %v", want)
+	}
+}
+
+// directSources is tierSources with direct links, the sources made under one
+// parent so that the check finds the theme sources beside the sermon
+// sources. a's rows 20 to 25 and 100, and b/1, preach on texts no topic
+// links; a/21 has no text. ty's alpha (2 verses, as tx's narrow) links
+// Rom.5.8; its far does not. The sermon sources load before the theme
+// sources.
+func directSources(t *testing.T) *pgxpool.Pool {
+	t.Helper()
+	parent := t.TempDir()
+	a := sermonSourceIn(t, parent, "a",
+		`{"id": "1", "title": "On the verse", "ref": "Rom.5.8", "url": "https://example.org/1"}`,
+		`{"id": "2", "title": "Stripes", "ref": "Isa.53.5", "url": "https://example.org/2"}`,
+		`{"id": "3", "title": "Prodigal", "ref": "Luke.15.17", "url": "https://example.org/3"}`,
+		`{"id": "4", "title": "Come", "ref": "John.6.37", "url": "https://example.org/4"}`,
+		`{"id": "5", "title": "Hear", "ref": "Isa.1.1", "url": "https://example.org/5"}`,
+		`{"id": "6", "title": "Only cites", "ref": "John.1.1", "url": "https://example.org/6", "cited": ["Isa.53.5", "Luke.15"]}`,
+		`{"id": "9", "title": "Nine", "ref": "John.6.37", "url": "https://example.org/9"}`,
+		`{"id": "10", "title": "Ten", "ref": "John.6.37", "url": "https://example.org/10"}`,
+		`{"id": "20", "title": "Shepherd", "ref": "Ps.23.1", "url": "https://example.org/20"}`,
+		`{"id": "21", "title": "No text", "url": "https://example.org/21"}`,
+		`{"id": "22", "title": "Beginning", "ref": "Gen.1.1", "url": "https://example.org/22"}`,
+		`{"id": "23", "title": "Two topics", "ref": "Ps.5.1", "url": "https://example.org/23"}`,
+		`{"id": "24", "title": "Far", "ref": "Ps.4.1", "url": "https://example.org/24"}`,
+		`{"id": "25", "title": "Alpha", "ref": "Ps.2.1", "url": "https://example.org/25"}`,
+		`{"id": "100", "title": "Hundred", "ref": "Ps.3.1", "url": "https://example.org/100"}`,
+	)
+	topics := []string{
+		`{"row": "21", "theme": "tx", "topic": "narrow"}`,
+		`{"row": "23", "theme": "tx", "topic": "mid"}`,
+		`{"row": "23", "theme": "tx", "topic": "narrow"}`,
+		`{"row": "20", "theme": "tx", "topic": "mid"}`,
+		`{"row": "4", "theme": "tx", "topic": "mid"}`,
+		`{"row": "22", "theme": "tx", "topic": "wide"}`,
+		`{"row": "1", "theme": "tx", "topic": "narrow"}`,
+		`{"row": "24", "theme": "ty", "topic": "far"}`,
+		`{"row": "25", "theme": "ty", "topic": "alpha"}`,
+		`{"row": "100", "theme": "tx", "topic": "narrow"}`,
+	}
+	if err := os.WriteFile(filepath.Join(a, "sermon-topics.jsonl"), []byte(strings.Join(topics, "\n")+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	b := sermonSourceIn(t, parent, "b", `{"id": "1", "title": "B one", "ref": "Ps.1.1", "url": "https://example.org/b1"}`)
+	if err := os.WriteFile(filepath.Join(b, "sermon-topics.jsonl"), []byte(`{"row": "1", "theme": "tx", "topic": "narrow"}`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	tx := themeSourceIn(t, parent, "tx")
+	ty := filepath.Join(parent, "ty")
+	if err := os.Mkdir(ty, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	toml, err := os.ReadFile(filepath.Join(tx, "source.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, content := range map[string]string{
+		"source.toml":  strings.Replace(string(toml), `id = "tx"`, `id = "ty"`, 1),
+		"topics.jsonl": `{"id": "alpha", "label": "Alpha"}` + "\n" + `{"id": "far", "label": "Far"}` + "\n",
+		"links.jsonl":  `{"topic": "alpha", "ref": "Rom.5.8"}` + "\n" + `{"topic": "alpha", "ref": "Obad.1"}` + "\n" + `{"topic": "far", "ref": "Obad.1"}` + "\n",
+	} {
+		if err := os.WriteFile(filepath.Join(ty, name), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return loaded(t, a, b, tx, ty)
+}
+
+// directKeys is themeKeys with a direct row marked "direct".
+func directKeys(rows []store.ThemeSermonRow) []string {
+	out := themeKeys(rows)
+	for i, r := range rows {
+		if r.Direct {
+			out[i] = "direct " + out[i]
+		}
+	}
+	return out
+}
+
+// The theme tier with direct links: every direct row first, by the topic's
+// verses, theme source, topic, sermon source and id; then the rows reached
+// through their text as before, less the sermons already direct.
+func TestThemeSermonsDirect(t *testing.T) {
+	db := directSources(t)
+	ctx := context.Background()
+	q := store.ThemeQuery{Span: ref(t, "Rom.5.8"), Limit: 50}
+	total, rows, err := store.ThemeSermons(ctx, db, q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{
+		"direct a/21   via tx:narrow Narrow",
+		"direct a/23 text Ps.5.1 via tx:narrow Narrow",
+		"direct a/100 text Ps.3.1 via tx:narrow Narrow",
+		"direct b/1 text Ps.1.1 via tx:narrow Narrow",
+		"direct a/25 text Ps.2.1 via ty:alpha Alpha",
+		"direct a/4 text John.6.37 via tx:mid Middle",
+		"direct a/20 text Ps.23.1 via tx:mid Middle",
+		"direct a/22 text Gen.1.1 via tx:wide Wide",
+		"a/2 text Isa.53.5 via tx:narrow Narrow (1 Cross)",
+		"a/3 text Luke.15.17 via tx:mid Middle",
+		"a/9 text John.6.37 via tx:mid Middle",
+		"a/10 text John.6.37 via tx:mid Middle",
+	}
+	if got := directKeys(rows); total != 12 || !reflect.DeepEqual(got, want) {
+		t.Errorf("rom.5.8: total %d\n got %q\nwant %q", total, got, want)
+	}
+
+	// The JSON: a direct row adds "direct": true, and one with no text has
+	// a null ref, role and width; a text row is as it was.
+	b, err := json.Marshal(rows[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := string(b); got != `{"source":"a","id":"21","title":"No text","preacher":null,"date":null,"url":"https://example.org/21","alt_url":null,"kind":"link","ref":null,"role":null,"width":null,"direct":true,"theme":{"source":"tx","topic":"narrow","label":"Narrow","part":null,"part_label":null}}` {
+		t.Errorf("a direct row with no text: %s", got)
+	}
+	b, _ = json.Marshal(rows[1])
+	if got := string(b); !strings.Contains(got, `"ref":"Ps.5.1","role":"text","width":1,"direct":true,"theme":`) {
+		t.Errorf("a direct row with a text: %s", got)
+	}
+	b, _ = json.Marshal(rows[8])
+	if got := string(b); got != `{"source":"a","id":"2","title":"Stripes","preacher":null,"date":null,"url":"https://example.org/2","alt_url":null,"kind":"link","ref":"Isa.53.5","role":"text","width":1,"theme":{"source":"tx","topic":"narrow","label":"Narrow","part":1,"part_label":"Cross"}}` {
+		t.Errorf("a row reached through its text: %s", got)
+	}
+
+	// limit and offset page across both kinds.
+	q.Limit, q.Offset = 3, 6
+	total, rows, _ = store.ThemeSermons(ctx, db, q)
+	if want := []string{"direct a/20 text Ps.23.1 via tx:mid Middle", "direct a/22 text Gen.1.1 via tx:wide Wide", "a/2 text Isa.53.5 via tx:narrow Narrow (1 Cross)"}; total != 12 || !reflect.DeepEqual(directKeys(rows), want) {
+		t.Errorf("limit 3 offset 6: %d %q", total, directKeys(rows))
+	}
+	q.Limit, q.Offset = 50, 0
+
+	// DirectOnly: the direct rows alone, and total counts only them.
+	q.DirectOnly = true
+	total, rows, _ = store.ThemeSermons(ctx, db, q)
+	if got := directKeys(rows); total != 8 || !reflect.DeepEqual(got, want[:8]) {
+		t.Errorf("direct only: %d %q", total, got)
+	}
+	q.DirectOnly = false
+
+	// source= leaves out a direct row of a source not named.
+	q.Sources = []string{"b"}
+	if total, rows, _ = store.ThemeSermons(ctx, db, q); total != 1 || !reflect.DeepEqual(directKeys(rows), []string{"direct b/1 text Ps.1.1 via tx:narrow Narrow"}) {
+		t.Errorf("source=b: %d %q", total, directKeys(rows))
+	}
+	q.Sources = nil
+}
+
+// theme= with direct links: the topic's direct rows, then its text rows; a
+// direct link to the other topic is not listed, and a sermon direct to it but
+// reached through its text by the topic named is a text row.
+func TestThemeSermonsDirectByTopic(t *testing.T) {
+	db := directSources(t)
+	ctx := context.Background()
+	q := store.ThemeQuery{Span: ref(t, "Rom.5.8"), Themes: []string{"tx:mid"}, Limit: 50}
+	total, rows, _ := store.ThemeSermons(ctx, db, q)
+	want := []string{
+		"direct a/4 text John.6.37 via tx:mid Middle",
+		"direct a/20 text Ps.23.1 via tx:mid Middle",
+		"direct a/23 text Ps.5.1 via tx:mid Middle",
+		"a/3 text Luke.15.17 via tx:mid Middle",
+		"a/9 text John.6.37 via tx:mid Middle",
+		"a/10 text John.6.37 via tx:mid Middle",
+	}
+	if got := directKeys(rows); total != 6 || !reflect.DeepEqual(got, want) {
+		t.Errorf("theme=tx:mid: %d\n got %q\nwant %q", total, got, want)
+	}
+	// The cap does not drop a direct link: wide is over 300 verses.
+	q.Themes = []string{"tx:wide"}
+	if total, rows, _ = store.ThemeSermons(ctx, db, q); total != 1 || !reflect.DeepEqual(directKeys(rows), []string{"direct a/22 text Gen.1.1 via tx:wide Wide"}) {
+		t.Errorf("theme=tx:wide: %d %q", total, directKeys(rows))
+	}
+	// A topic that does not link the place answers nothing, direct or not.
+	q.Themes = []string{"ty:far"}
+	if total, rows, _ = store.ThemeSermons(ctx, db, q); total != 0 || rows == nil || len(rows) != 0 {
+		t.Errorf("theme=ty:far: %d %q", total, directKeys(rows))
+	}
+	// At Obadiah, ty:far (1 verse) links the place: a/24 is its direct row,
+	// before ty:alpha's (2 verses); a/1, direct to tx:narrow, which does not
+	// link Obadiah, comes in through its text (Rom.5.8 meets alpha).
+	q = store.ThemeQuery{Span: ref(t, "Obad.1"), Limit: 50}
+	if total, rows, _ = store.ThemeSermons(ctx, db, q); total != 3 || !reflect.DeepEqual(directKeys(rows), []string{"direct a/24 text Ps.4.1 via ty:far Far", "direct a/25 text Ps.2.1 via ty:alpha Alpha", "a/1 text Rom.5.8 via ty:alpha Alpha"}) {
+		t.Errorf("Obad.1: %d %q", total, directKeys(rows))
+	}
+}
+
+// A directly linked sermon whose passage overlaps the place is a passage
+// row only (a/1, on Rom.5.8, is linked to tx:narrow); /v1/themes's sermon
+// counts are by preaching text only, so direct links do not change them.
+func TestThemeSermonsDirectPassageRowAndThemeCounts(t *testing.T) {
+	db := directSources(t)
+	ctx := context.Background()
+	_, rows, _ := store.ThemeSermons(ctx, db, store.ThemeQuery{Span: ref(t, "Rom.5.8"), Limit: 50})
+	for _, r := range rows {
+		if r.Source == "a" && r.ID == "1" {
+			t.Errorf("a/1 is a passage row and is in the theme tier: %+v", r)
+		}
+	}
+	if _, prows, _ := store.Sermons(ctx, db, store.SermonQuery{Span: ref(t, "Rom.5.8"), Limit: 50}); len(prows) != 1 || prows[0].ID != "1" {
+		t.Errorf("passage tier: %q", keys(prows))
+	}
+	themes, err := store.Themes(ctx, db, ref(t, "Rom.5.8"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, th := range themes {
+		if want := map[string]int{"narrow": 2, "mid": 5, "wide": 3, "alpha": 1}[th.Topic]; th.Sermons != want {
+			t.Errorf("%s:%s: %d sermons, want %d (by preaching text only)", th.Source, th.Topic, th.Sermons, want)
+		}
 	}
 }
