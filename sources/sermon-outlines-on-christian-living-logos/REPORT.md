@@ -11,8 +11,8 @@ lines read:                          30
 rows written:                        30
 lines dropped:                       0
 rows with a ref:                     30
-  of them read from the label:       0
-  of them read from the title:       4
+  of them read from the label:       1
+  of them read from the title:       3
   of them with cited references:     24
 rows with no ref:                    0
 series rows (ref over >3 chapters):  0
