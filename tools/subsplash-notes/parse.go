@@ -147,7 +147,7 @@ var refRE = func() *regexp.Regexp {
 	for i, n := range list {
 		list[i] = strings.ReplaceAll(regexp.QuoteMeta(n), `\ `, `\s+`)
 	}
-	return regexp.MustCompile(`(?i)^(` + strings.Join(list, "|") + `)\.?\s+(\d{1,3})(?::(\d{1,3})([a-z])?)?(?:\s*[-–—]\s*(\d{1,3})([a-z])?(?::(\d{1,3})([a-z])?)?)?$`)
+	return regexp.MustCompile(`(?i)^(` + strings.Join(list, "|") + `)\.?\s+(\d{1,3})(?::(` + passage.NumberPattern + `))?(?:\s*[-–—]\s*(` + passage.NumberPattern + `)(?::(` + passage.NumberPattern + `))?)?$`)
 }()
 
 var bookOSIS = func() map[string]string {
@@ -172,26 +172,44 @@ func ReferenceToOSIS(s string) (string, error) {
 		return "", fmt.Errorf("reference '%s' is not one passage of a book, chapter and verses", s)
 	}
 	book := bookOSIS[strings.ToLower(strings.Join(strings.Fields(m[1]), " "))]
-	// A letter part ("10a", "4b") names half a verse; the verse is the unit
-	// here, so the letter is dropped. It is only a verse's: a chapter with a
-	// letter ("Isaiah 40a", "Isaiah 40-41a") is still refused.
-	c1, v1, x, y := m[2], m[3], m[5], m[7]
-	if m[6] != "" && (v1 == "" || y != "") {
-		return "", fmt.Errorf("reference '%s' is not one passage of a book, chapter and verses", s)
-	}
+	// A verse may carry a letter part ("10a", "4b"), which passage.VerseNumber
+	// drops; a chapter may not ("Isaiah 40a", "Isaiah 40-41a"), which
+	// passage.ChapterNumber refuses.
+	notOne := fmt.Errorf("reference '%s' is not one passage of a book, chapter and verses", s)
+	c1, v1, x, y := m[2], m[3], m[4], m[5]
 	var ref string
 	if v1 == "" {
 		ref = book + "." + c1
 		if x != "" {
-			ref += "-" + book + "." + x
+			c2, err := passage.ChapterNumber(x)
+			if err != nil {
+				return "", notOne
+			}
+			ref += "-" + book + "." + c2
 		}
 	} else {
-		ref = book + "." + c1 + "." + v1
+		v, err := passage.VerseNumber(v1)
+		if err != nil {
+			return "", notOne
+		}
+		ref = book + "." + c1 + "." + v
 		switch {
 		case x != "" && y == "":
-			ref += "-" + book + "." + c1 + "." + x
+			v2, err := passage.VerseNumber(x)
+			if err != nil {
+				return "", notOne
+			}
+			ref += "-" + book + "." + c1 + "." + v2
 		case x != "":
-			ref += "-" + book + "." + x + "." + y
+			c2, err := passage.ChapterNumber(x)
+			if err != nil {
+				return "", notOne
+			}
+			v2, err := passage.VerseNumber(y)
+			if err != nil {
+				return "", notOne
+			}
+			ref += "-" + book + "." + c2 + "." + v2
 		}
 	}
 	r, err := passage.Parse(ref)

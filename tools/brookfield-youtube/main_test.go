@@ -299,6 +299,10 @@ func TestTextPassages(t *testing.T) {
 		{"Song of Solomon 2:1", []string{"Song.2.1"}},
 		{"Genesis 1:1-2:3", []string{"Gen.1.1-Gen.2.3"}},
 		{"Ephesians 1-6", []string{"Eph.1-Eph.6"}},
+		{"2 Peter 2:4-10a", []string{"2Pet.2.4-2Pet.2.10"}},
+		{"1 Peter 4:12b-19", []string{"1Pet.4.12-1Pet.4.19"}},
+		{"2 Peter 2:10a", []string{"2Pet.2.10"}},
+		{"John 3:16b-4:3a", []string{"John.3.16-John.4.3"}},
 		{"Online Service | August 23, 2020", nil},
 		{"Brookfield, CT 06804 and text 73256", nil},
 		{"Acts of kindness", nil},
@@ -313,6 +317,10 @@ func TestTextPassages(t *testing.T) {
 	}
 	if _, bad := textPassages("Romans 99:1"); len(bad) != 1 {
 		t.Errorf("Romans 99:1 should be unreadable, got %v", bad)
+	}
+	// A letter on a chapter is not a half verse: it is listed, never read short.
+	if got, bad := textPassages("Isaiah 40-41a"); len(bad) != 1 || len(got) != 0 {
+		t.Errorf("Isaiah 40-41a: read %v, unreadable %v; want it unreadable", got, bad)
 	}
 }
 

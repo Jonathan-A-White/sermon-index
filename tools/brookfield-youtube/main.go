@@ -402,7 +402,7 @@ var passageRE = func() *regexp.Regexp {
 	for i, n := range list {
 		list[i] = strings.ReplaceAll(regexp.QuoteMeta(n), `\ `, `\s+`)
 	}
-	return regexp.MustCompile(`(?i)\b(` + strings.Join(list, "|") + `)\.?\s+(\d{1,3})(?::(\d{1,3}))?(?:\s*[-–—]\s*(\d{1,3})(?::(\d{1,3}))?)?\b`)
+	return regexp.MustCompile(`(?i)\b(` + strings.Join(list, "|") + `)\.?\s+(\d{1,3})(?::(` + passage.NumberPattern + `))?(?:\s*[-–—]\s*(` + passage.NumberPattern + `)(?::(` + passage.NumberPattern + `))?)?\b`)
 }()
 
 var bookOSIS = func() map[string]string {
@@ -413,6 +413,47 @@ var bookOSIS = func() map[string]string {
 	return m
 }()
 
+// textRef writes one match of passageRE (book, chapter, verse, then the
+// second number and the one after its colon) as an OSIS reference. A verse may
+// carry a letter and is read through passage.VerseNumber; a chapter may not.
+func textRef(book, c1, v1, x, y string) (string, error) {
+	if v1 == "" {
+		ref := book + "." + c1
+		if x != "" {
+			c2, err := passage.ChapterNumber(x)
+			if err != nil {
+				return "", err
+			}
+			ref += "-" + book + "." + c2
+		}
+		return ref, nil
+	}
+	v, err := passage.VerseNumber(v1)
+	if err != nil {
+		return "", err
+	}
+	ref := book + "." + c1 + "." + v
+	switch {
+	case x != "" && y == "":
+		v2, err := passage.VerseNumber(x)
+		if err != nil {
+			return "", err
+		}
+		ref += "-" + book + "." + c1 + "." + v2
+	case x != "":
+		c2, err := passage.ChapterNumber(x)
+		if err != nil {
+			return "", err
+		}
+		v2, err := passage.VerseNumber(y)
+		if err != nil {
+			return "", err
+		}
+		ref += "-" + book + "." + c2 + "." + v2
+	}
+	return ref, nil
+}
+
 // textPassages finds the passages a text names ("Genesis 18:16-33", "Psalm
 // 23", "Mark 6:35–44") as OSIS references, in the order they occur, and lists
 // separately the ones the book table refuses ("Romans 99:1"). A number with
@@ -420,34 +461,22 @@ var bookOSIS = func() map[string]string {
 func textPassages(s string) (refs, bad []string) {
 	for _, m := range passageRE.FindAllStringSubmatch(s, -1) {
 		book := bookOSIS[strings.ToLower(strings.Join(strings.Fields(m[1]), " "))]
-		c1, v1, x, y := m[2], m[3], m[4], m[5]
-		var ref string
-		switch {
-		case v1 == "":
-			ref = book + "." + c1
-			if x != "" {
-				ref += "-" + book + "." + x
-			}
-		default:
-			ref = book + "." + c1 + "." + v1
-			switch {
-			case x != "" && y == "":
-				ref += "-" + book + "." + c1 + "." + x
-			case x != "":
-				ref += "-" + book + "." + x + "." + y
-			}
+		ref, err := textRef(book, m[2], m[3], m[4], m[5])
+		if err == nil {
+			var r passage.Range
+			r, err = passage.Parse(ref)
+			ref = r.OSIS
 		}
-		r, err := passage.Parse(ref)
 		if err != nil {
 			bad = append(bad, strings.TrimSpace(m[0]))
 			continue
 		}
 		dup := false
 		for _, have := range refs {
-			dup = dup || have == r.OSIS
+			dup = dup || have == ref
 		}
 		if !dup {
-			refs = append(refs, r.OSIS)
+			refs = append(refs, ref)
 		}
 	}
 	return refs, bad
