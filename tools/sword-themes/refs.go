@@ -134,7 +134,7 @@ func parseItem(b *passage.Book, chapter *int, rest string) ([]string, string) {
 			// Verses: C:V, C:V-V2, C:V-C2:V2, or a bare V (V-V2) in a list.
 			c, v := loC, loV
 			if !loColon {
-				c, v = *chapter, atoi(lo)
+				c, v = *chapter, verseOf(lo)
 				if oneChapter {
 					c = 1
 				}
@@ -164,7 +164,7 @@ func parseItem(b *passage.Book, chapter *int, rest string) ([]string, string) {
 				out = append(out, start+fmt.Sprintf("-%s.%d.%d", hiBook.OSIS, hiC, hiV))
 				continue
 			}
-			end := atoi(hi)
+			end := verseOf(hi)
 			if end == 0 {
 				return nil, fmt.Sprintf("'%s': the end of a range is not a number", el)
 			}
@@ -204,7 +204,17 @@ func splitCV(s string) (c, v int, colon bool) {
 	if !ok {
 		return 0, 0, false
 	}
-	return atoi(cs), atoi(vs), true
+	return atoi(cs), verseOf(vs), true
+}
+
+// verseOf is the verse s is, or 0 when s is not a verse number: a half verse
+// ("10a") is its verse, read by passage.VerseNumber.
+func verseOf(s string) int {
+	v, err := passage.VerseNumber(s)
+	if err != nil {
+		return 0
+	}
+	return atoi(v)
 }
 
 // atoi is the number s is, or 0 when s is not only digits.

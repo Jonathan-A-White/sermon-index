@@ -19,6 +19,9 @@ func TestParseGroup(t *testing.T) {
 		{"1 Co 13:1", []string{"1Cor.13.1"}},
 		{"Ro 9:24-26", []string{"Rom.9.24-Rom.9.26"}},
 		{"Ro 5:8-8", []string{"Rom.5.8"}},
+		// A half verse ("10a") is its verse; a chapter has no halves.
+		{"2Pe 2:4-10a; Ro 8:28b; Ps 19:8a-10b,14a", []string{"2Pet.2.4-2Pet.2.10", "Rom.8.28", "Ps.19.8-Ps.19.10", "Ps.19.14"}},
+		{"Isa 52:13b-53:12a; Jude 5a-7", []string{"Isa.52.13-Isa.53.12", "Jude.1.5-Jude.1.7"}},
 		{"Isa 52:13-53:12", []string{"Isa.52.13-Isa.53.12"}},
 		{"Ps 23; Isa 40-42", []string{"Ps.23", "Isa.40-Isa.42"}},
 		{"Ps 19:8-10,14; 119:20", []string{"Ps.19.8-Ps.19.10", "Ps.19.14", "Ps.119.20"}},
@@ -65,6 +68,8 @@ func TestParseGroupBad(t *testing.T) {
 		{"Ro 5:9-8", nil, "the range ends before it starts"},
 		// An item that has no book and no earlier item to take it from.
 		{"5:8", nil, "no book"},
+		// A letter on a chapter is refused, not dropped.
+		{"Isa 40a-42", nil, "is not a chapter"},
 	}
 	for _, c := range cases {
 		got, bad := ParseGroup(c.group)
