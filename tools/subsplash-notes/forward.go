@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"slices"
 	"strings"
 )
 
@@ -13,17 +14,19 @@ import (
 // forwarding address (Postern's docs/alerts-mail.md).
 const KindForwardConfirm = "forward-confirm"
 
-const (
-	confirmHost   = "mail.google.com"
-	confirmPrefix = "/mail/vf-"
-)
+// confirmHosts is the hosts a confirm link may be on. It must match
+// alerts.ConfirmHosts in the postern repo (server/internal/alerts/store.go),
+// the list Postern's receiver keeps a link by; change the two together.
+var confirmHosts = []string{"mail.google.com", "mail-settings.google.com", "isolated.mail.google.com"}
+
+const confirmPrefix = "/mail/vf-"
 
 // ForwardConfirmLink reads the body of GET /api/alerts and returns the link
 // of the newest forward-confirm alert (the highest seq) and that alert's id.
 // It only reads: the link is not visited and the alert is not claimed.
 //
 // The newest alert alone is judged. Its link must be one the receiver would
-// have kept, https://mail.google.com/mail/vf-..., and a link on any other
+// have kept, https://<a confirm host>/mail/vf-<token>, and a link on any other
 // host or path is refused, with the alert named and the link not repeated;
 // an older alert's good link is not offered in its place.
 func ForwardConfirmLink(body []byte) (link, alertID string, err error) {
@@ -62,9 +65,9 @@ func ForwardConfirmLink(body []byte) (link, alertID string, err error) {
 	return newest.Link, newest.ID, nil
 }
 
-// checkConfirmLink accepts only https://mail.google.com/mail/vf-<token>,
-// with an optional query: the host exactly, the default port, no user
-// information, no whitespace or control character and no further path.
+// checkConfirmLink accepts only https://<host>/mail/vf-<token>, the host one
+// of confirmHosts exactly: the default port, no user information, no query,
+// no fragment, no whitespace or control character and no further path.
 func checkConfirmLink(s string) error {
 	if s == "" {
 		return errors.New("it has no link")
@@ -81,10 +84,12 @@ func checkConfirmLink(s string) error {
 	switch {
 	case u.Scheme != "https":
 		return errors.New("the link is not https")
-	case u.User != nil || u.Host != confirmHost || u.Port() != "":
-		return fmt.Errorf("the link is not on https://%s", confirmHost)
+	case u.User != nil || u.Port() != "" || !slices.Contains(confirmHosts, u.Host):
+		return fmt.Errorf("the link is not on https://%s", strings.Join(confirmHosts, ", https://"))
+	case strings.ContainsAny(s, "?#"):
+		return errors.New("the link has a query or fragment")
 	case !strings.HasPrefix(u.Path, confirmPrefix) || len(u.Path) == len(confirmPrefix) || strings.Contains(u.Path[len(confirmPrefix):], "/"):
-		return fmt.Errorf("the link is not at https://%s%s<token>", confirmHost, confirmPrefix)
+		return fmt.Errorf("the link is not at https://<host>%s<token>", confirmPrefix)
 	}
 	return nil
 }

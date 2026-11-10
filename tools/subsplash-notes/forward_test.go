@@ -70,6 +70,21 @@ func TestForwardConfirmRefusesALinkOffGmail(t *testing.T) {
 		"https://mail.google.com/mail/vf-",
 		"https://mail.google.com/other/vf-abc",
 		"https://MAIL.google.com.evil.example/mail/vf-abc",
+		"https://google.com/mail/vf-abc",
+		"https://mail.google.com/mail/uf-abc?x=1",
+		"https://mail-settings.google.com/mail/uf-abc",
+		"https://isolated.mail.google.com/mail/uf-abc",
+		"https://mail-settings.google.com.evil.example.com/mail/vf-abc",
+		"https://other.mail.google.com/mail/vf-abc",
+		"https://mail.google.com/mail/vf-abc?ik=abc",
+		"https://mail.google.com/mail/vf-abc?",
+		"https://mail.google.com/mail/vf-abc#frag",
+		"https://mail.google.com/mail/vf-abc#",
+		"https://mail-settings.google.com/mail/vf-abc?ik=abc",
+		"https://isolated.mail.google.com/mail/vf-abc#frag",
+		"https://isolated.mail.google.com@example.com/mail/vf-abc",
+		"https://mail-settings.google.com:8443/mail/vf-abc",
+		"https://mail-settings.google.com/mail/vf-abc/more",
 		"https://mail.google.com/mail/vf-abc def",
 		"https://mail.google.com/mail/vf-abc\nsecond line",
 		"javascript:alert(1)",
@@ -99,11 +114,17 @@ func TestForwardConfirmRefusesALinkOffGmail(t *testing.T) {
 	if code == 0 || out != "" {
 		t.Errorf("a bad newest link with a good older one: exit %d, printed %q", code, out)
 	}
-	// A real-looking link with a query and the cancel link elsewhere is fine.
-	withQuery := "https://mail.google.com/mail/vf-%5BANGjdJ_x%5D-yyy?ik=abc&view=x"
-	_, code, out, errOut := confirmRun(t, alertsReply(t, forwardAlert("00000000000000b1", 1, withQuery)))
-	if code != 0 || out != withQuery+"\n" {
-		t.Errorf("a gmail link with a query: exit %d, printed %q, %s", code, out, errOut)
+}
+
+// Acceptance 1 (mw-qtu3zvz.49.10): each host in Postern's alerts.ConfirmHosts
+// is printed, with an invented token.
+func TestForwardConfirmPrintsEachConfirmHost(t *testing.T) {
+	for _, host := range []string{"mail.google.com", "mail-settings.google.com", "isolated.mail.google.com"} {
+		link := "https://" + host + "/mail/vf-%5BANGjdJ_invented%5D-abc123"
+		_, code, out, errOut := confirmRun(t, alertsReply(t, forwardAlert("00000000000000b1", 1, link)))
+		if code != 0 || out != link+"\n" {
+			t.Errorf("%s: exit %d, printed %q, %s", host, code, out, errOut)
+		}
 	}
 }
 

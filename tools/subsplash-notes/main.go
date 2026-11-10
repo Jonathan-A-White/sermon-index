@@ -28,8 +28,9 @@
 // forward-confirm lists the family's alerts the same way and prints the link of
 // the newest forward-confirm alert (Gmail's confirmation of a forwarding
 // address), which the Governor opens to confirm the address; with none it says
-// so and exits 1. It prints only a link on https://mail.google.com/mail/vf-
-// (any other host or path is refused and not printed), makes no request but
+// so and exits 1. It prints only a link
+// https://<host>/mail/vf-<token> on one of Postern's confirm hosts (see
+// confirmHosts; any other link is refused and not printed), makes no request but
 // the read of the alerts, and neither visits the link nor claims the alert.
 //
 // With no subcommand the tool reads a saved reply of GET /api/alerts, {"alerts":
