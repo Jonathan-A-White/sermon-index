@@ -169,7 +169,9 @@ func findBook(s string, tolerant bool) (osis, rest string, ok bool) {
 }
 
 // A piece of a label after its book: 3, 3:16, 3:1-13, 3-4, 3:1-4:5, 4-5:14.
-var tokenRE = regexp.MustCompile(`^(\d+)(?::(\d+))?(?:-(\d+)(?::(\d+))?)?$`)
+// A number may carry a half verse's letter (3:1-13b); passage.VerseNumber and
+// passage.ChapterNumber say where it is allowed.
+var tokenRE = regexp.MustCompile(`^(` + passage.NumberPattern + `)(?::(` + passage.NumberPattern + `))?(?:-(` + passage.NumberPattern + `)(?::(` + passage.NumberPattern + `))?)?$`)
 
 // LabelToOSIS reads a reference as a person writes it ("Romans 9",
 // "John 3:1–13", "Acts 1:12–15; 2:1, 7–13", "2 Samuel 11; 12:1–31; Psalm
@@ -215,6 +217,23 @@ func LabelToOSIS(label string) ([]string, error) {
 				return fail("cannot read " + strconv.Quote(tok))
 			}
 			c1, v1, x, y := m[1], m[2], m[3], m[4]
+			// Each number is a chapter or a verse by its place: a verse may
+			// carry a letter (dropped), a chapter may not (refused).
+			var bad error
+			chap := func(n *string) {
+				if v, err := passage.ChapterNumber(*n); err != nil {
+					bad = err
+				} else {
+					*n = v
+				}
+			}
+			verse := func(n *string) {
+				if v, err := passage.VerseNumber(*n); err != nil {
+					bad = err
+				} else {
+					*n = v
+				}
+			}
 			var ref string
 			switch {
 			case v1 == "" && i > 0 && verseCtx:
@@ -222,11 +241,28 @@ func LabelToOSIS(label string) ([]string, error) {
 				if y != "" {
 					return fail("cannot read " + strconv.Quote(tok))
 				}
+				verse(&c1)
+				if x != "" {
+					verse(&x)
+				}
+				if bad != nil {
+					return fail("cannot read " + strconv.Quote(tok))
+				}
 				ref = fmt.Sprintf("%s.%s.%s", book, chapter, c1)
 				if x != "" {
 					ref += fmt.Sprintf("-%s.%s.%s", book, chapter, x)
 				}
 			case v1 == "":
+				chap(&c1)
+				if x != "" {
+					chap(&x)
+				}
+				if y != "" {
+					verse(&y)
+				}
+				if bad != nil {
+					return fail("cannot read " + strconv.Quote(tok))
+				}
 				ref = fmt.Sprintf("%s.%s", book, c1)
 				chapter, verseCtx = c1, false
 				if x != "" {
@@ -236,6 +272,17 @@ func LabelToOSIS(label string) ([]string, error) {
 					}
 				}
 			default:
+				chap(&c1)
+				verse(&v1)
+				if x != "" && y == "" {
+					verse(&x)
+				} else if x != "" {
+					chap(&x)
+					verse(&y)
+				}
+				if bad != nil {
+					return fail("cannot read " + strconv.Quote(tok))
+				}
 				ref = fmt.Sprintf("%s.%s.%s", book, c1, v1)
 				chapter, verseCtx = c1, true
 				switch {

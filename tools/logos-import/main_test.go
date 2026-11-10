@@ -841,6 +841,28 @@ func TestBurroughsFrontMatterDropped(t *testing.T) {
 	}
 }
 
+// A half verse ("2 Peter 2:4-10a") is read as its verse by LabelToOSIS itself,
+// not only after CleanTitleLabel; a letter on a chapter is still refused.
+func TestLabelToOSISReadsHalfVerse(t *testing.T) {
+	for in, want := range map[string]string{
+		"2 Peter 2:4-10a":          "2Pet.2.4-2Pet.2.10",
+		"1 Peter 4:12b-19":         "1Pet.4.12-1Pet.4.19",
+		"2 Peter 2:10a":            "2Pet.2.10",
+		"John 3:16b-4:3a":          "John.3.16-John.4.3",
+		"Acts 1:12-15; 2:1, 7-13b": "Acts.1.12-Acts.1.15,Acts.2.1,Acts.2.7-Acts.2.13",
+	} {
+		got, err := LabelToOSIS(in)
+		if err != nil || strings.Join(got, ",") != want {
+			t.Errorf("LabelToOSIS(%q) = %v, %v; want %s", in, got, err, want)
+		}
+	}
+	for _, bad := range []string{"Isaiah 40a", "Isaiah 40-41a", "2a:4", "Romans 8:28ab"} {
+		if got, err := LabelToOSIS(bad); err == nil {
+			t.Errorf("LabelToOSIS(%q) = %v; want it refused", bad, got)
+		}
+	}
+}
+
 // Burroughs, The Saints' Happiness, Sermon XIX: Logos's own reference is Psalm
 // 5:6 where the label and the title say "Math . 5:6" (Matthew 5:6). The label
 // is read, so the disagreement is listed in REPORT.md; the row keeps Logos's
@@ -1952,8 +1974,9 @@ var batch6b = []struct {
 }
 
 // A verse printed with a part-of-verse letter in a title ("2 Peter 2:1–10a")
-// is read to the whole verse; Logos writes the same passage with a letter the
-// book table refuses, so the title's reading is the row's ref.
+// is read to the whole verse, and so is the index's own label of it ("2 Peter
+// 2:1–10a"): LabelToOSIS reads the letter, so the row's ref is read from the
+// label, as it is for any passage Logos gives no reference for.
 func TestTitleRefWithPartOfVerseLetterIsRead(t *testing.T) {
 	for label, want := range map[string]string{
 		"2 Peter 2:1–10a":  "2Pet.2.1-2Pet.2.10",
@@ -1968,7 +1991,7 @@ func TestTitleRefWithPartOfVerseLetterIsRead(t *testing.T) {
 	}
 	rows, rep := BuildSource([]File{{Inputs: readFile(t, "testdata/sermon-outlines-on-christian-living-sermons.jsonl"), TitleForm: FormRefInBrackets}}, false)
 	r := byID(rows, "SOCHRLIV.1-25496")
-	if r == nil || r.Title != "Faithfulness in Hard Places" || str(r.Ref) != "2Pet.2.1-2Pet.2.10" || !strings.Contains(str(r.Notes), "read from the title") {
+	if r == nil || r.Title != "Faithfulness in Hard Places" || str(r.Ref) != "2Pet.2.1-2Pet.2.10" || !strings.Contains(str(r.Notes), "read from the label") {
 		t.Errorf("2 Peter 2:1–10a: %+v", r)
 	}
 	if len(rep.Unparsed) != 0 || len(rep.NoRef) != 0 {
