@@ -2,3 +2,7 @@ bin/
 .ccel-cache/
 .sword-cache/
 .archive-cache/
+
+# Private files tools/subsplash-links and tools/subsplash-notes write; never commit them.
+data/subsplash-links-cache.jsonl
+data/subsplash-notes.jsonl
