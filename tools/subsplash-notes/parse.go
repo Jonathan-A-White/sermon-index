@@ -147,7 +147,7 @@ var refRE = func() *regexp.Regexp {
 	for i, n := range list {
 		list[i] = strings.ReplaceAll(regexp.QuoteMeta(n), `\ `, `\s+`)
 	}
-	return regexp.MustCompile(`(?i)^(` + strings.Join(list, "|") + `)\.?\s+(\d{1,3})(?::(\d{1,3}))?(?:\s*[-–—]\s*(\d{1,3})(?::(\d{1,3}))?)?$`)
+	return regexp.MustCompile(`(?i)^(` + strings.Join(list, "|") + `)\.?\s+(\d{1,3})(?::(\d{1,3})([a-z])?)?(?:\s*[-–—]\s*(\d{1,3})([a-z])?(?::(\d{1,3})([a-z])?)?)?$`)
 }()
 
 var bookOSIS = func() map[string]string {
@@ -159,7 +159,8 @@ var bookOSIS = func() map[string]string {
 }()
 
 // ReferenceToOSIS reads one passage as Subsplash prints it ("2 Peter
-// 3:10-18", "Psalm 23", "John 3:16-4:3") as an OSIS reference. Anything else,
+// 3:10-18", "Psalm 23", "John 3:16-4:3", "2 Peter 2:4-10a") as an OSIS
+// reference; a half verse is read as its verse. Anything else,
 // a second passage included, is an error naming what was given.
 func ReferenceToOSIS(s string) (string, error) {
 	s = strings.TrimSpace(s)
@@ -171,7 +172,13 @@ func ReferenceToOSIS(s string) (string, error) {
 		return "", fmt.Errorf("reference '%s' is not one passage of a book, chapter and verses", s)
 	}
 	book := bookOSIS[strings.ToLower(strings.Join(strings.Fields(m[1]), " "))]
-	c1, v1, x, y := m[2], m[3], m[4], m[5]
+	// A letter part ("10a", "4b") names half a verse; the verse is the unit
+	// here, so the letter is dropped. It is only a verse's: a chapter with a
+	// letter ("Isaiah 40a", "Isaiah 40-41a") is still refused.
+	c1, v1, x, y := m[2], m[3], m[5], m[7]
+	if m[6] != "" && (v1 == "" || y != "") {
+		return "", fmt.Errorf("reference '%s' is not one passage of a book, chapter and verses", s)
+	}
 	var ref string
 	if v1 == "" {
 		ref = book + "." + c1
