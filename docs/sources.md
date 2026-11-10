@@ -10,6 +10,7 @@ sources/
   spurgeon-ccel/      a sermon source
     source.toml
     rows.jsonl
+    sermon-topics.jsonl   optional: its sermons linked directly to topics
   themes-tcr1934/     a theme source (Thompson's 1934 topics)
     source.toml
     topics.jsonl
@@ -23,6 +24,7 @@ sources/
 
 - [source.toml](#sourcetoml)
 - [rows.jsonl (a sermon source)](#rowsjsonl-a-sermon-source)
+- [sermon-topics.jsonl (a sermon source, optional)](#sermon-topicsjsonl-a-sermon-source-optional)
 - [topics.jsonl and links.jsonl (a theme source)](#topicsjsonl-and-linksjsonl-a-theme-source)
 - [References](#references)
 - [Host rules](#host-rules)
@@ -76,6 +78,26 @@ One JSON object a line, one sermon each. A blank line is skipped. An unknown fie
 | `notes` | optional | Anything a later reader of the file should know: where the `ref` came from when the source did not tag it, why a field is missing. |
 | `series` | optional | `true` for a series or a whole book: a row whose `ref` spans more than 3 chapters. The row is kept, listed by its source and found by search, but it has **no passage**: `sermons load` writes none for it (not its `ref`, not its `cited`), so no passage query, `tier=theme` row or count ever meets it. Give it the narrowest text as its `ref`, or split the series into a row per text. Left out when false (`"series": false` is a fault). |
 | `expect_title` | optional | What `sermons check --urls` must find in the page at `url` when the page prints another title than `title`; the page is then fetched with GET. Not loaded. |
+
+## sermon-topics.jsonl (a sermon source, optional)
+
+A sermon source may link its sermons **directly** to topics of theme sources, beside `rows.jsonl`: chosen by a person (or a model reading the sermon's notes), not found through the sermon's preaching text. It is how a sermon with no preaching text (303 of Brookfield First's 354) reaches a topic at all. One JSON object a line, one link each:
+
+```json
+{"row": "12", "theme": "themes-demo", "topic": "grace"}
+```
+
+| Field | | What it is |
+| --- | --- | --- |
+| `row` | required | A row id of this source's `rows.jsonl` (a `series` row too). |
+| `theme` | required | The id of a theme source **beside this directory**: `<parent>/<theme>/source.toml` with `kind = "themes"`. |
+| `topic` | required | A topic id of that theme source's `topics.jsonl`. |
+
+No other field (a part, who chose the link) is taken: an unknown field is a fault, as in every file. The file holds ids only, never the words of a sermon's notes. A source without the file has no direct links and behaves exactly as before. The theme tier of `GET /v1/sermons` answers a directly linked sermon first, marked `"direct": true` ([api.md](api.md#the-theme-tier)).
+
+`sermons check` refuses, one line each, `sermon-topics.jsonl:<line>: ...`: a field missing (`row is missing`); a `row` not in `rows.jsonl` (`row '12': not in rows.jsonl`); a `theme` that is not a source id, has no theme source beside the directory (`theme 'themes-x': no theme source beside this directory (no ../themes-x/source.toml)`), or names a sermon source (`../other is a sermons source, not a themes source`); a `topic` not in that source's `topics.jsonl` (`topic 'mercy': not in themes-x/topics.jsonl`); and a line that repeats another (`repeats line 1`). A present but empty file is `no rows`, and the file in a theme source is a fault. Each theme source named is read once per check.
+
+So a link to a row that the source's files drop (a YouTube video taken down) faults the check, and the load with it, until the line is taken out.
 
 ## topics.jsonl and links.jsonl (a theme source)
 
@@ -147,9 +169,10 @@ rows.jsonl:7: ref 'Rom.5.99': verse past the chapter
 It checks:
 
 - `source.toml`: present, TOML, every required key given and not empty (the licence above all), no unknown key, `kind` known, `id` well formed and the directory's name, `homepage` and `terms_url` https and well formed.
-- The files of the kind are present and not empty, and the other kind's are absent.
+- The files of the kind are present and not empty, and the other kind's are absent (`sermon-topics.jsonl` is optional in a sermon source and a fault in a theme source).
 - Every line is one JSON object with no unknown field.
 - `rows.jsonl`: `id`, `title` and `url` given; ids well formed and unique (`id '104' repeats line 6`); `ref` and every `cited` reference parse (`unknown book 'Tob'`, `chapter past the book`, `verse past the chapter`, `verse 0 is not a verse ...`, `the range ends before it starts`); `url` and `alt_url` https and well formed; `kind`, `date` and `duration_s` well formed; no optional field given empty.
+- `sermon-topics.jsonl`: each line's `row` in `rows.jsonl`, its `theme` a theme source beside the directory and its `topic` in that source's `topics.jsonl`; no line repeats ([above](#sermon-topicsjsonl-a-sermon-source-optional)).
 - `topics.jsonl`: ids well formed and unique, a label, parts numbered and unique, every bare `see` id a topic of the file.
 - `links.jsonl`: the topic is in `topics.jsonl`, the part is one of the topic's, the reference parses, `via` is known, a link via a sermon names it in `from`, no link repeats.
 - `--urls N` (off by default; uses the network): sends a HEAD to a random N of the source's `url` and `alt_url` values and reports any that does not answer 200 after redirects (`rows.jsonl:12: url 'https://...': 404 Not Found`). It is run only when the rest passes. A 200 does not prove the page is the sermon: CCEL answers 200 to a made-up section id, so for a `url` on `ccel.org` the check fetches the page (a GET, not a HEAD) and reports `200 OK but the title '...' is not in the page` unless the row's title is in the page's text (markup stripped, entities read, curly quotes made straight, case ignored). The rule is per host (`DefaultHostRules` in `internal/sources/check.go`, and the source's `host_rules`); `alt_url` is only asked with HEAD. The rule is the source's [host rules](#host-rules) over the built-in CCEL one, and a row's `expect_title`.
@@ -174,11 +197,13 @@ sermons load --all sources
 Needs `DATABASE_URL` and a migrated database (`sermons migrate`). Checks the directory first and loads nothing if it has a fault. Then, in one transaction per source: upserts the source and every row by its key, deletes the source's rows that are no longer in the files, and prints the counts:
 
 ```
-spurgeon-20: 20 rows, 19 passages, 0 removed
+spurgeon-20: 20 rows, 19 passages, 1 topic links, 0 removed
 demo-themes: 2 topics, 1 parts, 3 links, 0 removed
 ```
 
-`passages` counts the preaching texts and cited references; `removed` counts what was in the database and is no longer in the files (a sermon source's rows; a theme source's topics and links). Loading the same files again changes nothing and prints the same counts.
+`passages` counts the preaching texts and cited references; `topic links` the lines of `sermon-topics.jsonl`, printed only for a source that has the file; `removed` counts what was in the database and is no longer in the files (a sermon source's rows; a theme source's topics and links). Loading the same files again changes nothing and prints the same counts.
+
+A sermon source's direct links are made exactly its `sermon-topics.jsonl` in the same transaction: a line taken out is deleted, and with no file the source has none. They have no key to the theme sources, so a sermon source loads before the theme sources it names (`--all` goes by directory name: `brookfield-first` before `themes-*`), a link to a topic not yet loaded matches nothing until it is, and a theme source's reload never deletes one.
 
 ## Theme sources
 
