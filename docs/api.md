@@ -108,7 +108,8 @@ The sermons whose passages overlap a reference.
 | `ref` | required | The passage: a verse, chapter, book or range (above). A bad one is 400 `bad_ref` with the parser's message. |
 | `source` | optional | Comma-separated source ids: only those sources. An id that is not a sermon source is ignored (it matches nothing), so a client's stale list does not fail. |
 | `tier` | optional | Which tiers to answer: `passage` (the default: the answer below), `theme` (or `passage,theme`: the passage rows, then the theme tier, [below](#the-theme-tier)) or `theme-only`. Anything else is 400 `bad_tier`. |
-| `theme` | optional | With a theme tier: only these topics, comma-separated `<theme source>:<topic>` (`themes-torrey:atonement-the`). Not of that shape is 400 `bad_theme`; a topic that does not link the ref, or is over the cap, matches nothing. Ignored for `tier=passage`. |
+| `theme` | optional | With a theme tier: only these topics, comma-separated `<theme source>:<topic>` (`themes-torrey:atonement-the`). Not of that shape is 400 `bad_theme`; a topic that does not link the ref matches nothing, and one over the cap only its [direct rows](#direct-links). Ignored for `tier=passage`. |
+| `direct` | optional | `direct=only`: with a theme tier, only its [directly linked](#direct-links) sermons (and `total` counts only them). Any other value is 400 `bad_direct`. Ignored for `tier=passage`. |
 | `limit` | optional | Rows in the page, 1 to 200; default 50. Outside that, 400 `bad_limit`. |
 | `offset` | optional | Rows to skip, 0 or more; default 0. Otherwise 400 `bad_offset`. With two tiers, `limit` and `offset` apply to each tier's page. |
 
@@ -202,20 +203,20 @@ Example (400): `GET /v1/sermons?ref=Rom.5.99`
 
 `tier=theme` adds a second tier below the passage rows: **sermons whose preaching text shares a topic with the passage** ("if a Bible passage you are reading covers a theme, it would note sermons on the same theme"). The answer is nested, `{ref, passage: {total, rows}, theme: {total, rows}}`; with `tier=theme-only` it is the same with `"passage": null` (so every answer has the same three keys). `passage` is exactly the flat answer's `total` and `rows`.
 
-A sermon is in the theme tier when all of these hold:
+A sermon is in the theme tier when it is [linked directly](#direct-links) to a topic that links `ref` (below), or when all of these hold:
 
 - **its preaching text** (`role: "text"`, never a cited reference) overlaps a link of a topic, and **that topic also has a link overlapping `ref`**. The match is on the preaching text only: a sermon that merely cites a verse of the topic is not matched.
 - **the topic covers at most 300 verses** (all its links together, a verse counted once; `THEME_MAX_VERSES` in `internal/store/queries.go`, `store.ThemeMaxVerses`). The probe that set it (Lampas `docs/sources/sermon-index.md`, section 4) found Nave's whole-subject topics, `JESUS, THE CHRIST` over 4,800 verses and `GOD` 4,000, put 2,735 sermons on Romans 5, and topics of 300 verses or fewer still 799; a topic's verse count is `verses` on `/v1/themes`.
 - **it is not already a passage row.** A sermon with any passage (text or cited) overlapping `ref` is in the passage tier and is never repeated in the theme tier, so the two tiers' rows are different sermons.
 
-**One row a sermon**: a sermon that meets several topics is listed once, with its **narrowest topic** (fewest verses; then theme source id, then topic id). Each row is the sermon's row (as above; `ref` is the preaching text that met the topic, `role` is always `text`, `width` its verses) and a `theme` naming how it came in:
+**One row a sermon**: a sermon that meets several topics is listed once, with its **narrowest topic** (fewest verses; then theme source id, then topic id). Each row is the sermon's row (as above; for a row reached through its text `ref` is the preaching text that met the topic, `role` is always `text`, `width` its verses; a direct row differs, [below](#direct-links)) and a `theme` naming how it came in:
 
 | Field | What it is |
 | --- | --- |
 | `theme.source`, `theme.topic`, `theme.label` | The theme source's id, the topic's id and its name: "Love of God, The". |
 | `theme.part`, `theme.part_label` | The numbered part of the topic the sermon's text met (`4`, `"Of God"`), or both `null` for a link to the whole topic. Of the topic's links the text meets, the narrowest, then the lowest part. |
 
-**The order**: the topic's size ascending (a six-verse topic's sermons before a 140-verse topic's: the narrower the topic, the closer the sermon), then the sermon's source id, then its id as a number. A topic can still merge two senses (Thompson's `Oil` has a part "Figuratively used" beside the oil itself); the row names the topic and part so the reader can judge.
+**The order** (after any [direct rows](#direct-links)): the topic's size ascending (a six-verse topic's sermons before a 140-verse topic's: the narrower the topic, the closer the sermon), then the sermon's source id, then its id as a number. A topic can still merge two senses (Thompson's `Oil` has a part "Figuratively used" beside the oil itself); the row names the topic and part so the reader can judge.
 
 Example: `GET /v1/sermons?ref=rom.5.8&tier=theme`
 
@@ -295,6 +296,116 @@ Example: `GET /v1/sermons?ref=rom.5.8&tier=theme-only&theme=themes-demo:atonemen
           "source": "themes-demo",
           "topic": "atonement",
           "label": "Atonement",
+          "part": null,
+          "part_label": null
+        }
+      }
+    ]
+  }
+}
+```
+
+#### Direct links
+
+A sermon source may also link a sermon **directly** to a topic (its `sermon-topics.jsonl`, [sources.md](sources.md#sermon-topicsjsonl-a-sermon-source-optional)): chosen by a person or a model reading the sermon's notes, not found through its preaching text. A directly linked sermon is in the theme tier when **the topic has a link overlapping `ref`**, and, as for every theme row, it is **not already a passage row**. Beside those rows reached through their text:
+
+- **The mark.** A direct row has `"direct": true`, after `width`. A row reached through its text has **no `direct` key at all** (not `false`), so an answer with no direct link in it is byte for byte what it was before direct links.
+- **The topic** is named by `theme` as above: `theme.source`, `theme.topic`, `theme.label`; `theme.part` and `theme.part_label` are `null` (a direct link names no part).
+- **`ref`, `role`, `width`** are the sermon's preaching text (`role: "text"`) when it has one, wherever it is; **all three `null`** when it has none (most of Brookfield First's).
+- **No cap.** A direct link is never left out for its topic's size (`THEME_MAX_VERSES` applies only to the rows reached through their text): a person chose it.
+- **The order.** Every direct row comes first: by the topic's verses ascending (a topic with no verse count last), then theme source id, topic id, the sermon's source id, its id (a number as a number). Then the rows reached through their text, in the order above. `total` counts both kinds, and `limit` and `offset` page across both.
+- **One row a sermon.** A sermon both directly linked and reached through its text is listed once, as a direct row. A sermon directly linked to two topics that link `ref` is listed once, with the narrowest (then theme source id, then topic id).
+- **Filters.** `source=` and `theme=` apply to direct rows as to the rest (with `theme=`, a sermon linked directly to a topic not named may still come in through its text by one named); `direct=only` answers the direct rows alone.
+- `GET /v1/themes`'s `sermons` count is still the sermons on the topic **by their preaching text**: direct links are not counted there. `/v1/search` is unchanged.
+
+Over the fixtures `spurgeon-20/sermon-topics.jsonl` links 12, The Peculiar Sleep of the Beloved (Psalm 127:2), to the demo topic Grace, which links Romans 5:15-21 and Ephesians 2:8. At Ephesians 2:8 it comes first, marked; 37, 330 and 2544 follow because their texts in Romans 5 meet Grace.
+
+Example: `GET /v1/sermons?ref=eph.2.8&tier=theme-only`
+
+```json
+{
+  "ref": "Eph.2.8",
+  "passage": null,
+  "theme": {
+    "total": 4,
+    "rows": [
+      {
+        "source": "spurgeon-20",
+        "id": "12",
+        "title": "The Peculiar Sleep of the Beloved",
+        "preacher": "C. H. Spurgeon",
+        "date": null,
+        "url": "https://ccel.org/ccel/spurgeon/sermons01/sermons01.xi.html",
+        "alt_url": "https://www.spurgeongems.org/sermon/chs12.pdf",
+        "kind": "link",
+        "ref": "Ps.127.2",
+        "role": "text",
+        "width": 1,
+        "direct": true,
+        "theme": {
+          "source": "themes-demo",
+          "topic": "grace",
+          "label": "Grace",
+          "part": null,
+          "part_label": null
+        }
+      },
+      {
+        "source": "spurgeon-20",
+        "id": "37",
+        "title": "Law and Grace",
+        "preacher": "C. H. Spurgeon",
+        "date": null,
+        "url": "https://ccel.org/ccel/spurgeon/sermons01/sermons01.xxxvi.html",
+        "alt_url": "https://www.spurgeongems.org/sermon/chs37.pdf",
+        "kind": "link",
+        "ref": "Rom.5.20",
+        "role": "text",
+        "width": 1,
+        "theme": {
+          "source": "themes-demo",
+          "topic": "grace",
+          "label": "Grace",
+          "part": null,
+          "part_label": null
+        }
+      },
+      {
+        "source": "spurgeon-20",
+        "id": "330",
+        "title": "Reigning Grace",
+        "preacher": "C. H. Spurgeon",
+        "date": null,
+        "url": "https://ccel.org/ccel/spurgeon/sermons06/sermons06.xliv.html",
+        "alt_url": "https://www.spurgeongems.org/sermon/chs330.pdf",
+        "kind": "link",
+        "ref": "Rom.5.21",
+        "role": "text",
+        "width": 1,
+        "theme": {
+          "source": "themes-demo",
+          "topic": "grace",
+          "label": "Grace",
+          "part": null,
+          "part_label": null
+        }
+      },
+      {
+        "source": "spurgeon-20",
+        "id": "2544",
+        "title": "The One and the Many",
+        "preacher": "C. H. Spurgeon",
+        "date": null,
+        "url": "https://ccel.org/ccel/spurgeon/sermons43/sermons43.xlvii.html",
+        "alt_url": "https://www.spurgeongems.org/sermon/chs2544.pdf",
+        "kind": "link",
+        "ref": "Rom.5.16",
+        "role": "text",
+        "width": 1,
+        "theme": {
+          "source": "themes-demo",
+          "topic": "grace",
+          "label": "Grace",
           "part": null,
           "part_label": null
         }
@@ -441,7 +552,7 @@ Every error is `{error, detail}`: `error` a stable code a client may branch on, 
 | Status | `error` | When |
 | --- | --- | --- |
 | 400 | `bad_ref` | `ref` is missing or does not parse; `detail` is the parser's message (`ref 'Rom.5.99': verse past the chapter`). |
-| 400 | `bad_tier`, `bad_theme` | `tier` is not `passage`, `theme`, `passage,theme` or `theme-only`; `theme` is not `<theme source>:<topic>`. |
+| 400 | `bad_tier`, `bad_theme`, `bad_direct` | `tier` is not `passage`, `theme`, `passage,theme` or `theme-only`; `theme` is not `<theme source>:<topic>`; `direct` is not `only`. |
 | 400 | `bad_limit`, `bad_offset` | `limit` is not 1 to 200; `offset` is not 0 or more. |
 | 400 | `bad_query` | `q` is empty or over 200 characters. |
 | 404 | `not_found` | No such route (`/` itself is the page above). |

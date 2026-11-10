@@ -97,7 +97,23 @@ func parseThemes(w http.ResponseWriter, r *http.Request) ([]string, bool) {
 	return out, true
 }
 
-// sermons is GET /v1/sermons?ref=&source=&tier=&theme=&limit=&offset=.
+const badDirect = "direct must be only (the theme tier's directly linked sermons alone), or left out"
+
+// parseDirect reads direct=only: the theme tier's direct rows alone. Left
+// out it is false; any other value answers 400 and reports false.
+func parseDirect(w http.ResponseWriter, r *http.Request) (directOnly, ok bool) {
+	q := r.URL.Query()
+	if !q.Has("direct") {
+		return false, true
+	}
+	if strings.TrimSpace(q.Get("direct")) == "only" {
+		return true, true
+	}
+	fail(w, r, http.StatusBadRequest, "bad_direct", badDirect)
+	return false, false
+}
+
+// sermons is GET /v1/sermons?ref=&source=&tier=&theme=&direct=&limit=&offset=.
 func (s *server) sermons(w http.ResponseWriter, r *http.Request) {
 	span, ok := parseRef(w, r)
 	if !ok {
@@ -108,6 +124,10 @@ func (s *server) sermons(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	themeIDs, ok := parseThemes(w, r)
+	if !ok {
+		return
+	}
+	directOnly, ok := parseDirect(w, r)
 	if !ok {
 		return
 	}
@@ -151,7 +171,7 @@ func (s *server) sermons(w http.ResponseWriter, r *http.Request) {
 	}
 	if wantTheme {
 		total, rows, err := store.ThemeSermons(r.Context(), s.db, store.ThemeQuery{
-			Span: span, Sources: sq.Sources, Themes: themeIDs, Limit: sq.Limit, Offset: sq.Offset})
+			Span: span, Sources: sq.Sources, Themes: themeIDs, DirectOnly: directOnly, Limit: sq.Limit, Offset: sq.Offset})
 		if err != nil {
 			s.dbFailed(w, r, err)
 			return

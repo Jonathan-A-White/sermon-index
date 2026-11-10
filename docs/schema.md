@@ -33,6 +33,11 @@ sermon_passages             │  │      the sermon's preaching text and cited 
   (source_id, sermon_id) ──────┘ ──►  sermons  ON DELETE CASCADE
   ref_osis ('Rom.5.1-Rom.5.11'), role ('text'|'cited'),
   span int4range  [first ordinal, last ordinal + 1)      GiST index on span
+                            │  │
+sermon_topics               │  │      one line of sermon-topics.jsonl (migration 0005)
+  PK (source_id, sermon_id, theme_source_id, theme_id)
+  (source_id, sermon_id) ──────┘ ──►  sermons  ON DELETE CASCADE
+  theme_source_id, theme_id           NO key to themes (below); index on the two
                             │
 themes                      │         one line of topics.jsonl
   PK (source_id, id)        │
@@ -81,6 +86,8 @@ schema_migrations (version PK, name, applied_at)   made by `sermons migrate`
 **The date is text, ISO 8601 at the precision known.** `'1855'`, `'1855-03'` or `'1855-03-18'`: many sermons are known only to the year (Matthew Henry's) or the month, and a `date` column would force a made-up day. Text in this shape sorts in time order. `sermons check` also refuses a day that does not exist (`1855-02-30`).
 
 **`theme_links` has no primary key, but a unique natural key.** A link's identity is its topic, its part, its reference, where it came from (`via`) and which sermon (`from_ref`); the part and the sermon may be absent. A primary key cannot hold a NULL, so the key is `UNIQUE NULLS NOT DISTINCT` (Postgres 15 or later: a link with no part is a key like any other, and a reload's `ON CONFLICT ON CONSTRAINT theme_links_key` finds it).
+
+**`sermon_topics` has no foreign key to `themes`.** A direct link from a sermon to a topic (a sermon source's `sermon-topics.jsonl`, [sources.md](sources.md#sermon-topicsjsonl-a-sermon-source-optional)) is checked by `sermons check` against the theme source's files, not by the database. With a key, a sermon source could not load before the theme sources it names, and `load --all` goes by directory name (`brookfield-first` before `themes-*`; the test fixtures `spurgeon-20` before `themes-demo`); and a theme source's reload, which deletes the topics no longer in its files, would cascade into the links a person chose and delete them silently. Without it, a link to a topic that is not loaded matches nothing, and answers again once the topic is. The key to `sermons` stays: a sermon taken out of its source takes its links with it.
 
 **A part is named by its number, not its label.** Thompson's parts are numbered within a topic ("Love-Hatred (4) Of God"); the number is stable where the label's wording may be corrected. A link to a part is checked by a foreign key; a link to the whole topic has `part_n` NULL and is not.
 

@@ -67,7 +67,7 @@ func TestMigrateAndLoadTwice(t *testing.T) {
 	env := map[string]string{"DATABASE_URL": db.Config().ConnString()}
 
 	code, out, errOut := runCmd(t, env, "migrate")
-	if code != 0 || out != "applied 0001_init\napplied 0002_search\napplied 0003_theme_verses\napplied 0004_source_language\n" {
+	if code != 0 || out != "applied 0001_init\napplied 0002_search\napplied 0003_theme_verses\napplied 0004_source_language\napplied 0005_sermon_topics\n" {
 		t.Fatalf("migrate: %d %q %q", code, out, errOut)
 	}
 	if code, out, _ := runCmd(t, env, "migrate"); code != 0 || !strings.Contains(out, "nothing to apply") {
@@ -75,7 +75,7 @@ func TestMigrateAndLoadTwice(t *testing.T) {
 	}
 	for i := 0; i < 2; i++ {
 		code, out, errOut := runCmd(t, env, "load", "../../sources/_fixtures/spurgeon-20")
-		if code != 0 || out != "spurgeon-20: 20 rows, 19 passages, 0 removed\n" {
+		if code != 0 || out != "spurgeon-20: 20 rows, 19 passages, 1 topic links, 0 removed\n" {
 			t.Errorf("load %d: %d %q %q", i+1, code, out, errOut)
 		}
 	}

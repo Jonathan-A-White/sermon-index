@@ -53,7 +53,7 @@ func TestLoadTheFixtureTwiceGivesTheSameCounts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := first.String(); got != "spurgeon-20: 20 rows, 19 passages, 0 removed" {
+	if got := first.String(); got != "spurgeon-20: 20 rows, 19 passages, 1 topic links, 0 removed" {
 		t.Errorf("first load: %s", got)
 	}
 	sermons := count(t, db, "select count(*) from sermons")
@@ -1226,5 +1226,128 @@ func TestHenryLeavesHoldTheirHeads(t *testing.T) {
 				t.Errorf("row %s: leaf n%d of %s prints the head, and so does n%d before it: the sermon begins earlier", id, n, m[1], n-1)
 			}
 		}
+	}
+}
+
+// Direct links (sermon-topics.jsonl): loaded with the source, the same on a
+// second load, a line taken out deleted, the file taken out all deleted; a
+// sermon source loads before the theme source its links name, and its direct
+// rows answer once that is loaded.
+func TestLoadSermonTopics(t *testing.T) {
+	ctx := context.Background()
+	db := migrated(t)
+	dir := demoWithTopics(t, `{"row": "1", "theme": "themes-x", "topic": "love"}`+"\n"+
+		`{"row": "1", "theme": "themes-x", "topic": "grace"}`+"\n"+
+		`{"row": "s", "theme": "themes-x", "topic": "grace"}`+"\n")
+	links := func() []string {
+		t.Helper()
+		rows, err := db.Query(ctx, `select source_id || '/' || sermon_id || ' ' || theme_source_id || ':' || theme_id
+			from sermon_topics order by 1`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var out []string
+		for rows.Next() {
+			var s string
+			if err := rows.Scan(&s); err != nil {
+				t.Fatal(err)
+			}
+			out = append(out, s)
+		}
+		return out
+	}
+
+	// The sermon source first: themes-x is not loaded.
+	first, err := Load(ctx, db, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := first.String(); got != "demo: 2 rows, 1 passages, 3 topic links, 0 removed" {
+		t.Errorf("first load: %s", got)
+	}
+	want := []string{"demo/1 themes-x:grace", "demo/1 themes-x:love", "demo/s themes-x:grace"}
+	if got := links(); !reflect.DeepEqual(got, want) {
+		t.Errorf("links %q, want %q", got, want)
+	}
+	second, err := Load(ctx, db, dir)
+	if err != nil || second != first {
+		t.Errorf("second load %s (%v), first %s", second, err, first)
+	}
+	if got := links(); !reflect.DeepEqual(got, want) {
+		t.Errorf("links after the second load %q", got)
+	}
+
+	// Its direct row answers once the theme source is loaded: Love links
+	// Rom.5.8, where demo/1 is a passage row, and Grace links Eph.2.8.
+	span, _ := passage.Parse("Eph.2.8")
+	q := store.ThemeQuery{Span: span, Limit: 50}
+	if total, _, err := store.ThemeSermons(ctx, db, q); err != nil || total != 0 {
+		t.Errorf("before themes-x is loaded: %d %v", total, err)
+	}
+	if _, err := Load(ctx, db, filepath.Join(filepath.Dir(dir), "themes-x")); err != nil {
+		t.Fatal(err)
+	}
+	total, rows, err := store.ThemeSermons(ctx, db, q)
+	if err != nil || total != 2 || len(rows) != 2 || !rows[0].Direct || rows[0].ID != "1" || rows[1].ID != "s" || rows[0].Theme.Topic != "grace" {
+		t.Errorf("after themes-x is loaded: %d %+v %v", total, rows, err)
+	}
+	// A theme source's reload never deletes a direct link.
+	if _, err := Load(ctx, db, filepath.Join(filepath.Dir(dir), "themes-x")); err != nil {
+		t.Fatal(err)
+	}
+	if got := links(); !reflect.DeepEqual(got, want) {
+		t.Errorf("links after themes-x's reload %q", got)
+	}
+
+	// A line taken out is deleted on reload.
+	if err := os.WriteFile(filepath.Join(dir, SermonTopicsFile), []byte(`{"row": "1", "theme": "themes-x", "topic": "love"}`+"\n"+
+		`{"row": "s", "theme": "themes-x", "topic": "grace"}`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	c, err := Load(ctx, db, dir)
+	if err != nil || c.String() != "demo: 2 rows, 1 passages, 2 topic links, 0 removed" {
+		t.Errorf("a line out: %s %v", c, err)
+	}
+	if got, want := links(), []string{"demo/1 themes-x:love", "demo/s themes-x:grace"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("links after a line out %q, want %q", got, want)
+	}
+
+	// The file taken out: the source has no links, and its load line is as
+	// it was before direct links.
+	if err := os.Remove(filepath.Join(dir, SermonTopicsFile)); err != nil {
+		t.Fatal(err)
+	}
+	c, err = Load(ctx, db, dir)
+	if err != nil || c.String() != "demo: 2 rows, 1 passages, 0 removed" {
+		t.Errorf("the file out: %s %v", c, err)
+	}
+	if got := links(); len(got) != 0 {
+		t.Errorf("links after the file out %q", got)
+	}
+}
+
+// A sermon taken out of rows.jsonl takes its links with it (and the check
+// refuses a link to it left in the file).
+func TestLoadSermonTopicsFollowTheirRow(t *testing.T) {
+	ctx := context.Background()
+	db := migrated(t)
+	dir := demoWithTopics(t, `{"row": "s", "theme": "themes-x", "topic": "grace"}`+"\n")
+	if _, err := Load(ctx, db, dir); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, RowsFile), []byte(goodRow+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Load(ctx, db, dir); err == nil || !strings.Contains(err.Error(), "sermon-topics.jsonl:1: row 's': not in rows.jsonl") {
+		t.Errorf("a link to a row taken out: %v", err)
+	}
+	if err := os.Remove(filepath.Join(dir, SermonTopicsFile)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Load(ctx, db, dir); err != nil {
+		t.Fatal(err)
+	}
+	if n := count(t, db, "select count(*) from sermon_topics"); n != 0 {
+		t.Errorf("%d links left", n)
 	}
 }

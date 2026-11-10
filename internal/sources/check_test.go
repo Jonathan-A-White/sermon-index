@@ -460,3 +460,160 @@ func TestExpectTitleAndOverridingTheCCELDefault(t *testing.T) {
 		t.Errorf("requests %v: want 2 GET (the expect_title rows) and 1 HEAD (ccel.org, rule off)", counts)
 	}
 }
+
+// sourcesBeside makes a temp sources/ holding the directories given (each
+// a map of file to text) and returns its path.
+func sourcesBeside(t *testing.T, dirs map[string]map[string]string) string {
+	t.Helper()
+	root := t.TempDir()
+	for id, files := range dirs {
+		dir := filepath.Join(root, id)
+		if err := os.Mkdir(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		for name, body := range files {
+			if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	return root
+}
+
+// demoWithTopics is sources/ with demo (two rows, the second a series, and
+// the sermon-topics.jsonl given), the theme source themes-x (topics love
+// and grace) and the sermon source other.
+func demoWithTopics(t *testing.T, sermonTopics string) string {
+	t.Helper()
+	root := sourcesBeside(t, map[string]map[string]string{
+		"demo": {
+			"source.toml": goodToml,
+			"rows.jsonl": goodRow + "\n" +
+				`{"id": "s", "title": "Romans", "ref": "Rom.1.1-Rom.16.24", "url": "https://example.org/s", "series": true}` + "\n",
+			"sermon-topics.jsonl": sermonTopics,
+		},
+		"themes-x": {
+			"source.toml":  strings.Replace(goodThemeToml, `id = "demo"`, `id = "themes-x"`, 1),
+			"topics.jsonl": `{"id": "love", "label": "Love"}` + "\n" + `{"id": "grace", "label": "Grace"}` + "\n",
+			"links.jsonl":  `{"topic": "love", "ref": "Rom.5.8"}` + "\n" + `{"topic": "grace", "ref": "Eph.2.8"}` + "\n",
+		},
+		"other": {
+			"source.toml": strings.Replace(goodToml, `id = "demo"`, `id = "other"`, 1),
+			"rows.jsonl":  goodRow + "\n",
+		},
+	})
+	return filepath.Join(root, "demo")
+}
+
+func expectTopicsFault(t *testing.T, sermonTopics, want string) {
+	t.Helper()
+	got := faultStrings(Check(demoWithTopics(t, sermonTopics)))
+	if len(got) != 1 || got[0] != want {
+		t.Errorf("faults %q\n  want only %q", got, want)
+	}
+}
+
+func TestSermonTopicsGoodChecksClean(t *testing.T) {
+	// Two topics of one theme source, and a link to a series row.
+	dir := demoWithTopics(t, `{"row": "1", "theme": "themes-x", "topic": "love"}`+"\n"+
+		`{"row": "1", "theme": "themes-x", "topic": "grace"}`+"\n"+
+		`{"row": "s", "theme": "themes-x", "topic": "grace"}`+"\n")
+	if fs := Check(dir); len(fs) != 0 {
+		t.Errorf("faults: %q", faultStrings(fs))
+	}
+	d, fs := Read(dir)
+	if len(fs) != 0 || !d.HasSermonTopics || len(d.SermonTopics) != 3 || d.SermonTopics[2] != (SermonTopic{Row: "s", Theme: "themes-x", Topic: "grace", Line: 3}) {
+		t.Errorf("read: %+v %q", d.SermonTopics, faultStrings(fs))
+	}
+}
+
+func TestSermonTopicsRowNotInRows(t *testing.T) {
+	expectTopicsFault(t, `{"row": "1", "theme": "themes-x", "topic": "love"}`+"\n"+`{"row": "2", "theme": "themes-x", "topic": "love"}`+"\n",
+		"sermon-topics.jsonl:2: row '2': not in rows.jsonl")
+}
+
+func TestSermonTopicsThemeNotBeside(t *testing.T) {
+	expectTopicsFault(t, `{"row": "1", "theme": "themes-y", "topic": "love"}`+"\n",
+		"sermon-topics.jsonl:1: theme 'themes-y': no theme source beside this directory (no ../themes-y/source.toml)")
+}
+
+func TestSermonTopicsThemeIsASermonSource(t *testing.T) {
+	expectTopicsFault(t, `{"row": "1", "theme": "other", "topic": "love"}`+"\n",
+		"sermon-topics.jsonl:1: theme 'other': ../other is a sermons source, not a themes source")
+}
+
+func TestSermonTopicsThemeNotASourceID(t *testing.T) {
+	expectTopicsFault(t, `{"row": "1", "theme": "../themes-x", "topic": "love"}`+"\n",
+		"sermon-topics.jsonl:1: theme '../themes-x': not a source id (lower-case letters, digits and '-')")
+}
+
+func TestSermonTopicsTopicNotInTopics(t *testing.T) {
+	expectTopicsFault(t, `{"row": "1", "theme": "themes-x", "topic": "mercy"}`+"\n",
+		"sermon-topics.jsonl:1: topic 'mercy': not in themes-x/topics.jsonl")
+}
+
+func TestSermonTopicsRepeatedLine(t *testing.T) {
+	expectTopicsFault(t, `{"row": "1", "theme": "themes-x", "topic": "love"}`+"\n"+
+		`{"row": "s", "theme": "themes-x", "topic": "love"}`+"\n"+
+		`{"row": "1", "theme": "themes-x", "topic": "love"}`+"\n",
+		"sermon-topics.jsonl:3: repeats line 1")
+}
+
+func TestSermonTopicsMissingFields(t *testing.T) {
+	for field, line := range map[string]string{
+		"row":   `{"theme": "themes-x", "topic": "love"}`,
+		"theme": `{"row": "1", "topic": "love"}`,
+		"topic": `{"row": "1", "theme": "themes-x"}`,
+	} {
+		expectTopicsFault(t, line+"\n", "sermon-topics.jsonl:1: "+field+" is missing")
+	}
+}
+
+func TestSermonTopicsUnknownKey(t *testing.T) {
+	expectTopicsFault(t, `{"row": "1", "theme": "themes-x", "topic": "love", "part": 1}`+"\n",
+		`sermon-topics.jsonl:1: unknown field "part"`)
+}
+
+func TestSermonTopicsEmptyFile(t *testing.T) {
+	expectTopicsFault(t, "\n", "sermon-topics.jsonl: no rows")
+}
+
+func TestSermonTopicsInAThemeSource(t *testing.T) {
+	expectFault(t, map[string]string{
+		"source.toml":         goodThemeToml,
+		"topics.jsonl":        `{"id": "love", "label": "Love"}` + "\n",
+		"links.jsonl":         `{"topic": "love", "ref": "Rom.5.8"}` + "\n",
+		"sermon-topics.jsonl": `{"row": "1", "theme": "demo", "topic": "love"}` + "\n",
+	}, "sermon-topics.jsonl: a themes source has no sermon-topics.jsonl")
+}
+
+// Faults come in file order: rows.jsonl's, then sermon-topics.jsonl's.
+func TestSermonTopicsFaultsFollowRows(t *testing.T) {
+	root := sourcesBeside(t, map[string]map[string]string{"demo": {
+		"source.toml":         goodToml,
+		"rows.jsonl":          `{"id": "1", "title": "One", "ref": "Rom.5.99", "url": "https://example.org/1"}` + "\n",
+		"sermon-topics.jsonl": `{"row": "9", "theme": "themes-x", "topic": "love"}` + "\n",
+	}})
+	got := faultStrings(Check(filepath.Join(root, "demo")))
+	want := []string{
+		"rows.jsonl:1: ref 'Rom.5.99': verse past the chapter",
+		"sermon-topics.jsonl:1: row '9': not in rows.jsonl",
+		"sermon-topics.jsonl:1: theme 'themes-x': no theme source beside this directory (no ../themes-x/source.toml)",
+	}
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Errorf("faults\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+}
+
+// The fixture's file names themes-demo beside it, and checks clean; a
+// source without the file checks exactly as before (TestFixtureAndTemplatePass).
+func TestTheFixturesSermonTopicsCheckClean(t *testing.T) {
+	d, fs := checked(fixture)
+	if len(fs) != 0 || !d.HasSermonTopics || len(d.SermonTopics) != 1 {
+		t.Errorf("%q %+v", faultStrings(fs), d.SermonTopics)
+	}
+	d, fs = checked("../../sources/_template")
+	if len(fs) != 0 || d.HasSermonTopics || d.SermonTopics != nil {
+		t.Errorf("the template: %q %+v", faultStrings(fs), d)
+	}
+}
