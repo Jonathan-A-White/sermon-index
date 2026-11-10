@@ -2,16 +2,35 @@
 // keeps for the sermon index's own family (the Governor's forwarded Subsplash
 // notes mail, parsed there into a title, a passage and a date) and writes each
 // sermon's Sunday, title and passage against the Brookfield First YouTube row
-// it belongs to:
+// it belongs to.
 //
-//	subsplash-notes --alerts alerts.json --rows sources/brookfield-first/rows.jsonl --out data/subsplash-notes.jsonl
+//	subsplash-notes keygen [--key <file>]
+//	subsplash-notes address [--key <file>] [--postern <url>]
+//	subsplash-notes fetch [--key <file>] [--postern <url>] [--since n] [--rows rows.jsonl] [--out records.jsonl]
+//	subsplash-notes [--alerts <file>|-] [--rows rows.jsonl] [--out records.jsonl]
 //
-// The alerts file is the body of GET /api/alerts, {"alerts": [...], "next": n}
-// ("-" reads it from standard input). Only an alert of kind sermon-notes is
-// read, and only its title, reference and date: the reader has no place for a
-// mail's body or the notes PDF attached to it, and an alert that carries any
-// field besides those is dropped and reported. Nothing is fetched or claimed
-// here: the tool reads what it is given.
+// keygen makes the family's key once, at ~/.config/sermon-index/postern-alerts.key
+// by default (mode 0600, never replaced), and prints only its public key, which
+// the Governor issues a licence to on Postern's Key screen. The key never goes
+// in the repo, which is public, and is never printed.
+//
+// address asks Postern for the family's alert address (POST
+// /api/alerts/address, made on the first ask) and prints it: the address the
+// Gmail filter forwards the notes mail to. fetch lists the family's alerts
+// (GET /api/alerts?since=n), writes the records, and only once the records
+// file is in place claims (DELETE /api/alerts/{id}) each alert whose record it
+// holds; an alert that is dropped, unmatched or disagrees with a kept record
+// is reported and left unclaimed, and Postern forgets it after 30 days. Every
+// request is signed by the key with a Postern2 proof (Postern's docs/api.md,
+// Authentication). --postern defaults to $POSTERN_URL.
+//
+// With no subcommand the tool reads a saved reply of GET /api/alerts, {"alerts":
+// [...], "next": n} ("-" reads it from standard input), and claims nothing.
+//
+// Only an alert of kind sermon-notes is read, and only its title, reference
+// and date: the reader has no place for a mail's body or the notes PDF
+// attached to it, and an alert that carries any field besides those is
+// dropped and reported.
 //
 // The date an alert gives can be the Saturday or the Monday of the Sunday it
 // is about (the mail's date is when the notes went out), so a Saturday or a
@@ -25,31 +44,178 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/Jonathan-A-White/sermon-index/internal/sources"
 )
 
+const (
+	defaultRows = "sources/brookfield-first/rows.jsonl"
+	defaultOut  = "data/subsplash-notes.jsonl"
+)
+
 func main() {
-	alertsPath := flag.String("alerts", "-", "the alerts JSON (the body of GET /api/alerts); - is standard input")
-	rowsPath := flag.String("rows", "sources/brookfield-first/rows.jsonl", "the YouTube rows to match against")
-	out := flag.String("out", "data/subsplash-notes.jsonl", "the records file to write; read first and merged with")
-	flag.Parse()
-	if flag.NArg() != 0 {
-		fmt.Fprintln(os.Stderr, "usage: subsplash-notes [--alerts <file>|-] [--rows rows.jsonl] [--out records.jsonl]")
-		os.Exit(2)
+	os.Exit(cli(os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
+}
+
+// cli runs one command line and returns its exit code: 0 done, 1 failed, 2
+// a usage error.
+func cli(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	if len(args) > 0 {
+		switch args[0] {
+		case "keygen":
+			return keygenCmd(args[1:], stdout, stderr)
+		case "address":
+			return addressCmd(args[1:], stdout, stderr)
+		case "fetch":
+			return fetchCmd(args[1:], stdout, stderr)
+		}
 	}
-	if err := run(*alertsPath, *rowsPath, *out, os.Stdin, os.Stdout, os.Stderr); err != nil {
-		fmt.Fprintln(os.Stderr, "subsplash-notes:", err)
-		os.Exit(1)
+	return readCmd(args, stdin, stdout, stderr)
+}
+
+// fail reports err in one line.
+func fail(stderr io.Writer, err error) int {
+	fmt.Fprintln(stderr, "subsplash-notes:", strings.Join(strings.Fields(err.Error()), " "))
+	return 1
+}
+
+func flags(name string, stderr io.Writer) *flag.FlagSet {
+	fs := flag.NewFlagSet(strings.TrimSpace("subsplash-notes "+name), flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	return fs
+}
+
+func parse(fs *flag.FlagSet, args []string, stderr io.Writer, usage string) bool {
+	if err := fs.Parse(args); err != nil {
+		return false
 	}
+	if fs.NArg() != 0 {
+		fmt.Fprintln(stderr, "usage: "+usage)
+		return false
+	}
+	return true
+}
+
+func keygenCmd(args []string, stdout, stderr io.Writer) int {
+	fs := flags("keygen", stderr)
+	keyPath := fs.String("key", DefaultKeyPath(), "where to write the new key (never replaced)")
+	if !parse(fs, args, stderr, "subsplash-notes keygen [--key <file>]") {
+		return 2
+	}
+	pub, err := Keygen(*keyPath)
+	if err != nil {
+		return fail(stderr, err)
+	}
+	fmt.Fprintln(stdout, pub)
+	return 0
+}
+
+// postern is the client for --postern with the key at keyPath.
+func postern(base, keyPath string) (*Client, error) {
+	if base == "" {
+		return nil, errors.New("no Postern named: give --postern <url> or set POSTERN_URL")
+	}
+	key, err := LoadKey(keyPath)
+	if err != nil {
+		return nil, err
+	}
+	return &Client{Base: base, Key: key, HTTP: &http.Client{Timeout: 30 * time.Second}}, nil
+}
+
+func addressCmd(args []string, stdout, stderr io.Writer) int {
+	fs := flags("address", stderr)
+	keyPath := fs.String("key", DefaultKeyPath(), "the key keygen wrote")
+	base := fs.String("postern", os.Getenv("POSTERN_URL"), "Postern's backend (default $POSTERN_URL)")
+	if !parse(fs, args, stderr, "subsplash-notes address [--key <file>] [--postern <url>]") {
+		return 2
+	}
+	c, err := postern(*base, *keyPath)
+	if err != nil {
+		return fail(stderr, err)
+	}
+	addr, err := c.Address(context.Background())
+	if err != nil {
+		return fail(stderr, err)
+	}
+	fmt.Fprintln(stdout, addr)
+	return 0
+}
+
+func fetchCmd(args []string, stdout, stderr io.Writer) int {
+	fs := flags("fetch", stderr)
+	keyPath := fs.String("key", DefaultKeyPath(), "the key keygen wrote")
+	base := fs.String("postern", os.Getenv("POSTERN_URL"), "Postern's backend (default $POSTERN_URL)")
+	since := fs.Int("since", 0, "list the alerts above this seq (a claimed alert is gone, so 0 lists what is left)")
+	rowsPath := fs.String("rows", defaultRows, "the YouTube rows to match against")
+	out := fs.String("out", defaultOut, "the records file to write; read first and merged with")
+	if !parse(fs, args, stderr, "subsplash-notes fetch [--key <file>] [--postern <url>] [--since n] [--rows rows.jsonl] [--out records.jsonl]") {
+		return 2
+	}
+	c, err := postern(*base, *keyPath)
+	if err != nil {
+		return fail(stderr, err)
+	}
+	rows, err := readRows(*rowsPath)
+	if err != nil {
+		return fail(stderr, err)
+	}
+	existing, err := readRecords(*out)
+	if err != nil {
+		return fail(stderr, err)
+	}
+	ctx := context.Background()
+	body, err := c.Alerts(ctx, *since)
+	if err != nil {
+		return fail(stderr, err)
+	}
+	records, report, recorded, err := merge(bytes.NewReader(body), rows, existing)
+	if err != nil {
+		return fail(stderr, err)
+	}
+	// The records are on disk before any alert is claimed: a claimed alert is
+	// gone from Postern, so its record must not be lost with it.
+	if err := writeRecords(*out, records); err != nil {
+		return fail(stderr, fmt.Errorf("%w; no alert claimed", err))
+	}
+	for _, line := range report {
+		fmt.Fprintln(stderr, line)
+	}
+	claimed, code := 0, 0
+	for _, id := range recorded {
+		if err := c.Claim(ctx, id); err != nil {
+			code = fail(stderr, fmt.Errorf("alert %s recorded but not claimed: %w", id, err))
+			continue
+		}
+		claimed++
+	}
+	fmt.Fprintf(stdout, "%d records in %s (%d before), %d reported, %d claimed\n", len(records), *out, len(existing), len(report), claimed)
+	return code
+}
+
+func readCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	fs := flags("", stderr)
+	alertsPath := fs.String("alerts", "-", "the alerts JSON (the body of GET /api/alerts); - is standard input")
+	rowsPath := fs.String("rows", defaultRows, "the YouTube rows to match against")
+	out := fs.String("out", defaultOut, "the records file to write; read first and merged with")
+	if !parse(fs, args, stderr, "subsplash-notes [keygen|address|fetch] ... or subsplash-notes [--alerts <file>|-] [--rows rows.jsonl] [--out records.jsonl]") {
+		return 2
+	}
+	if err := run(*alertsPath, *rowsPath, *out, stdin, stdout, stderr); err != nil {
+		return fail(stderr, err)
+	}
+	return 0
 }
 
 func run(alertsPath, rowsPath, out string, stdin io.Reader, stdout, stderr io.Writer) error {
@@ -74,18 +240,7 @@ func run(alertsPath, rowsPath, out string, stdin io.Reader, stdout, stderr io.Wr
 	if err != nil {
 		return err
 	}
-	var buf bytes.Buffer
-	for _, r := range records {
-		enc := json.NewEncoder(&buf)
-		enc.SetEscapeHTML(false)
-		if err := enc.Encode(r); err != nil {
-			return err
-		}
-	}
-	if err := os.MkdirAll(filepath.Dir(out), 0o755); err != nil {
-		return err
-	}
-	if err := os.WriteFile(out, buf.Bytes(), 0o644); err != nil {
+	if err := writeRecords(out, records); err != nil {
 		return err
 	}
 	for _, line := range report {
@@ -95,13 +250,65 @@ func run(alertsPath, rowsPath, out string, stdin io.Reader, stdout, stderr io.Wr
 	return nil
 }
 
+// writeRecords writes the records, one JSON object a line, to a temporary
+// file beside out, syncs it and renames it into place: out is either the old
+// file or the whole new one, and on a nil return the new one is on disk.
+func writeRecords(out string, records []Record) error {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	for _, r := range records {
+		if err := enc.Encode(r); err != nil {
+			return err
+		}
+	}
+	dir := filepath.Dir(out)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return fmt.Errorf("writing the records: %w", err)
+	}
+	tmp, err := os.CreateTemp(dir, ".subsplash-notes-*")
+	if err != nil {
+		return fmt.Errorf("writing the records: %w", err)
+	}
+	defer os.Remove(tmp.Name())
+	_, err = tmp.Write(buf.Bytes())
+	if err == nil {
+		err = tmp.Chmod(0o644)
+	}
+	if err == nil {
+		err = tmp.Sync()
+	}
+	if cerr := tmp.Close(); err == nil {
+		err = cerr
+	}
+	if err == nil {
+		err = os.Rename(tmp.Name(), out)
+	}
+	if err != nil {
+		return fmt.Errorf("writing the records to %s: %w", out, err)
+	}
+	if d, err := os.Open(dir); err == nil {
+		d.Sync()
+		d.Close()
+	}
+	return nil
+}
+
 // Run reads the alerts, matches each note to a row and merges the records
 // with the existing ones by row id. report lists, one line each, what was
 // dropped or not guessed.
 func Run(alerts io.Reader, rows []sources.Row, existing []Record) (records []Record, report []string, err error) {
+	records, report, _, err = merge(alerts, rows, existing)
+	return records, report, err
+}
+
+// merge is Run, also naming the alerts whose record the merged records hold
+// (written now, or kept already and the same), in the order they came: the
+// alerts that may be claimed once the records are on disk.
+func merge(alerts io.Reader, rows []sources.Row, existing []Record) (records []Record, report, recorded []string, err error) {
 	notes, problems, err := ReadAlerts(alerts)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	for _, p := range problems {
 		report = append(report, fmt.Sprintf("alert %s: %s", p.AlertID, p.Why))
@@ -119,10 +326,13 @@ func Run(alerts io.Reader, rows []sources.Row, existing []Record) (records []Rec
 		if have, ok := byID[rec.ID]; ok {
 			if have != rec {
 				report = append(report, fmt.Sprintf("alert %s: disagrees with the record kept for row %s (kept '%s', %s, %s); not replaced", n.AlertID, rec.ID, have.Title, have.Ref, have.Date))
+				continue
 			}
+			recorded = append(recorded, n.AlertID)
 			continue
 		}
 		byID[rec.ID] = rec
+		recorded = append(recorded, n.AlertID)
 	}
 	for _, r := range byID {
 		records = append(records, r)
@@ -133,7 +343,7 @@ func Run(alerts io.Reader, rows []sources.Row, existing []Record) (records []Rec
 		}
 		return records[i].ID < records[j].ID
 	})
-	return records, report, nil
+	return records, report, recorded, nil
 }
 
 func readRows(path string) ([]sources.Row, error) {
