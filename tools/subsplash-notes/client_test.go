@@ -37,10 +37,11 @@ type fakePostern struct {
 	nonces   map[string]bool // issued and not yet spent
 	alerts   []map[string]any
 	claimed  []string
-	verified int    // signed requests whose signature verified
-	refused  int    // signed requests refused for their proof
-	nonceBad int    // how many of the next proofs to refuse with reason "nonce"
-	wire     []byte // every request's headers and body, and every reply's body
+	verified int      // signed requests whose signature verified
+	refused  int      // signed requests refused for their proof
+	nonceBad int      // how many of the next proofs to refuse with reason "nonce"
+	wire     []byte   // every request's headers and body, and every reply's body
+	requests []string // every request's method and path, the challenges included
 }
 
 func newFakePostern(t *testing.T, alertsJSON string) (*fakePostern, *httptest.Server) {
@@ -67,6 +68,7 @@ func (f *fakePostern) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		f.wire = append(f.wire, []byte(k+": "+strings.Join(v, ",")+"\n")...)
 	}
 	f.wire = append(f.wire, body...)
+	f.requests = append(f.requests, r.Method+" "+r.URL.Path)
 	rec := httptest.NewRecorder()
 	f.serve(rec, r, body)
 	f.wire = append(f.wire, rec.Body.Bytes()...)
