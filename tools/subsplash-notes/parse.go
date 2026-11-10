@@ -18,26 +18,37 @@ import (
 // Subsplash notes mail (docs/protocol.md section 26 there).
 const KindSermonNotes = "sermon-notes"
 
+// MaxNotesBytes is the most Postern keeps of one alert's notes PDF (5 MiB,
+// docs/api.md there).
+const MaxNotesBytes = 5 << 20
+
 // Alert is a sermon-notes alert as Postern lists it (GET /api/alerts): parsed
-// facts only. It has no place for a mail's body or an attachment, and a reply
-// that carries a field not here is refused, so neither can be held by
-// mistake.
+// facts only. It has no place for a mail's body or an attachment's bytes (the
+// list never carries them: an alert with notes names them by hash and size, and
+// they are fetched on their own), and a reply that carries a field not here
+// is refused, so neither can be held by mistake.
 type Alert struct {
-	ID        string `json:"id"`
-	Seq       int    `json:"seq"`
-	Kind      string `json:"kind"`
-	Title     string `json:"title"`
-	Reference string `json:"reference"`
-	When      string `json:"when"`
+	ID          string `json:"id"`
+	Seq         int    `json:"seq"`
+	Kind        string `json:"kind"`
+	Title       string `json:"title"`
+	Reference   string `json:"reference"`
+	When        string `json:"when"`
+	NotesSHA256 string `json:"notes_sha256"`
+	NotesSize   int    `json:"notes_size"`
 }
 
 // Note is what one alert says about a sermon: its title, its passage as an
-// OSIS reference, and the date the alert gives (YYYY-MM-DD).
+// OSIS reference, and the date the alert gives (YYYY-MM-DD). NotesSHA256 and
+// NotesSize name the notes PDF the alert holds at Postern, both empty/zero when
+// it has none.
 type Note struct {
-	AlertID string
-	Title   string
-	Ref     string
-	Date    string
+	AlertID     string
+	Title       string
+	Ref         string
+	Date        string
+	NotesSHA256 string
+	NotesSize   int
 }
 
 // Problem is an alert the reader dropped, and why. Why never repeats a
@@ -77,7 +88,7 @@ func ReadAlerts(r io.Reader) ([]Note, []Problem, error) {
 		dec.DisallowUnknownFields()
 		var a Alert
 		if err := dec.Decode(&a); err != nil {
-			problems = append(problems, Problem{head.ID, "dropped: " + err.Error() + " (the reader takes only title, reference and when)"})
+			problems = append(problems, Problem{head.ID, "dropped: " + err.Error() + " (the reader takes only title, reference, when, notes_sha256 and notes_size)"})
 			continue
 		}
 		n, err := a.note()
@@ -108,8 +119,20 @@ func (a Alert) note() (Note, error) {
 	}
 	// The alert's own offset is Eastern: its date is the date the church's
 	// mail printed, not the UTC date of that instant.
-	return Note{AlertID: a.ID, Title: title, Ref: ref, Date: t.Format("2006-01-02")}, nil
+	n := Note{AlertID: a.ID, Title: title, Ref: ref, Date: t.Format("2006-01-02"), NotesSHA256: a.NotesSHA256, NotesSize: a.NotesSize}
+	switch {
+	case a.NotesSHA256 == "" && a.NotesSize == 0:
+	case a.NotesSHA256 == "" || a.NotesSize == 0:
+		return Note{}, errors.New("notes_sha256 and notes_size come together; one is missing")
+	case !sha256RE.MatchString(a.NotesSHA256):
+		return Note{}, errors.New("notes_sha256 is not 64 lower-case hex characters")
+	case a.NotesSize < 0 || a.NotesSize > MaxNotesBytes:
+		return Note{}, fmt.Errorf("notes_size %d is outside 1 to %d bytes", a.NotesSize, MaxNotesBytes)
+	}
+	return n, nil
 }
+
+var sha256RE = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
 var refRE = func() *regexp.Regexp {
 	names := map[string]bool{"psalm": true, "song of songs": true}

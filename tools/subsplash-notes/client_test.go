@@ -37,11 +37,13 @@ type fakePostern struct {
 	nonces   map[string]bool // issued and not yet spent
 	alerts   []map[string]any
 	claimed  []string
-	verified int      // signed requests whose signature verified
-	refused  int      // signed requests refused for their proof
-	nonceBad int      // how many of the next proofs to refuse with reason "nonce"
-	wire     []byte   // every request's headers and body, and every reply's body
-	requests []string // every request's method and path, the challenges included
+	verified int               // signed requests whose signature verified
+	refused  int               // signed requests refused for their proof
+	nonceBad int               // how many of the next proofs to refuse with reason "nonce"
+	wire     []byte            // every request's headers and body, and every reply's body
+	requests []string          // every request's method and path, the challenges included
+	notes    map[string][]byte // GET /api/alerts/{id}/notes answers these bytes; any other id is 404
+	onClaim  func(id string)   // called as an alert is claimed, before it is gone
 }
 
 func newFakePostern(t *testing.T, alertsJSON string) (*fakePostern, *httptest.Server) {
@@ -121,8 +123,21 @@ func (f *fakePostern) serve(w http.ResponseWriter, r *http.Request, body []byte)
 			}
 		}
 		json.NewEncoder(w).Encode(map[string]any{"alerts": list, "next": next})
+	case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/api/alerts/") && strings.HasSuffix(r.URL.Path, "/notes"):
+		id := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/api/alerts/"), "/notes")
+		pdf, ok := f.notes[id]
+		if !ok {
+			f.refuse(w, 404, "", "no such notes")
+			return
+		}
+		w.Header().Set("Content-Type", "application/pdf")
+		w.Header().Set("Cache-Control", "no-store")
+		w.Write(pdf)
 	case r.Method == http.MethodDelete && strings.HasPrefix(r.URL.Path, "/api/alerts/"):
 		id := strings.TrimPrefix(r.URL.Path, "/api/alerts/")
+		if f.onClaim != nil {
+			f.onClaim(id)
+		}
 		for i, a := range f.alerts {
 			if a["id"] == id {
 				f.alerts = append(f.alerts[:i], f.alerts[i+1:]...)

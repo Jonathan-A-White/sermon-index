@@ -7,6 +7,7 @@ Running the sermon index on the Laptop: where to look, what to do after a change
 - [Looking](#looking)
 - [After a change](#after-a-change)
 - [What a wrong setting looks like](#what-a-wrong-setting-looks-like)
+- [The Brookfield First notes](#the-brookfield-first-notes)
 
 <!-- /toc -->
 
@@ -51,3 +52,11 @@ curl -s http://10.88.0.2:8790/v1/health       # {status, version, sources, sermo
 | The password in `pg.env` matches `env` | `sermon-index` starts, `/v1/health` answers 503, the journal says `password authentication failed`; the password in `pg.env` only counts when the data directory is first filled |
 | Port 5433 free on the loopback | `sermon-index-pg` fails with `port is already allocated`; the install's wait for Postgres times out |
 | User lingering (`loginctl enable-linger`) | the units run only while the user is logged in; after a reboot nothing answers until login |
+
+## The Brookfield First notes
+
+`go run ./tools/subsplash-notes fetch` (the package comment of `tools/subsplash-notes/main.go` is its contract) lists the family's sermon-notes alerts at Postern and, for each it can match to one Brookfield First row, writes a record (`data/subsplash-notes.jsonl`, gitignored) and claims the alert.
+
+An alert whose mail had the church's notes PDF carries `notes_sha256` and `notes_size`; its bytes are at the signed `GET /api/alerts/{id}/notes`. `fetch` downloads them for each alert it will record, checks the size and the sha256, and keeps the PDF at **`~/.local/state/sermon-index/notes/<row id>.pdf`** (`--notes <dir>` to change; the directory is mode 0700, the files 0600). That is the Laptop only, outside the checkout: the PDF holds the church's notes and the Governor's own fill-ins, so it is **never committed**, and a `--notes` directory inside a git work tree is refused. Only a record (Sunday, title, passage) is ever written under the checkout.
+
+The order is kept so nothing is lost: **the PDF on disk, then the records file in place, and only then the alert claimed** (a claimed alert is gone from Postern, notes and all). A failed download, a size that is not `notes_size` or a sha256 that is not `notes_sha256` is reported on stderr, writes no record for that alert and leaves it unclaimed; the other alerts of the run go on. A second run writes the same bytes and does not download a PDF it already holds with the same sha256; a file there with another sha256 is reported and not replaced (look at it, delete it by hand if the new one is right). An alert that carries any other field than the ones the reader knows is dropped, reported and left unclaimed. The no-subcommand reader (a saved reply of `GET /api/alerts`) accepts the two fields, downloads nothing and claims nothing.

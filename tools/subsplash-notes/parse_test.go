@@ -193,3 +193,32 @@ func TestNoRealEmailAddress(t *testing.T) {
 		}
 	}
 }
+
+// A sermon-notes alert with notes carries notes_sha256 and notes_size, which
+// the reader takes; one without carries neither. Half a pair, a malformed
+// hash or a size past Postern's limit is dropped and reported.
+func TestReadAlertsTakesTheNotesFields(t *testing.T) {
+	sha := strings.Repeat("ab", 32)
+	head := `{"id":"x1","kind":"sermon-notes","title":"T","reference":"Romans 5:1","when":"2031-03-02T00:00:00-05:00"`
+	notes, problems, err := ReadAlerts(strings.NewReader(`{"alerts":[` + head + `,"notes_sha256":"` + sha + `","notes_size":1234}]}`))
+	if err != nil || len(problems) != 0 || len(notes) != 1 {
+		t.Fatalf("notes %+v problems %+v err %v", notes, problems, err)
+	}
+	if notes[0].NotesSHA256 != sha || notes[0].NotesSize != 1234 {
+		t.Errorf("note = %+v", notes[0])
+	}
+	bad := map[string]string{
+		"sha without size": `,"notes_sha256":"` + sha + `"`,
+		"size without sha": `,"notes_size":10`,
+		"short sha":        `,"notes_sha256":"abcd","notes_size":10`,
+		"upper-case sha":   `,"notes_sha256":"` + strings.ToUpper(sha) + `","notes_size":10`,
+		"zero size":        `,"notes_sha256":"` + sha + `","notes_size":0`,
+		"too large":        `,"notes_sha256":"` + sha + `","notes_size":5242881`,
+	}
+	for name, extra := range bad {
+		notes, problems, err := ReadAlerts(strings.NewReader(`{"alerts":[` + head + extra + `}]}`))
+		if err != nil || len(notes) != 0 || len(problems) != 1 || problems[0].AlertID != "x1" {
+			t.Errorf("%s: notes %+v problems %+v err %v", name, notes, problems, err)
+		}
+	}
+}

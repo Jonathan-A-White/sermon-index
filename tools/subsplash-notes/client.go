@@ -88,6 +88,13 @@ func (c *Client) Claim(ctx context.Context, id string) error {
 	return err
 }
 
+// Notes is the alert's notes PDF, GET /api/alerts/{id}/notes: the bytes as the
+// mail carried them. The caller checks their size and sha256 against the
+// alert's.
+func (c *Client) Notes(ctx context.Context, id string) ([]byte, error) {
+	return c.signed(ctx, http.MethodGet, "/api/alerts/"+url.PathEscape(id)+"/notes", nil)
+}
+
 // signed makes one signed request and returns the reply's body. A nonce
 // refusal is tried once more from a fresh challenge, as Postern asks: nothing
 // was acted on.

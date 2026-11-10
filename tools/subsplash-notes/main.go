@@ -6,7 +6,7 @@
 //
 //	subsplash-notes keygen [--key <file>]
 //	subsplash-notes address [--key <file>] [--postern <url>]
-//	subsplash-notes fetch [--key <file>] [--postern <url>] [--since n] [--rows rows.jsonl] [--out records.jsonl]
+//	subsplash-notes fetch [--key <file>] [--postern <url>] [--since n] [--rows rows.jsonl] [--out records.jsonl] [--notes <dir>]
 //	subsplash-notes forward-confirm [--key <file>] [--postern <url>]
 //	subsplash-notes [--alerts <file>|-] [--rows rows.jsonl] [--out records.jsonl]
 //
@@ -36,10 +36,26 @@
 // With no subcommand the tool reads a saved reply of GET /api/alerts, {"alerts":
 // [...], "next": n} ("-" reads it from standard input), and claims nothing.
 //
-// Only an alert of kind sermon-notes is read, and only its title, reference
-// and date: the reader has no place for a mail's body or the notes PDF
-// attached to it, and an alert that carries any field besides those is
-// dropped and reported.
+// Only an alert of kind sermon-notes is read, and only its title, reference,
+// date and, when it has notes, notes_sha256 and notes_size: the reader has no
+// place for a mail's body, and an alert that carries any field besides those
+// is dropped and reported.
+//
+// The notes PDF. An alert with notes names them by notes_sha256 and
+// notes_size, and their bytes are at the signed GET /api/alerts/{id}/notes.
+// For each alert fetch will record it downloads them, checks the size and the
+// sha256, and keeps the PDF as <row id>.pdf in the notes directory (--notes;
+// default ~/.local/state/sermon-index/notes, mode 0700, files 0600). That is
+// on the Laptop alone and outside the checkout: the PDF holds the church's
+// notes and the Governor's own fill-ins, so it is NEVER COMMITTED, the repo
+// being public and keeping no sermon's words, and a notes directory inside a
+// git work tree is refused. The order is: the PDF on disk, then the records
+// file in place, and only then the alert claimed. A failed download, a wrong
+// size or a wrong sha256 is reported, writes no record for that alert and
+// leaves it unclaimed; the other alerts go on. A file already there with the
+// same sha256 is not downloaded again; one with another sha256 is reported
+// and not replaced. The no-subcommand reader accepts the two fields and
+// downloads nothing.
 //
 // The date an alert gives can be the Saturday or the Monday of the Sunday it
 // is about (the mail's date is when the notes went out), so a Saturday or a
@@ -198,11 +214,16 @@ func fetchCmd(args []string, stdout, stderr io.Writer) int {
 	since := fs.Int("since", 0, "list the alerts above this seq (a claimed alert is gone, so 0 lists what is left)")
 	rowsPath := fs.String("rows", defaultRows, "the YouTube rows to match against")
 	out := fs.String("out", defaultOut, "the records file to write; read first and merged with")
-	if !parse(fs, args, stderr, "subsplash-notes fetch [--key <file>] [--postern <url>] [--since n] [--rows rows.jsonl] [--out records.jsonl]") {
+	notesDir := fs.String("notes", DefaultNotesDir(), "where the notes PDFs are kept: outside the checkout, never committed")
+	if !parse(fs, args, stderr, "subsplash-notes fetch [--key <file>] [--postern <url>] [--since n] [--rows rows.jsonl] [--out records.jsonl] [--notes <dir>]") {
 		return 2
 	}
 	c, err := postern(*base, *keyPath)
 	if err != nil {
+		return fail(stderr, err)
+	}
+	store := &NotesStore{Dir: *notesDir, Client: c}
+	if err := store.checkDir(); err != nil {
 		return fail(stderr, err)
 	}
 	rows, err := readRows(*rowsPath)
@@ -218,12 +239,18 @@ func fetchCmd(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return fail(stderr, err)
 	}
-	records, report, recorded, err := merge(bytes.NewReader(body), rows, existing)
+	// An alert with notes is recorded only once its PDF is on disk.
+	records, report, recorded, err := merge(bytes.NewReader(body), rows, existing, func(n Note, rec Record) error {
+		if n.NotesSHA256 == "" {
+			return nil
+		}
+		return store.Keep(ctx, n, rec.ID)
+	})
 	if err != nil {
 		return fail(stderr, err)
 	}
-	// The records are on disk before any alert is claimed: a claimed alert is
-	// gone from Postern, so its record must not be lost with it.
+	// The PDFs and then the records are on disk before any alert is claimed: a
+	// claimed alert is gone from Postern, so neither must be lost with it.
 	if err := writeRecords(*out, records); err != nil {
 		return fail(stderr, fmt.Errorf("%w; no alert claimed", err))
 	}
@@ -239,6 +266,9 @@ func fetchCmd(args []string, stdout, stderr io.Writer) int {
 		claimed++
 	}
 	fmt.Fprintf(stdout, "%d records in %s (%d before), %d reported, %d claimed\n", len(records), *out, len(existing), len(report), claimed)
+	if store.Asked > 0 {
+		fmt.Fprintf(stdout, "%d notes downloaded to %s\n", store.Asked, store.Dir)
+	}
 	return code
 }
 
@@ -336,14 +366,17 @@ func writeRecords(out string, records []Record) error {
 // with the existing ones by row id. report lists, one line each, what was
 // dropped or not guessed.
 func Run(alerts io.Reader, rows []sources.Row, existing []Record) (records []Record, report []string, err error) {
-	records, report, _, err = merge(alerts, rows, existing)
+	records, report, _, err = merge(alerts, rows, existing, nil)
 	return records, report, err
 }
 
 // merge is Run, also naming the alerts whose record the merged records hold
 // (written now, or kept already and the same), in the order they came: the
-// alerts that may be claimed once the records are on disk.
-func merge(alerts io.Reader, rows []sources.Row, existing []Record) (records []Record, report, recorded []string, err error) {
+// alerts that may be claimed once the records are on disk. keep, when not nil,
+// is asked of each note about to be recorded (its record new or already kept
+// and the same) and an error from it is reported, the alert neither recorded
+// nor named: fetch keeps the notes PDF there.
+func merge(alerts io.Reader, rows []sources.Row, existing []Record, keep func(Note, Record) error) (records []Record, report, recorded []string, err error) {
 	notes, problems, err := ReadAlerts(alerts)
 	if err != nil {
 		return nil, nil, nil, err
@@ -366,7 +399,15 @@ func merge(alerts io.Reader, rows []sources.Row, existing []Record) (records []R
 				report = append(report, fmt.Sprintf("alert %s: disagrees with the record kept for row %s (kept '%s', %s, %s); not replaced", n.AlertID, rec.ID, have.Title, have.Ref, have.Date))
 				continue
 			}
+			if err := keepNotes(keep, n, rec); err != nil {
+				report = append(report, fmt.Sprintf("alert %s: not recorded: %v", n.AlertID, err))
+				continue
+			}
 			recorded = append(recorded, n.AlertID)
+			continue
+		}
+		if err := keepNotes(keep, n, rec); err != nil {
+			report = append(report, fmt.Sprintf("alert %s: not recorded: %v", n.AlertID, err))
 			continue
 		}
 		byID[rec.ID] = rec
@@ -382,6 +423,13 @@ func merge(alerts io.Reader, rows []sources.Row, existing []Record) (records []R
 		return records[i].ID < records[j].ID
 	})
 	return records, report, recorded, nil
+}
+
+func keepNotes(keep func(Note, Record) error, n Note, rec Record) error {
+	if keep == nil {
+		return nil
+	}
+	return keep(n, rec)
 }
 
 func readRows(path string) ([]sources.Row, error) {
