@@ -1,7 +1,11 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"strings"
 	"time"
@@ -193,6 +197,49 @@ func (r *Result) recount() {
 		}
 		if x.IsSeries() {
 			r.SeriesRows++
+		}
+	}
+}
+
+// ReadAltURLs reads the alt_url of each row of the rows.jsonl at path, by row
+// id. tools/subsplash-links writes alt_url, and this tool rewrites the file
+// whole, so what is there is read before it is replaced. A file that is not
+// there holds none; a line that cannot be read is an error, because carrying
+// on would drop what the line holds.
+func ReadAltURLs(path string) (map[string]string, error) {
+	b, err := os.ReadFile(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	alts := map[string]string{}
+	for i, line := range bytes.Split(b, []byte("\n")) {
+		if len(bytes.TrimSpace(line)) == 0 {
+			continue
+		}
+		var r struct {
+			ID     string  `json:"id"`
+			AltURL *string `json:"alt_url"`
+		}
+		if err := json.Unmarshal(line, &r); err != nil {
+			return nil, fmt.Errorf("%s:%d: %v (the alt_url of its rows would be lost)", path, i+1, err)
+		}
+		if r.AltURL != nil && r.ID != "" {
+			alts[r.ID] = *r.AltURL
+		}
+	}
+	return alts, nil
+}
+
+// KeepAltURLs sets the alt_url of each row that has one in alts (by id). A row
+// that is not in rows is not carried over, and a row that alts does not know
+// has none.
+func KeepAltURLs(rows []sources.Row, alts map[string]string) {
+	for i := range rows {
+		if u, ok := alts[rows[i].ID]; ok {
+			rows[i].AltURL = ptr(u)
 		}
 	}
 }

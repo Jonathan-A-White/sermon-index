@@ -15,6 +15,11 @@
 // sent in a request header, never written to a file, a log or the report, and
 // any error text that would hold it has it blanked.
 //
+// It rewrites rows.jsonl whole, but alt_url is not its field: the one that
+// tools/subsplash-links wrote to a row is read from the file first and kept on
+// the row with the same id. A row the channel no longer lists loses it; a new
+// row has none. url (the watch link) is always the API's.
+//
 // A second run over the same channel writes the same bytes (the order is
 // publish order, oldest first), so a diff shows only new videos.
 package main
@@ -119,6 +124,13 @@ func run(ctx context.Context, c *Client, handle, out, rephilPath, reportPath, li
 		res.Merge = MergeList(res.Rows, l)
 		res.recount()
 	}
+	// alt_url is written by tools/subsplash-links, not by this tool: a
+	// regeneration keeps each row's, matched on the row id.
+	alts, err := ReadAltURLs(filepath.Join(out, "rows.jsonl"))
+	if err != nil {
+		return err
+	}
+	KeepAltURLs(res.Rows, alts)
 
 	if err := os.MkdirAll(out, 0o755); err != nil {
 		return err

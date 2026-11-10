@@ -440,3 +440,127 @@ func TestRunStopsOnAnAPIError(t *testing.T) {
 		t.Error("rows.jsonl written after a failed run")
 	}
 }
+
+// readRowsFile reads a rows.jsonl as rows, for a test.
+func readRowsFile(t *testing.T, path string) []sources.Row {
+	t.Helper()
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var rows []sources.Row
+	for _, line := range strings.Split(strings.TrimSpace(string(b)), "\n") {
+		var r sources.Row
+		if err := json.Unmarshal([]byte(line), &r); err != nil {
+			t.Fatal(err)
+		}
+		rows = append(rows, r)
+	}
+	return rows
+}
+
+// A regeneration keeps the alt_url that tools/subsplash-links wrote to a row,
+// matched on the row's id; a row that is gone loses it and a new row has none;
+// url (YouTube) is rewritten from the API; and a second run changes nothing.
+func TestRunKeepsTheAltURLsOfTheRowsItRewrites(t *testing.T) {
+	dir := t.TempDir()
+	out := filepath.Join(dir, "sources", "brookfield-first")
+	rephil := filepath.Join(dir, "data", "morning-rephil.jsonl")
+	report := filepath.Join(out, "REPORT.md")
+
+	// The rows as the API makes them, to take two ids from.
+	if _, err := runFixture(t, out, rephil, report); err != nil {
+		t.Fatal(err)
+	}
+	fresh := readRowsFile(t, filepath.Join(out, "rows.jsonl"))
+	if len(fresh) < 3 {
+		t.Fatalf("the fixture makes %d rows, want at least 3", len(fresh))
+	}
+	kept := fresh[0]
+	if kept.AltURL != nil {
+		t.Fatal("a fresh row has an alt_url")
+	}
+
+	// The rows file as it stands after subsplash-links: the first row has an
+	// alt_url and an old url, a row the channel no longer lists has an
+	// alt_url, and the second row (new since) is not there at all.
+	const keptAlt = "https://subsplash.com/u/brookfieldfirst/media/d/abc1234-the-garden-gate"
+	const goneAlt = "https://subsplash.com/u/brookfieldfirst/media/d/zzz9999-a-removed-sermon"
+	old := kept
+	old.AltURL = ptr(keptAlt)
+	old.URL = "https://www.youtube.com/watch?v=oldaddress"
+	gone := sources.Row{ID: "removedVid1", Title: "A Removed Sermon", URL: watchURL + "removedVid1", AltURL: ptr(goneAlt)}
+	var seed bytes.Buffer
+	for _, r := range []sources.Row{old, gone} {
+		if err := writeLine(&seed, r); err != nil {
+			t.Fatal(err)
+		}
+	}
+	rowsPath := filepath.Join(out, "rows.jsonl")
+	if err := os.WriteFile(rowsPath, seed.Bytes(), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var first []byte
+	for i := 0; i < 2; i++ {
+		if _, err := runFixture(t, out, rephil, report); err != nil {
+			t.Fatal(err)
+		}
+		b, err := os.ReadFile(rowsPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if i == 0 {
+			first = b
+		} else if !bytes.Equal(first, b) {
+			t.Error("the second regeneration wrote other bytes")
+		}
+	}
+
+	rows := readRowsFile(t, rowsPath)
+	if len(rows) != len(fresh) {
+		t.Fatalf("%d rows after the regeneration, want %d", len(rows), len(fresh))
+	}
+	for _, r := range rows {
+		switch r.ID {
+		case kept.ID:
+			if r.AltURL == nil || *r.AltURL != keptAlt {
+				t.Errorf("row %s lost its alt_url: %v", r.ID, r.AltURL)
+			}
+			if r.URL != kept.URL {
+				t.Errorf("row %s: url is %q, want the API's %q", r.ID, r.URL, kept.URL)
+			}
+		default:
+			if r.AltURL != nil {
+				t.Errorf("row %s has an alt_url %q, want none", r.ID, *r.AltURL)
+			}
+		}
+		if r.ID == "removedVid1" {
+			t.Error("the removed row is back")
+		}
+	}
+	if strings.Contains(string(first), goneAlt) {
+		t.Error("the alt_url of a row that no longer exists was kept")
+	}
+}
+
+// A rows file that cannot be read stops the run and is left as it is: going on
+// would drop the alt_url of every row in it.
+func TestRunStopsOnAnUnreadableRowsFile(t *testing.T) {
+	dir := t.TempDir()
+	out := filepath.Join(dir, "sources", "brookfield-first")
+	if err := os.MkdirAll(out, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	bad := []byte("{\"id\": \"a\", \"alt_url\": \n")
+	rowsPath := filepath.Join(out, "rows.jsonl")
+	if err := os.WriteFile(rowsPath, bad, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runFixture(t, out, filepath.Join(dir, "r.jsonl"), filepath.Join(out, "REPORT.md")); err == nil {
+		t.Fatal("a run over an unreadable rows file went on")
+	}
+	if b, _ := os.ReadFile(rowsPath); !bytes.Equal(b, bad) {
+		t.Error("the unreadable rows file was rewritten")
+	}
+}
