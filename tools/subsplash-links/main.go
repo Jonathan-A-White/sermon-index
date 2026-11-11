@@ -57,6 +57,17 @@
 // could compare, 1 when it could not (the service down, a bad answer).
 // scripts/subsplash-hourly.sh reads it to load what the service lacks.
 //
+// --feed <file> --service <url> writes the job feed Postern's Jobs page shows
+// (feed.go; Postern's docs/jobs.md) and nothing else, with GETs of the sermons
+// service only: one item for each row of --rows, newest first, with the checks
+// mail (a record of --notes names the row), link (the row holds a Subsplash
+// address) and live (the service serves that address), and "here", the oldest
+// row with both mail and link. It holds titles and dates and the Subsplash
+// address, no notes text and no mail address. The file is written whole to a
+// temporary name and renamed; if the service cannot be asked the old file is
+// left as it was and the exit is 1. scripts/subsplash-hourly.sh runs it last,
+// into $POSTERN_DATA/jobs/subsplash-links.json.
+//
 // --progress <file> appends one JSON line to the file after a real run (never
 // after a dry run), so that a page can show how far the linking has got:
 //
@@ -146,9 +157,22 @@ func cli(args []string, stdout, stderr io.Writer, d deps) int {
 	dry := fs.Bool("dry-run", false, "write nothing and make no request")
 	compare := fs.String("compare", "", "the sermons service's address: compare the rows with what it serves, write nothing")
 	source := fs.String("source", "brookfield-first", "with --compare, the source id the service knows the rows by")
-	usage := "usage: subsplash-links [--links <file>] [--pdf <file>]... [--rows rows.jsonl] [--notes records.jsonl] [--cache <file>] [--progress <file>] [--dry-run]\n       subsplash-links --compare <service url> [--rows rows.jsonl] [--source brookfield-first]"
+	feed := fs.String("feed", "", "write the Jobs page's feed to this file (with --service)")
+	service := fs.String("service", "", "with --feed, the sermons service's address")
+	usage := "usage: subsplash-links [--links <file>] [--pdf <file>]... [--rows rows.jsonl] [--notes records.jsonl] [--cache <file>] [--progress <file>] [--dry-run]\n       subsplash-links --compare <service url> [--rows rows.jsonl] [--source brookfield-first]\n       subsplash-links --feed <file> --service <url> [--rows rows.jsonl] [--notes records.jsonl] [--source brookfield-first]"
 	if err := fs.Parse(args); err != nil {
 		return 2
+	}
+	if *feed != "" || *service != "" {
+		if *feed == "" || *service == "" || *compare != "" || fs.NArg() != 0 || *linksPath != "" || len(pdfs) > 0 {
+			fmt.Fprintln(stderr, usage)
+			return 2
+		}
+		if err := feedService(*rowsPath, *notesPath, *service, *source, *feed, d.now()); err != nil {
+			fmt.Fprintln(stderr, "subsplash-links: feed:", strings.Join(strings.Fields(err.Error()), " "))
+			return 1
+		}
+		return 0
 	}
 	if *compare != "" {
 		if fs.NArg() != 0 || *linksPath != "" || len(pdfs) > 0 {
