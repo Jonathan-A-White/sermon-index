@@ -41,6 +41,22 @@
 // The report is printed to standard output and ends with "N of M linked": the
 // rows that hold a Subsplash address, of all the rows.
 //
+// --compare <service url> writes nothing and makes no request but GETs of the
+// sermons service (never Subsplash): it asks the service for the rows of
+// --source (default brookfield-first) and prints
+//
+//	compare: N of M rows differ from the service
+//	ids: a b c d e
+//
+// M is the rows of --rows that have a passage (the service serves a row only
+// through one, its ref or a cited reference; a row with neither, or a series,
+// cannot be asked about), N those
+// whose title, ref, date, preacher, url or alt_url differ from the service's
+// answer, or that it lacks, plus any row it serves that --rows does not hold;
+// the ids line (at most five) is left out when N is 0. It exits 0 whenever it
+// could compare, 1 when it could not (the service down, a bad answer).
+// scripts/subsplash-hourly.sh reads it to load what the service lacks.
+//
 // --progress <file> appends one JSON line to the file after a real run (never
 // after a dry run), so that a page can show how far the linking has got:
 //
@@ -128,9 +144,22 @@ func cli(args []string, stdout, stderr io.Writer, d deps) int {
 	cachePath := fs.String("cache", defaultCache, "the cache of code -> full address")
 	progressPath := fs.String("progress", "", "append one JSON line of progress to this file after a real run")
 	dry := fs.Bool("dry-run", false, "write nothing and make no request")
-	usage := "usage: subsplash-links [--links <file>] [--pdf <file>]... [--rows rows.jsonl] [--notes records.jsonl] [--cache <file>] [--progress <file>] [--dry-run]"
+	compare := fs.String("compare", "", "the sermons service's address: compare the rows with what it serves, write nothing")
+	source := fs.String("source", "brookfield-first", "with --compare, the source id the service knows the rows by")
+	usage := "usage: subsplash-links [--links <file>] [--pdf <file>]... [--rows rows.jsonl] [--notes records.jsonl] [--cache <file>] [--progress <file>] [--dry-run]\n       subsplash-links --compare <service url> [--rows rows.jsonl] [--source brookfield-first]"
 	if err := fs.Parse(args); err != nil {
 		return 2
+	}
+	if *compare != "" {
+		if fs.NArg() != 0 || *linksPath != "" || len(pdfs) > 0 {
+			fmt.Fprintln(stderr, usage)
+			return 2
+		}
+		if err := compareService(*rowsPath, *compare, *source, stdout); err != nil {
+			fmt.Fprintln(stderr, "subsplash-links: compare:", strings.Join(strings.Fields(err.Error()), " "))
+			return 1
+		}
+		return 0
 	}
 	if fs.NArg() != 0 || (*linksPath == "" && len(pdfs) == 0) {
 		fmt.Fprintln(stderr, usage)
