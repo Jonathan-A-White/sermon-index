@@ -7,7 +7,10 @@
 # ('Subsplash links: N new (hourly)'), and loads the source into the live
 # database, so a link he sends shows in Lampas within the hour. It stops, and
 # changes nothing, if the checkout at ~/sermon-index is dirty or behind
-# origin, and it takes the lock the Brookfield refresh takes. A failed run is
+# origin, and it takes the lock the Brookfield refresh takes. Last, it writes
+# the 'Subsplash links' job feed for Postern's Jobs page to
+# $POSTERN_DATA/jobs/subsplash-links.json (default ~/.local/state/postern, the
+# Laptop backend's own POSTERN_DATA). A failed run is
 # mailed to the Mayor by OnFailure=.
 [Unit]
 Description=Sermon index: link new Subsplash notes and shared links to Brookfield First's rows and load them

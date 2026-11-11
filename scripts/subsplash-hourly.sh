@@ -39,6 +39,13 @@
 #      and fails, which is the alarm. With the two equal nothing is loaded. A
 #      service that cannot be asked fails the run; the git hash of the last load
 #      (.../subsplash-loaded) is then the guide to whether to load.
+#   7. writes the 'Subsplash links' job feed for Postern's Jobs page
+#      ($POSTERN_DATA/jobs/subsplash-links.json, POSTERN_DATA defaulting to
+#      ~/.local/state/postern): every Brookfield row newest first, with mail (a
+#      notes record names it), link (it holds a Subsplash address) and live (the
+#      service serves that address), and his place (subsplash-links --feed).
+#      Titles and dates only. If the service cannot be asked the old file is
+#      left and the run fails, so the page's "updated" goes stale.
 # A failed step does not hide the later ones that can still run (a Postern that
 # is down does not stop the inbox's links); the script exits 1 at the end if
 # any step failed, and the timer's OnFailure= tells the Mayor.
@@ -61,6 +68,7 @@ SERMONS=${SERMONS:-sermons}
 SERVICE=${SERMONS_URL:-https://sermons.allmymind.org}
 ENVFILE=$H/.config/sermon-index/env
 ROWS=sources/brookfield-first/rows.jsonl
+FEED=${POSTERN_DATA:-$H/.local/state/postern}/jobs/subsplash-links.json
 SRC=sources/brookfield-first
 
 say() { echo "subsplash-hourly: $*"; }
@@ -207,6 +215,12 @@ if [ -n "$need" ]; then
 		echo "subsplash-hourly: sermons load $ROOT/$SRC failed (see above); the next run loads again" >&2
 		status=1
 	fi
+fi
+
+# 7. The job feed, last, so that "live" is what the service holds now.
+if ! "$GO" run ./tools/subsplash-links --feed "$FEED" --service "$SERVICE" --rows "$ROWS"; then
+	echo "subsplash-hourly: the job feed $FEED was not written (see above)" >&2
+	status=1
 fi
 
 [ "$status" = 0 ] || die "done with errors (see above)"

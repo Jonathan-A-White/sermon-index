@@ -311,6 +311,74 @@ func TestHourlyRunsInOrderCommitsPushesLoadsAndTheSecondRunDoesNothing(t *testin
 	}
 }
 
+// The run's last step writes the Jobs page's feed: every row newest first,
+// with mail, link and live, his place, atomically, and nothing private.
+func TestHourlyWritesTheJobFeed(t *testing.T) {
+	h := newHourlyRig(t)
+	if out, code := h.hourly(); code != 0 {
+		t.Fatalf("exit %d:\n%s", code, out)
+	}
+	feedPath := filepath.Join(h.home, ".local/state/postern/jobs/subsplash-links.json")
+	b, err := os.ReadFile(feedPath)
+	if err != nil {
+		t.Fatalf("no feed: %v", err)
+	}
+	var f struct {
+		ID, Title, Updated string
+		Checks             []string
+		Items              []struct {
+			Label, Date, Link string
+			Done              map[string]bool
+		}
+		Here *int
+	}
+	if err := json.Unmarshal(b, &f); err != nil {
+		t.Fatalf("feed is not JSON: %v\n%s", err, b)
+	}
+	labels := []string{"No Passage Named", "God's Quiet Work", "The Narrow Door", "The Garden Gate"}
+	if f.ID != "subsplash-links" || len(f.Items) != len(labels) {
+		t.Fatalf("feed: %s", b)
+	}
+	for i, l := range labels {
+		if f.Items[i].Label != l {
+			t.Errorf("item %d is %q, want %q", i, f.Items[i].Label, l)
+		}
+	}
+	// v2 (The Narrow Door) has mail, a link, and is loaded; v1 has a link and is loaded;
+	// v5 has none; the oldest row with mail and link is v2.
+	if d := f.Items[2].Done; !d["mail"] || !d["link"] || !d["live"] {
+		t.Errorf("The Narrow Door: %v", d)
+	}
+	if d := f.Items[3].Done; d["mail"] || !d["link"] || !d["live"] {
+		t.Errorf("The Garden Gate: %v", d)
+	}
+	if d := f.Items[1].Done; d["mail"] || d["link"] || d["live"] {
+		t.Errorf("God's Quiet Work: %v", d)
+	}
+	if f.Here == nil || *f.Here != 2 {
+		t.Errorf("here = %v, want 2", f.Here)
+	}
+	if strings.Contains(string(b), "youtube") || strings.Contains(string(b), "Luke.") {
+		t.Errorf("the feed holds more than titles and dates:\n%s", b)
+	}
+	ents, _ := os.ReadDir(filepath.Dir(feedPath))
+	if len(ents) != 1 {
+		t.Errorf("%d files in the jobs directory, want 1", len(ents))
+	}
+}
+
+// With the service unable to answer, no feed is written and the run fails.
+func TestHourlyWritesNoFeedWhenTheServiceCannotBeAsked(t *testing.T) {
+	h := newHourlyRig(t)
+	h.env = append(h.env, "SERMONS_URL=http://127.0.0.1:1")
+	if _, code := h.hourly(); code == 0 {
+		t.Error("exit 0")
+	}
+	if _, err := os.Stat(filepath.Join(h.home, ".local/state/postern/jobs/subsplash-links.json")); err == nil {
+		t.Error("a feed was written")
+	}
+}
+
 // seedAltURLs writes alt_url on two committed rows and pushes, as a story or
 // a hand edit would, without the hourly run's own links: the service (still
 // holding the rows without them) lacks them. No inbox message, no record.
