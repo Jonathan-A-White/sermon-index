@@ -1,0 +1,163 @@
+#!/bin/sh
+# Link Brookfield First's sermons to their Subsplash pages as the Governor's
+# mails and shared links arrive, and put them in the live database. The
+# Laptop's timer sermon-index-subsplash-hourly.timer runs this every hour; by
+# hand it is the same command.
+#
+#   scripts/subsplash-hourly.sh
+#
+# What it does, in order:
+#   0. takes the lock it shares with scripts/refresh-brookfield.sh
+#      ($SERMON_INDEX_HOME/.local/state/sermon-index/brookfield.lock): if the
+#      refresh (or another hourly run) holds it, this run says so and exits 0,
+#      the next hour's run does the work; the refresh WAITS for this one;
+#   1. checks the checkout is on the branch (HOURLY_BRANCH, default main), that
+#      its tree is clean and that it is not behind origin. If any is not so it
+#      says why, exits 1 and changes NOTHING (it has run nothing yet): a dirty
+#      tree is somebody's work, and a refresh's fast-forward would stop on it;
+#   2. subsplash-notes fetch: the notes mails Postern kept (the records file
+#      data/subsplash-notes.jsonl, git-ignored; the notes PDFs stay outside the
+#      checkout);
+#   3. the link list: every https://brookfieldfirst.subspla.sh/<code> in the
+#      Postern inbox's messages ($POSTERN_INBOX, default ~/.local/state/mw/
+#      postern/inbox), in a temporary file outside the checkout, and every
+#      search PDF in the inbox that pdftohtml can read;
+#   4. subsplash-links over those and the records, which writes each row's
+#      alt_url (one HEAD per short link it has never seen, the cache keeps the
+#      rest) and appends one line to $SERMON_INDEX_HOME/.local/state/sermon-index/
+#      subsplash-progress.jsonl;
+#   5. if rows.jsonl changed: commits it ('Subsplash links: N new (hourly)')
+#      and pushes, so the tree is never left dirty; a commit the remote does not
+#      have yet (a refused push) is pushed by the next run;
+#   6. loads sources/brookfield-first into the live database (sermons load, with
+#      DATABASE_URL from ~/.config/sermon-index/env in a subshell), but only if
+#      rows.jsonl is not the file the last load put there: the git hash of what
+#      was loaded is kept in .../subsplash-loaded, written only after a good
+#      load, so a failed load is tried again next hour and a run with nothing
+#      new loads nothing.
+# A failed step does not hide the later ones that can still run (a Postern that
+# is down does not stop the inbox's links); the script exits 1 at the end if
+# any step failed, and the timer's OnFailure= tells the Mayor.
+#
+# HOURLY_ROOT stands in for the checkout (the tests use it); SERMON_INDEX_HOME
+# for $HOME; GO and SERMONS for the commands (the unit sets SERMONS to
+# ~/.local/bin/sermons, which is not on its PATH).
+set -eu
+
+ROOT=${HOURLY_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}
+H=${SERMON_INDEX_HOME:-$HOME}
+STATE=$H/.local/state/sermon-index
+LOCK=$STATE/brookfield.lock
+PROGRESS=$STATE/subsplash-progress.jsonl
+LOADED=$STATE/subsplash-loaded
+INBOX=${POSTERN_INBOX:-$H/.local/state/mw/postern/inbox}
+BRANCH=${HOURLY_BRANCH:-main}
+GO=${GO:-go}
+SERMONS=${SERMONS:-sermons}
+ENVFILE=$H/.config/sermon-index/env
+ROWS=sources/brookfield-first/rows.jsonl
+SRC=sources/brookfield-first
+
+say() { echo "subsplash-hourly: $*"; }
+die() { echo "subsplash-hourly: $*" >&2; exit 1; }
+
+# 0. The lock.
+mkdir -p "$STATE"
+exec 9>"$LOCK"
+if ! flock -n 9; then
+	say "another run (the Brookfield refresh, or the last hourly run) holds $LOCK; nothing done, the next hour's run will link"
+	exit 0
+fi
+
+# 1. The checkout.
+cd "$ROOT"
+[ "$(git rev-parse --abbrev-ref HEAD)" = "$BRANCH" ] || die "$ROOT is not on $BRANCH; nothing done"
+dirty=$(git status --porcelain)
+if [ -n "$dirty" ]; then
+	die "the tree of $ROOT is not clean, so nothing was done (somebody's work is in it, and the refresh's fast-forward would stop on it): $(echo "$dirty" | head -n 3 | tr '\n' ';')"
+fi
+git fetch -q origin "$BRANCH" || die "cannot fetch origin $BRANCH; nothing done"
+behind=$(git rev-list --count "HEAD..origin/$BRANCH")
+[ "$behind" = 0 ] || die "$BRANCH is $behind commit(s) behind origin/$BRANCH (the refresh or a landing will bring it up to date); nothing done"
+
+TMP=$(mktemp -d "${TMPDIR:-/tmp}/subsplash-hourly.XXXXXX")
+trap 'rm -rf "$TMP"' EXIT
+status=0
+
+# 2. The notes mails.
+if ! "$GO" run ./tools/subsplash-notes fetch; then
+	echo "subsplash-hourly: subsplash-notes fetch failed (see above); going on with the records and links there are" >&2
+	status=1
+fi
+
+# 3. The link list, from the messages in the inbox, and the search PDFs.
+: > "$TMP/links.txt"
+if [ -d "$INBOX" ]; then
+	find "$INBOX" -maxdepth 1 -name '*.message.json' -print0 | xargs -0 -r cat 2>/dev/null |
+		grep -o 'brookfieldfirst\.subspla\.sh/[A-Za-z0-9]*' | sort -u | sed 's|^|https://|' > "$TMP/links.txt" || true
+fi
+say "$(wc -l < "$TMP/links.txt" | tr -d ' ') shared links in $INBOX"
+set -- --links "$TMP/links.txt" --progress "$PROGRESS"
+if [ -d "$INBOX" ] && command -v pdftohtml >/dev/null 2>&1; then
+	for f in "$INBOX"/*.pdf; do
+		[ -f "$f" ] || continue
+		if pdftohtml -stdout -xml -i "$f" >/dev/null 2>&1; then
+			set -- "$@" --pdf "$f"
+		else
+			echo "subsplash-hourly: $f is not a PDF pdftohtml can read; skipped" >&2
+		fi
+	done
+fi
+
+# 4. The links.
+if "$GO" run ./tools/subsplash-links "$@" > "$TMP/links.out"; then :; else
+	echo "subsplash-hourly: subsplash-links failed (see above)" >&2
+	status=1
+fi
+cat "$TMP/links.out"
+
+# 5. Commit and push what changed.
+if [ -n "$(git status --porcelain -- "$ROWS")" ]; then
+	new=$(git diff --numstat -- "$ROWS" | cut -f1)
+	git add -- "$ROWS"
+	if ! git commit -q -m "Subsplash links: $new new (hourly)" -- "$ROWS"; then
+		git reset -q -- "$ROWS" || true
+		git checkout -q -- "$ROWS"
+		die "git commit failed; $ROWS was put back as it was"
+	fi
+	say "committed $(git rev-parse --short HEAD): Subsplash links: $new new (hourly)"
+fi
+if [ -n "$(git rev-list "origin/$BRANCH..HEAD")" ]; then
+	if git push -q origin "$BRANCH"; then
+		say "pushed to origin/$BRANCH"
+	else
+		echo "subsplash-hourly: git push origin $BRANCH failed; the commit is kept here and the next run pushes it" >&2
+		status=1
+	fi
+fi
+
+# 6. Load, only when rows.jsonl is not what the last load put in the database.
+want=$(git hash-object -- "$ROWS")
+have=$(cat "$LOADED" 2>/dev/null || true)
+if [ "$want" = "$have" ]; then
+	say "rows.jsonl is what the database holds; nothing loaded"
+elif [ ! -r "$ENVFILE" ]; then
+	echo "subsplash-hourly: cannot read $ENVFILE; $SRC was not loaded" >&2
+	status=1
+elif (
+	set -a
+	# shellcheck disable=SC1090
+	. "$ENVFILE"
+	set +a
+	exec "$SERMONS" load "$ROOT/$SRC"
+); then
+	echo "$want" > "$LOADED.new"
+	mv "$LOADED.new" "$LOADED"
+	say "loaded $ROOT/$SRC into the database"
+else
+	echo "subsplash-hourly: sermons load $ROOT/$SRC failed (see above); the next run loads again" >&2
+	status=1
+fi
+
+[ "$status" = 0 ] || die "done with errors (see above)"
+say "done"

@@ -35,6 +35,16 @@
 #      reads. A run that found the list unchanged is a good refresh: the 30
 #      days start again.
 #
+# THE LOCK. scripts/subsplash-hourly.sh (every hour) rewrites alt_url in the same
+# rows.jsonl this regenerates, commits it and loads it, so the two take one lock,
+# $SERMON_INDEX_HOME/.local/state/sermon-index/brookfield.lock (flock), before
+# they touch the checkout. The hourly run that finds it held skips the hour; this
+# run waits for it (REFRESH_LOCK_WAIT seconds, default 1800) and fails if it
+# cannot get it. The regeneration keeps every row's alt_url by row id
+# (tools/brookfield-youtube, KeepAltURLs), so a link the hourly run wrote
+# survives; a row it linked since the refresh began cannot be lost, for the
+# hourly run cannot write while this one holds the lock.
+#
 # REFRESH_ROOT stands in for the checkout (the tests use it); SERMON_INDEX_HOME
 # for $HOME; MW, GO and SERMONS for the commands (the unit sets SERMONS to
 # ~/.local/bin/sermons, which is not on its PATH).
@@ -49,8 +59,15 @@ GO=${GO:-go}
 SERMONS=${SERMONS:-sermons}
 ENVFILE=$H/.config/sermon-index/env
 DATA="sources/brookfield-first data/morning-rephil.jsonl"
+STATE=$H/.local/state/sermon-index
+LOCK=$STATE/brookfield.lock
+LOCK_WAIT=${REFRESH_LOCK_WAIT:-1800}
 
 die() { echo "refresh-brookfield: $*" >&2; exit 1; }
+
+mkdir -p "$STATE"
+exec 9>"$LOCK"
+flock -w "$LOCK_WAIT" 9 || die "$LOCK is held (scripts/subsplash-hourly.sh is running?) and was not free in ${LOCK_WAIT}s; nothing was done, the stamp is as it was"
 
 cd "$ROOT"
 [ "$(git rev-parse --abbrev-ref HEAD)" = "$BRANCH" ] || die "$ROOT is not on $BRANCH; it will not commit there"
@@ -101,6 +118,8 @@ if ! (
 	die "sermons load --all $ROOT/sources failed (see above); the commit is kept, the stamp is as it was and the next run loads again"
 fi
 echo "refresh-brookfield: loaded $ROOT/sources into the database"
+# What the hourly run keeps to know the database holds rows.jsonl as it is now.
+git hash-object -- sources/brookfield-first/rows.jsonl > "$STATE/subsplash-loaded.new" && mv "$STATE/subsplash-loaded.new" "$STATE/subsplash-loaded"
 
 mkdir -p "$(dirname "$STAMP")"
 date +%s > "$STAMP.new"

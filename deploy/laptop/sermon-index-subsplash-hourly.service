@@ -1,0 +1,35 @@
+# One run of scripts/subsplash-hourly.sh, as the user, then it exits: no
+# daemon. Started by sermon-index-subsplash-hourly.timer. For `systemctl --user`.
+#
+# It fetches the Governor's Subsplash notes mails from Postern, reads the
+# Subsplash links he shared from the Postern inbox, writes each sermon's
+# alt_url in sources/brookfield-first/rows.jsonl, commits and pushes the change
+# ('Subsplash links: N new (hourly)'), and loads the source into the live
+# database, so a link he sends shows in Lampas within the hour. It stops, and
+# changes nothing, if the checkout at ~/sermon-index is dirty or behind
+# origin, and it takes the lock the Brookfield refresh takes. A failed run is
+# mailed to the Mayor by OnFailure=.
+[Unit]
+Description=Sermon index: link new Subsplash notes and shared links to Brookfield First's rows and load them
+After=network-online.target
+Wants=network-online.target
+OnFailure=mw-unit-failed@%n.service
+# Nothing to run until the checkout has the script: a skipped start is not a failure.
+ConditionPathExists=%h/sermon-index/scripts/subsplash-hourly.sh
+
+[Service]
+Type=oneshot
+# PATH only (go, git, flock and pdftohtml are found through it). The sermons
+# command is not on it; the script reads the service's env file itself
+# (DATABASE_URL) for the load. POSTERN_URL is the Laptop's Postern backend, the
+# one the notes fetch asks for the family's alerts.
+EnvironmentFile=-%h/.config/mw/dispatch.env
+Environment=SERMONS=%h/.local/bin/sermons
+Environment=POSTERN_URL=http://10.88.0.2:8787
+WorkingDirectory=%h/sermon-index
+ExecStart=/bin/sh %h/sermon-index/scripts/subsplash-hourly.sh
+
+# Type=oneshot has no start timeout by default, and a hung request would then
+# block every later run. The first run after a long gap may send a HEAD a
+# second for each new short link.
+TimeoutStartSec=30min

@@ -1,0 +1,13 @@
+# Runs sermon-index-subsplash-hourly.service at the top of every hour. For
+# `systemctl --user`.
+[Unit]
+Description=Every hour, link new Subsplash notes and shared links to Brookfield First's sermons
+
+[Timer]
+OnCalendar=hourly
+# A host that was off at the top of the hour runs it when it wakes.
+Persistent=true
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target

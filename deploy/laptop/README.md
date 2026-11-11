@@ -1,6 +1,6 @@
 # deploy/laptop: the sermon index as systemd user units
 
-Two user units for the service, and four more for the Brookfield First refresh (below), installed by [`scripts/install-laptop.sh`](../../scripts/install-laptop.sh) (no sudo; the way back is [`scripts/uninstall-laptop.sh`](../../scripts/uninstall-laptop.sh)). In both, `%h` is the user's home directory, which systemd fills in. The pattern is the Laptop's `postern-backend.service`: an `EnvironmentFile`, `%h` paths, `Restart=on-failure`.
+Two user units for the service, four more for the Brookfield First refresh and two for the hourly Subsplash linking (both below), installed by [`scripts/install-laptop.sh`](../../scripts/install-laptop.sh) (no sudo; the way back is [`scripts/uninstall-laptop.sh`](../../scripts/uninstall-laptop.sh)). In all of them, `%h` is the user's home directory, which systemd fills in. The pattern is the Laptop's `postern-backend.service`: an `EnvironmentFile`, `%h` paths, `Restart=on-failure`.
 
 | What | Where |
 | --- | --- |
@@ -16,6 +16,7 @@ Two user units for the service, and four more for the Brookfield First refresh (
 - [sermon-index.service](#sermon-indexservice)
 - [The env files](#the-env-files)
 - [The Brookfield First refresh](#the-brookfield-first-refresh)
+- [The hourly Subsplash linking](#the-hourly-subsplash-linking)
 
 <!-- /toc -->
 
@@ -108,4 +109,20 @@ YouTube's Developer Policies (III.E.4) let the rig keep public API data for 30 c
 | `sermon-index-brookfield-stale.timer` | Daily at 13:00 UTC, `Persistent=true`. |
 | `sermon-index-brookfield-stale.service` | `scripts/check-brookfield-stale.sh`: exits non-zero when the stamp is missing, not a number, or older than 27 days (`STALE_DAYS`), and the same `OnFailure=` mails the Mayor. 27 days is two refreshes missed and still three inside YouTube's 30. |
 
-The key is never in a unit, a file, the journal or a command line: the script holds it in one shell variable and hands it to the one command through a prefix assignment (`YOUTUBE_API_KEY=$key go run ...`). The script refuses to run if the checkout is not on `main`, if the two data paths have uncommitted changes, or if `main` has diverged from `origin/main`; when the tool fails it puts the two paths back as they were and leaves the stamp alone; a push that is refused leaves the commit, and the next run pushes it. A load that fails (or a missing `~/.config/sermon-index/env`) fails the run and leaves the stamp alone, so the stale check still counts the days; the commit is kept and the next run loads again. A run that finds the list unchanged commits nothing, loads, and still writes the stamp (the 30 days start again). To run it by hand: `sh ~/sermon-index/scripts/refresh-brookfield.sh`; to see the next runs: `systemctl --user list-timers 'sermon-index-*'`.
+The key is never in a unit, a file, the journal or a command line: the script holds it in one shell variable and hands it to the one command through a prefix assignment (`YOUTUBE_API_KEY=$key go run ...`). The script refuses to run if the checkout is not on `main`, if the two data paths have uncommitted changes, or if `main` has diverged from `origin/main`; when the tool fails it puts the two paths back as they were and leaves the stamp alone; a push that is refused leaves the commit, and the next run pushes it. A load that fails (or a missing `~/.config/sermon-index/env`) fails the run and leaves the stamp alone, so the stale check still counts the days; the commit is kept and the next run loads again. A run that finds the list unchanged commits nothing, loads, and still writes the stamp (the 30 days start again). The refresh takes the lock `~/.local/state/sermon-index/brookfield.lock` first and waits for it (see the hourly Subsplash linking, below), and after its `load --all` notes what it loaded for the hourly run. To run it by hand: `sh ~/sermon-index/scripts/refresh-brookfield.sh`; to see the next runs: `systemctl --user list-timers 'sermon-index-*'`.
+
+## The hourly Subsplash linking
+
+A sermon's Subsplash page is the row's `alt_url`, and the Governor sends the evidence as it comes: the notes mail (Postern keeps it as an alert) and the short links he shares (they land in Postern's inbox). Two more units, `sermon-index-subsplash-hourly.service` and `.timer` (`OnCalendar=hourly`, `Persistent=true`), run [`scripts/subsplash-hourly.sh`](../../scripts/subsplash-hourly.sh) of the checkout at `~/sermon-index` so that a link he sends shows in Lampas within the hour. The install enables the timer like the others; the unit has `ConditionPathExists=` on the script, so before the checkout has it a start is skipped, not failed.
+
+| Step | What |
+| --- | --- |
+| lock | `~/.local/state/sermon-index/brookfield.lock`, the one lock the refresh also takes. An hourly run that finds it held says so and exits 0 (the next hour links); the refresh waits for it (`REFRESH_LOCK_WAIT`, 30 minutes) and fails if it never comes free. So the two never rewrite `rows.jsonl` at once, and the refresh keeps every row's `alt_url` by row id (`tools/brookfield-youtube`, `KeepAltURLs`). |
+| checkout | On `main`, tree clean, not behind `origin/main`: otherwise the run says why, exits 1 and has changed nothing (it has run nothing yet). |
+| notes | `go run ./tools/subsplash-notes fetch` (the key `~/.config/sermon-index/postern-alerts.key`, `POSTERN_URL` from the unit): `data/subsplash-notes.jsonl`, git-ignored. |
+| link list | Every `https://brookfieldfirst.subspla.sh/<code>` in `~/.local/state/mw/postern/inbox/*.message.json`, in a temporary file outside the checkout, and each `*.pdf` in the inbox that `pdftohtml` reads. |
+| link | `go run ./tools/subsplash-links` over those and the records. It sends one HEAD for each short link it has never seen (the cache, `data/subsplash-links-cache.jsonl`, keeps the rest) and appends one line to `~/.local/state/sermon-index/subsplash-progress.jsonl`: `time`, `records`, `links`, `rows_linked`, `rows_total`, `new`, `oldest`, `newest` (the dates of the linked rows). |
+| commit | If `rows.jsonl` changed: one commit, `Subsplash links: N new (hourly)`, then a push; a commit the remote lacks (a refused push) is pushed by the next run. The tree is never left dirty. |
+| load | `sermons load ~/sermon-index/sources/brookfield-first` (`DATABASE_URL` from `~/.config/sermon-index/env`), only when `rows.jsonl` is not what the last load put there: the git hash of the loaded file is kept in `~/.local/state/sermon-index/subsplash-loaded`, written after a good load (and by the refresh after its `load --all`). A failed load is tried again next hour. |
+
+A step that fails does not hide the later ones that can still run (Postern down does not stop the inbox's links); the run exits 1 at the end and `OnFailure=mw-unit-failed@%n.service` tells the Mayor. To read a run: `journalctl --user -u sermon-index-subsplash-hourly`; the next runs: `systemctl --user list-timers | grep subsplash-hourly`; by hand: `sh ~/sermon-index/scripts/subsplash-hourly.sh`. The progress file is private to the Laptop and is not in the repository.

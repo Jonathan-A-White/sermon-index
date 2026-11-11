@@ -65,6 +65,7 @@ echo "loaded"
 type refreshRig struct {
 	t      *testing.T
 	script string // the repo's scripts directory
+	stubs  string // the directory of fake commands at the front of PATH
 	clone  string
 	origin string
 	home   string
@@ -88,7 +89,7 @@ func git(t *testing.T, dir string, args ...string) string {
 func newRefreshRig(t *testing.T) *refreshRig {
 	t.Helper()
 	tmp := t.TempDir()
-	r := &refreshRig{t: t, script: repoRoot(t), clone: filepath.Join(tmp, "clone"), origin: filepath.Join(tmp, "origin.git"),
+	r := &refreshRig{t: t, stubs: filepath.Join(tmp, "stubs"), script: repoRoot(t), clone: filepath.Join(tmp, "clone"), origin: filepath.Join(tmp, "origin.git"),
 		home: filepath.Join(tmp, "home"), log: filepath.Join(tmp, "calls.log")}
 	stubs := filepath.Join(tmp, "stubs")
 	for _, d := range []string{stubs, r.home, r.clone} {

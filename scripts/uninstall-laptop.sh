@@ -1,6 +1,6 @@
 #!/bin/sh
 # The way back from scripts/install-laptop.sh: stop and disable both units and
-# the two Brookfield timers, remove them and the binary. The database, the
+# the three Brookfield timers, remove them and the binary. The database, the
 # password files and the refresh stamp are left, so installing again finds the
 # same data; this script names them and says how to remove them. Safe to run
 # again.
@@ -14,12 +14,12 @@ BIN=$H/.local/bin/sermons
 CONF=$H/.config/sermon-index
 DATA=$H/.local/state/sermon-index/pg
 
-# The Brookfield First refresh and its daily check first: the timers, then the
+# The Brookfield First refresh, its daily check and the hourly Subsplash linking first: the timers, then the
 # services they run.
 # The sermon index service next: it Requires Postgres, and stopping Postgres
 # first would stop it anyway.
-for u in sermon-index-brookfield-refresh.timer sermon-index-brookfield-stale.timer \
-	sermon-index-brookfield-refresh.service sermon-index-brookfield-stale.service \
+for u in sermon-index-brookfield-refresh.timer sermon-index-brookfield-stale.timer sermon-index-subsplash-hourly.timer \
+	sermon-index-brookfield-refresh.service sermon-index-brookfield-stale.service sermon-index-subsplash-hourly.service \
 	sermon-index.service sermon-index-pg.service; do
 	systemctl --user disable --now "$u" >/dev/null 2>&1 || true
 	if [ -f "$UNITS/$u" ]; then

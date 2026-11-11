@@ -21,7 +21,9 @@
 # sermon-index-brookfield-*): a service and a timer that regenerate the YouTube
 # list on the 1st and the 26th of each month, and a daily check that it did.
 # The install enables both timers but fetches nothing; the units run the
-# scripts of the checkout at ~/sermon-index. The first stamp the check wants
+# scripts of the checkout at ~/sermon-index. The same goes for the hourly
+# Subsplash linking (sermon-index-subsplash-hourly.*, scripts/subsplash-hourly.sh).
+# The first stamp the check wants
 # comes from the first refresh: run scripts/refresh-brookfield.sh once.
 #
 # SERMON_INDEX_HOME stands in for $HOME (the tests set it to a temporary
@@ -37,8 +39,8 @@ DATA=$H/.local/state/sermon-index/pg
 PG_WAIT=${PG_WAIT:-60}
 PG_UNIT=sermon-index-pg.service
 SVC_UNIT=sermon-index.service
-BF_TIMERS="sermon-index-brookfield-refresh.timer sermon-index-brookfield-stale.timer"
-BF_UNITS="sermon-index-brookfield-refresh.service sermon-index-brookfield-stale.service $BF_TIMERS"
+BF_TIMERS="sermon-index-brookfield-refresh.timer sermon-index-brookfield-stale.timer sermon-index-subsplash-hourly.timer"
+BF_UNITS="sermon-index-brookfield-refresh.service sermon-index-brookfield-stale.service sermon-index-subsplash-hourly.service $BF_TIMERS"
 
 CHANGED=0
 changed() { CHANGED=1; echo "$*"; }
@@ -193,7 +195,7 @@ cat <<WAYBACK
 
 The way back:
   sh $ROOT/scripts/uninstall-laptop.sh
-stops and disables both units and the two Brookfield timers and removes them
+stops and disables both units and the three Brookfield timers and removes them
 and $BIN. It leaves, and names again when it runs:
   $DATA   (the database)
   $CONF    (the password: pg.env and env)
