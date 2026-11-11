@@ -51,7 +51,7 @@ func feedServed() map[string]servedRow {
 
 func TestBuildFeedOrdersChecksAndPlacesHere(t *testing.T) {
 	now := time.Date(2031, 5, 1, 12, 0, 0, 0, time.UTC)
-	f := BuildFeed(feedRows(), feedRecords(), feedServed(), now)
+	f := BuildFeed(feedRows(), feedRecords(), nil, feedServed(), now)
 	if f.ID != "subsplash-links" || f.Title != "Subsplash links" || f.Updated != "2031-05-01T12:00:00Z" {
 		t.Errorf("header: %+v", f)
 	}
@@ -88,7 +88,7 @@ func TestBuildFeedOrdersChecksAndPlacesHere(t *testing.T) {
 }
 
 func TestBuildFeedHereAbsentWhenNoRowHasMailAndLink(t *testing.T) {
-	f := BuildFeed(feedRows()[3:5], nil, nil, time.Now())
+	f := BuildFeed(feedRows()[3:5], nil, nil, nil, time.Now())
 	if f.Here != nil {
 		t.Errorf("here = %d, want none", *f.Here)
 	}
@@ -110,7 +110,7 @@ func TestBuildFeedLiveWhenServiceHoldsEverything(t *testing.T) {
 			served[r.ID] = servedRow{ID: r.ID, Title: r.Title, URL: r.URL, Date: r.Date, AltURL: r.AltURL, Ref: *r.Ref, Role: "text"}
 		}
 	}
-	f := BuildFeed(rows, nil, served, time.Now())
+	f := BuildFeed(rows, nil, nil, served, time.Now())
 	for _, it := range f.Items {
 		if it.Done["link"] != it.Done["live"] {
 			t.Errorf("%s: link %v live %v, want equal when the service holds rows.jsonl", it.Label, it.Done["link"], it.Done["live"])
@@ -124,7 +124,7 @@ func TestFeedHoldsNoNotesTextAndNoAddress(t *testing.T) {
 	rows[0].Notes = sp("SECRET-NOTES-TEXT someone@example.org")
 	rows[0].Preacher = sp("A. Preacher")
 	recs := feedRecords()
-	f := BuildFeed(rows, recs, feedServed(), time.Now())
+	f := BuildFeed(rows, recs, nil, feedServed(), time.Now())
 	b, _ := json.Marshal(f)
 	for _, bad := range []string{"SECRET", "@", "A. Preacher", "youtube", "Luke.13", "y2"} {
 		if strings.Contains(string(b), bad) {
@@ -211,5 +211,48 @@ func TestFeedFlagWritesFileAtomically(t *testing.T) {
 	// --feed needs --service.
 	if code := cli([]string{"--feed", out, "--rows", rows}, &o, &e, deps{}); code != 2 {
 		t.Errorf("--feed without --service: exit %d, want 2", code)
+	}
+}
+
+// A row whose sermon has no notes counts its mail as done and says so.
+func TestBuildFeedMarksANoNotesRow(t *testing.T) {
+	a := feedAlt + "ddd4444-the-running-man"
+	rows := []sources.Row{
+		{ID: "e1", Title: "The Running Man", Ref: sp("Luke.24.33-Luke.24.46"), URL: "y", Date: sp("2031-04-06"), AltURL: &a},
+		{ID: "e2", Title: "Brookfield First - Online Service | April 13, 2031", Ref: sp("Mark.1.1"), URL: "y", Date: sp("2031-04-13")},
+	}
+	f := BuildFeed(rows, nil, map[string]bool{"e1": true}, nil, time.Now())
+	if len(f.Items) != 2 {
+		t.Fatalf("%+v", f)
+	}
+	if it := f.Items[1]; it.Label != "The Running Man (no notes)" || !it.Done["mail"] || !it.Done["link"] {
+		t.Errorf("the no-notes row: %+v", it)
+	}
+	if it := f.Items[0]; strings.Contains(it.Label, "no notes") || it.Done["mail"] {
+		t.Errorf("a row not in the list: %+v", it)
+	}
+	if f.Here == nil || *f.Here != 1 {
+		t.Errorf("here %v, want the no-notes row (index 1)", f.Here)
+	}
+}
+
+func TestFeedFlagReadsTheNoNotesFile(t *testing.T) {
+	dir := t.TempDir()
+	rows := filepath.Join(dir, "rows.jsonl")
+	a := feedAlt + "ddd4444-the-running-man"
+	b, _ := json.Marshal(sources.Row{ID: "e1", Title: "The Running Man", URL: "y", Date: sp("2031-04-06"), AltURL: &a})
+	os.WriteFile(rows, append(b, '\n'), 0o644)
+	nn := filepath.Join(dir, "no-notes.tsv")
+	os.WriteFile(nn, []byte("date\trow\ttxid\n2031-04-05\te1\tdirect:x\n"), 0o644)
+	srv := fakeService(t, nil)
+	out := filepath.Join(dir, "jobs", "f.json")
+	var o, e bytes.Buffer
+	code := cli([]string{"--feed", out, "--service", srv.URL, "--rows", rows, "--notes", filepath.Join(dir, "none.jsonl"), "--no-notes-file", nn}, &o, &e, deps{})
+	if code != 0 {
+		t.Fatalf("exit %d: %s%s", code, o.String(), e.String())
+	}
+	got, _ := os.ReadFile(out)
+	if !strings.Contains(string(got), "The Running Man (no notes)") || !strings.Contains(string(got), `"mail": true`) {
+		t.Errorf("feed: %s", got)
 	}
 }

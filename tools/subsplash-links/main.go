@@ -68,6 +68,11 @@
 // left as it was and the exit is 1. scripts/subsplash-hourly.sh runs it last,
 // into $POSTERN_DATA/jobs/subsplash-links.json.
 //
+// --read-messages <inbox> --key <hex> reads the Governor's messages of a
+// sermon with no notes (nonotes.go) and writes them to --passages and
+// --no-notes-file, with no request at all; the run of tools/brookfield-youtube
+// --merge-only that follows puts them on their rows.
+//
 // --progress <file> appends one JSON line to the file after a real run (never
 // after a dry run), so that a page can show how far the linking has got:
 //
@@ -102,6 +107,8 @@ const (
 	defaultRows  = "sources/brookfield-first/rows.jsonl"
 	defaultNotes = "data/subsplash-notes.jsonl"
 	defaultCache = "data/subsplash-links-cache.jsonl"
+	defaultList  = "sources/brookfield-first/passages.tsv"
+	defaultNoNot = "sources/brookfield-first/no-notes.tsv"
 )
 
 // deps are the parts a test replaces.
@@ -159,16 +166,36 @@ func cli(args []string, stdout, stderr io.Writer, d deps) int {
 	source := fs.String("source", "brookfield-first", "with --compare, the source id the service knows the rows by")
 	feed := fs.String("feed", "", "write the Jobs page's feed to this file (with --service)")
 	service := fs.String("service", "", "with --feed, the sermons service's address")
-	usage := "usage: subsplash-links [--links <file>] [--pdf <file>]... [--rows rows.jsonl] [--notes records.jsonl] [--cache <file>] [--progress <file>] [--dry-run]\n       subsplash-links --compare <service url> [--rows rows.jsonl] [--source brookfield-first]\n       subsplash-links --feed <file> --service <url> [--rows rows.jsonl] [--notes records.jsonl] [--source brookfield-first]"
+	messages := fs.String("read-messages", "", "the Postern inbox: read the Governor's 'No notes' messages into --passages and --no-notes-file")
+	key := fs.String("key", "", "with --read-messages, the Governor's public key (hex); only messages signed by it are read")
+	passages := fs.String("passages", defaultList, "with --read-messages, the church's list (passages.tsv)")
+	noNotesFile := fs.String("no-notes-file", defaultNoNot, "no-notes.tsv, written by --read-messages and read by --feed")
+	usage := "usage: subsplash-links [--links <file>] [--pdf <file>]... [--rows rows.jsonl] [--notes records.jsonl] [--cache <file>] [--progress <file>] [--dry-run]\n       subsplash-links --compare <service url> [--rows rows.jsonl] [--source brookfield-first]\n       subsplash-links --feed <file> --service <url> [--rows rows.jsonl] [--notes records.jsonl] [--no-notes-file no-notes.tsv] [--source brookfield-first]\n       subsplash-links --read-messages <inbox> --key <hex> [--rows rows.jsonl] [--passages passages.tsv] [--no-notes-file no-notes.tsv]"
 	if err := fs.Parse(args); err != nil {
 		return 2
+	}
+	if *messages != "" {
+		if *key == "" || *feed != "" || *service != "" || *compare != "" || fs.NArg() != 0 || *linksPath != "" || len(pdfs) > 0 {
+			fmt.Fprintln(stderr, usage)
+			return 2
+		}
+		res, err := RunNoNotes(*messages, *key, *passages, *noNotesFile, *rowsPath)
+		if err != nil {
+			fmt.Fprintln(stderr, "subsplash-links: read-messages:", strings.Join(strings.Fields(err.Error()), " "))
+			return 1
+		}
+		for _, p := range res.Problems {
+			fmt.Fprintln(stdout, "no-notes: not read:", p)
+		}
+		fmt.Fprintf(stdout, "no-notes: %d sermon(s) read, %d added, %d already there, %d not read\n", res.Read, res.Added, res.Already, len(res.Problems))
+		return 0
 	}
 	if *feed != "" || *service != "" {
 		if *feed == "" || *service == "" || *compare != "" || fs.NArg() != 0 || *linksPath != "" || len(pdfs) > 0 {
 			fmt.Fprintln(stderr, usage)
 			return 2
 		}
-		if err := feedService(*rowsPath, *notesPath, *service, *source, *feed, d.now()); err != nil {
+		if err := feedService(*rowsPath, *notesPath, *noNotesFile, *service, *source, *feed, d.now()); err != nil {
 			fmt.Fprintln(stderr, "subsplash-links: feed:", strings.Join(strings.Fields(err.Error()), " "))
 			return 1
 		}

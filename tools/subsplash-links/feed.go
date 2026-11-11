@@ -16,7 +16,10 @@ import (
 // The job feed for Postern's Jobs page (Postern's docs/jobs.md): one item for
 // each Brookfield row, newest first, held to three checks.
 //
-//	mail  a notes record (tools/subsplash-notes) names the row
+//	mail  a notes record (tools/subsplash-notes) names the row, or the row is
+//	      in no-notes.tsv: the Governor read its sermon in the app and sent it
+//	      as one that has no notes, so no mail will come, and the label ends
+//	      " (no notes)"
 //	link  the row holds a Subsplash address, which only a code he shared (or a
 //	      search PDF he gave) can have put there
 //	live  the sermons service serves that same address for the row
@@ -77,10 +80,11 @@ func recordRow(rows []sources.Row, rec Record) int {
 func isGenericTitle(t string) bool { return strings.HasPrefix(t, "Brookfield First") }
 
 // BuildFeed is the feed for rows, as the notes records and the service's
-// answer (served, by row id) stand at now. A row with no passage cannot be
+// answer (served, by row id) stand at now; noNotes holds the ids of the rows of
+// sermons that have no notes. A row with no passage cannot be
 // asked about, so it is live when it has its link and the service holds every
 // row it can serve as rows.jsonl has it.
-func BuildFeed(rows []sources.Row, recs []Record, served map[string]servedRow, now time.Time) Feed {
+func BuildFeed(rows []sources.Row, recs []Record, noNotes map[string]bool, served map[string]servedRow, now time.Time) Feed {
 	mail := map[int]string{} // row index -> the title of its record
 	for _, rec := range recs {
 		if i := recordRow(rows, rec); i >= 0 {
@@ -114,6 +118,10 @@ func BuildFeed(rows []sources.Row, recs []Record, served map[string]servedRow, n
 			default:
 				label = "Online Service"
 			}
+		}
+		if noNotes[r.ID] {
+			hasMail = true
+			label += " (no notes)"
 		}
 		link := ""
 		if r.AltURL != nil && strings.HasPrefix(*r.AltURL, addressPrefix) {
@@ -198,7 +206,7 @@ func writeFeed(path string, f Feed) error {
 
 // feedService reads the rows, the records and the service, and writes the feed
 // to path.
-func feedService(rowsPath, notesPath, base, source, path string, now time.Time) error {
+func feedService(rowsPath, notesPath, noNotesPath, base, source, path string, now time.Time) error {
 	rows, err := readRows(rowsPath)
 	if err != nil {
 		return err
@@ -207,9 +215,13 @@ func feedService(rowsPath, notesPath, base, source, path string, now time.Time) 
 	if err != nil {
 		return err
 	}
+	noNotes, err := ReadNoNotes(noNotesPath)
+	if err != nil {
+		return err
+	}
 	served, err := fetchServed(&http.Client{Timeout: 60 * time.Second}, base, source)
 	if err != nil {
 		return err
 	}
-	return writeFeed(path, BuildFeed(rows, recs, served, now))
+	return writeFeed(path, BuildFeed(rows, recs, noNotes, served, now))
 }
