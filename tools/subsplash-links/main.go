@@ -3,7 +3,7 @@
 // sources/brookfield-first/rows.jsonl.
 //
 //	subsplash-links [--links <file>] [--pdf <file>]... [--rows rows.jsonl]
-//	                [--notes data/subsplash-notes.jsonl] [--cache <file>] [--dry-run]
+//	                [--notes data/subsplash-notes.jsonl] [--cache <file>] [--progress <file>] [--dry-run]
 //
 // The links come from --links (a file of short links, one a line, like
 // https://brookfieldfirst.subspla.sh/q59d572; a full subsplash.com sermon
@@ -41,6 +41,17 @@
 // The report is printed to standard output and ends with "N of M linked": the
 // rows that hold a Subsplash address, of all the rows.
 //
+// --progress <file> appends one JSON line to the file after a real run (never
+// after a dry run), so that a page can show how far the linking has got:
+//
+//	{"time":"2026-11-11T19:00:00Z","records":19,"links":205,"rows_linked":29,
+//	 "rows_total":354,"new":0,"oldest":"2026-02-01","newest":"2026-11-09"}
+//
+// records is the lines of the notes file; links the distinct sermon links read
+// (short links and full addresses); rows_linked the rows that hold a Subsplash
+// address, of rows_total; new the rows this run wrote; oldest and newest the
+// dates of the linked rows (null when none is linked).
+//
 // The link file, the PDFs and the cache are private: never commit them.
 package main
 
@@ -53,7 +64,9 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/Jonathan-A-White/sermon-index/internal/sources"
 )
@@ -68,6 +81,7 @@ const (
 type deps struct {
 	expander func(*Cache) *Expander
 	pdfToXML func(path string) ([]byte, error)
+	now      func() time.Time
 }
 
 func (d deps) withDefaults() deps {
@@ -76,6 +90,9 @@ func (d deps) withDefaults() deps {
 	}
 	if d.pdfToXML == nil {
 		d.pdfToXML = pdftohtml
+	}
+	if d.now == nil {
+		d.now = time.Now
 	}
 	return d
 }
@@ -109,8 +126,9 @@ func cli(args []string, stdout, stderr io.Writer, d deps) int {
 	rowsPath := fs.String("rows", defaultRows, "the rows to write alt_url to")
 	notesPath := fs.String("notes", defaultNotes, "the records file of tools/subsplash-notes (may be missing)")
 	cachePath := fs.String("cache", defaultCache, "the cache of code -> full address")
+	progressPath := fs.String("progress", "", "append one JSON line of progress to this file after a real run")
 	dry := fs.Bool("dry-run", false, "write nothing and make no request")
-	usage := "usage: subsplash-links [--links <file>] [--pdf <file>]... [--rows rows.jsonl] [--notes records.jsonl] [--cache <file>] [--dry-run]"
+	usage := "usage: subsplash-links [--links <file>] [--pdf <file>]... [--rows rows.jsonl] [--notes records.jsonl] [--cache <file>] [--progress <file>] [--dry-run]"
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -229,6 +247,18 @@ func cli(args []string, stdout, stderr io.Writer, d deps) int {
 				return fail(err)
 			}
 		}
+		if *progressPath != "" {
+			codes := map[string]bool{}
+			for c := range known {
+				codes[c] = true
+			}
+			for _, c := range in.Codes {
+				codes[c] = true
+			}
+			if err := appendProgress(*progressPath, progressLine(d.now(), len(recs), len(codes), rows, len(res.Set))); err != nil {
+				return fail(err)
+			}
+		}
 	}
 	fmt.Fprintf(stdout, "%d of %d linked\n", linked, len(rows))
 	return code
@@ -307,4 +337,60 @@ func readRows(path string) ([]sources.Row, error) {
 		return nil, err
 	}
 	return rf.rows, nil
+}
+
+// progress is one line of the --progress file.
+type progress struct {
+	Time       string  `json:"time"`
+	Records    int     `json:"records"`
+	Links      int     `json:"links"`
+	RowsLinked int     `json:"rows_linked"`
+	RowsTotal  int     `json:"rows_total"`
+	New        int     `json:"new"`
+	Oldest     *string `json:"oldest"`
+	Newest     *string `json:"newest"`
+}
+
+// progressLine counts the rows (as they stand after the run) that hold a
+// Subsplash address, and the oldest and newest date among them.
+func progressLine(now time.Time, records, links int, rows []sources.Row, written int) progress {
+	p := progress{Time: now.UTC().Format(time.RFC3339), Records: records, Links: links, RowsTotal: len(rows), New: written}
+	for _, r := range rows {
+		if r.AltURL == nil || !strings.HasPrefix(*r.AltURL, addressPrefix) {
+			continue
+		}
+		p.RowsLinked++
+		if r.Date == nil || *r.Date == "" {
+			continue
+		}
+		d := *r.Date
+		if p.Oldest == nil || d < *p.Oldest {
+			p.Oldest = &d
+		}
+		if p.Newest == nil || d > *p.Newest {
+			p.Newest = &d
+		}
+	}
+	return p
+}
+
+// appendProgress adds one line to the file, making its directory (0700) and
+// the file (0600) if they are not there.
+func appendProgress(path string, p progress) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return err
+	}
+	b, err := json.Marshal(p)
+	if err != nil {
+		return err
+	}
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
+	if err != nil {
+		return err
+	}
+	if _, err := f.Write(append(b, '\n')); err != nil {
+		f.Close()
+		return err
+	}
+	return f.Close()
 }

@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/Jonathan-A-White/sermon-index/internal/sources"
 )
@@ -319,5 +320,71 @@ func TestRunRecordsFileMayBeMissing(t *testing.T) {
 	var m map[string]any
 	if err := json.Unmarshal([]byte(strings.Split(mustRead(t, e.rows), "\n")[0]), &m); err != nil || m["alt_url"] == nil {
 		t.Errorf("row 1 = %v, %v", m, err)
+	}
+}
+
+// --progress appends one JSON line to a file after a real run: when, how many
+// notes records and links it read, how many rows hold a Subsplash address of
+// all the rows, how many this run wrote, and the oldest and newest date among
+// the linked rows. A second run appends a second line; a dry run none.
+func TestRunAppendsAProgressLine(t *testing.T) {
+	e := setup(t, links1)
+	prog := filepath.Join(e.dir, "state", "progress.jsonl")
+	if out, errs, code := e.run(t, "--links", e.links, "--dry-run", "--progress", prog); code != 0 {
+		t.Fatalf("dry run exit %d: %s%s", code, out, errs)
+	}
+	if _, err := os.Stat(prog); err == nil {
+		t.Fatal("a dry run wrote the progress file")
+	}
+	if out, errs, code := e.run(t, "--links", e.links, "--progress", prog); code != 0 {
+		t.Fatalf("exit %d: %s%s", code, out, errs)
+	}
+	if out, errs, code := e.run(t, "--links", e.links, "--progress", prog); code != 0 {
+		t.Fatalf("second run exit %d: %s%s", code, out, errs)
+	}
+	lines := strings.Split(strings.TrimRight(mustRead(t, prog), "\n"), "\n")
+	if len(lines) != 2 {
+		t.Fatalf("%d progress lines, want 2 (one a run):\n%s", len(lines), strings.Join(lines, "\n"))
+	}
+	var first, second map[string]any
+	if err := json.Unmarshal([]byte(lines[0]), &first); err != nil {
+		t.Fatalf("%q: %v", lines[0], err)
+	}
+	if err := json.Unmarshal([]byte(lines[1]), &second); err != nil {
+		t.Fatal(err)
+	}
+	// links1 holds 5 short links of the church (the example.org line is none),
+	// the notes file 1 record; v1, v2 and v5 are linked of 5 rows.
+	want := map[string]any{"records": 1.0, "links": 5.0, "rows_linked": 3.0, "rows_total": 5.0, "new": 3.0,
+		"oldest": "2031-03-02", "newest": "2031-04-06"}
+	for k, v := range want {
+		if first[k] != v {
+			t.Errorf("first line %s = %v, want %v\n%s", k, first[k], v, lines[0])
+		}
+	}
+	if second["new"] != 0.0 || second["rows_linked"] != 3.0 {
+		t.Errorf("a second run with nothing new: new = %v, rows_linked = %v\n%s", second["new"], second["rows_linked"], lines[1])
+	}
+	ts, _ := first["time"].(string)
+	if _, err := time.Parse(time.RFC3339, ts); err != nil {
+		t.Errorf("time %q is not RFC 3339: %v", ts, err)
+	}
+}
+
+// A run with nothing linked has no oldest or newest date.
+func TestRunProgressWithNothingLinked(t *testing.T) {
+	e := setup(t, "")
+	os.WriteFile(e.notes, nil, 0o644)
+	prog := filepath.Join(e.dir, "progress.jsonl")
+	os.WriteFile(e.links, []byte("https://brookfieldfirst.subspla.sh/nnn0000\n"), 0o644)
+	if out, errs, code := e.run(t, "--links", e.links, "--progress", prog); code != 0 {
+		t.Fatalf("exit %d: %s%s", code, out, errs)
+	}
+	var got map[string]any
+	if err := json.Unmarshal([]byte(strings.TrimSpace(mustRead(t, prog))), &got); err != nil {
+		t.Fatal(err)
+	}
+	if got["rows_linked"] != 0.0 || got["oldest"] != nil || got["newest"] != nil {
+		t.Errorf("nothing linked: %v", got)
 	}
 }
