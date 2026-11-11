@@ -217,45 +217,12 @@ func ReferenceToOSIS(s string) (string, error) {
 		return "", fmt.Errorf("reference '%s' is not one passage of a book, chapter and verses", s)
 	}
 	book := bookOSIS[strings.ToLower(strings.Join(strings.Fields(m[1]), " "))]
-	// A verse may carry a letter part ("10a", "4b"), which passage.VerseNumber
-	// drops; a chapter may not ("Isaiah 40a", "Isaiah 40-41a"), which
-	// passage.ChapterNumber refuses.
-	notOne := fmt.Errorf("reference '%s' is not one passage of a book, chapter and verses", s)
-	c1, v1, x, y := m[2], m[3], m[4], m[5]
-	var ref string
-	if v1 == "" {
-		ref = book + "." + c1
-		if x != "" {
-			c2, err := passage.ChapterNumber(x)
-			if err != nil {
-				return "", notOne
-			}
-			ref += "-" + book + "." + c2
-		}
-	} else {
-		v, err := passage.VerseNumber(v1)
-		if err != nil {
-			return "", notOne
-		}
-		ref = book + "." + c1 + "." + v
-		switch {
-		case x != "" && y == "":
-			v2, err := passage.VerseNumber(x)
-			if err != nil {
-				return "", notOne
-			}
-			ref += "-" + book + "." + c1 + "." + v2
-		case x != "":
-			c2, err := passage.ChapterNumber(x)
-			if err != nil {
-				return "", notOne
-			}
-			v2, err := passage.VerseNumber(y)
-			if err != nil {
-				return "", notOne
-			}
-			ref += "-" + book + "." + c2 + "." + v2
-		}
+	// A verse may carry a letter part ("10a", "4b"), which passage.RangeOSIS
+	// reads as its verse; a chapter may not ("Isaiah 40a", "Isaiah 40-41a"),
+	// which it refuses.
+	ref, err := passage.RangeOSIS(book, m[2], m[3], m[4], m[5])
+	if err != nil {
+		return "", fmt.Errorf("reference '%s' is not one passage of a book, chapter and verses", s)
 	}
 	r, err := passage.Parse(ref)
 	if err != nil {

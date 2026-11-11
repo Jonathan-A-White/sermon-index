@@ -153,6 +153,9 @@ func TestReferenceToOSIS(t *testing.T) {
 		"Genesis 2:8-17":      "Gen.2.8-Gen.2.17",
 		"John 3:16-4:3":       "John.3.16-John.4.3",
 		"Isaiah 40-41":        "Isa.40-Isa.41",
+		"Ephesians 4-5:14":    "Eph.4.1-Eph.5.14",
+		"Ephesians 4:1-5:14":  "Eph.4.1-Eph.5.14",
+		"Ephesians 4-5":       "Eph.4-Eph.5",
 		"Song of Songs 2:1-7": "Song.2.1-Song.2.7",
 		"  1 John 1:5 - 2:2 ": "1John.1.5-1John.2.2",
 		"2 Peter 2:4-10a":     "2Pet.2.4-2Pet.2.10",
@@ -172,7 +175,7 @@ func TestReferenceToOSIS(t *testing.T) {
 		}
 	}
 	for _, bad := range []string{"", "Hezekiah 3:1", "Romans 99:1", "Romans", "3:10-18", "Romans 5:8 and more", "Romans 5:8; John 3:16",
-		"Romans 5:8a; John 3:16", "Romans 5:8ab", "Romans 5:8-10a; John 3:16", "Isaiah 40a", "Isaiah 40-41a", "Romans 5:8 a", "Romans 5:8-"} {
+		"Romans 5:8a; John 3:16", "Romans 5:8ab", "Romans 5:8-10a; John 3:16", "Isaiah 40a", "Isaiah 40-41a", "Ephesians 4-5a:14", "Romans 5:8 a", "Romans 5:8-"} {
 		if got, err := ReferenceToOSIS(bad); err == nil {
 			t.Errorf("%q accepted as %q", bad, got)
 		}

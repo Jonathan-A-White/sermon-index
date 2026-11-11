@@ -413,47 +413,6 @@ var bookOSIS = func() map[string]string {
 	return m
 }()
 
-// textRef writes one match of passageRE (book, chapter, verse, then the
-// second number and the one after its colon) as an OSIS reference. A verse may
-// carry a letter and is read through passage.VerseNumber; a chapter may not.
-func textRef(book, c1, v1, x, y string) (string, error) {
-	if v1 == "" {
-		ref := book + "." + c1
-		if x != "" {
-			c2, err := passage.ChapterNumber(x)
-			if err != nil {
-				return "", err
-			}
-			ref += "-" + book + "." + c2
-		}
-		return ref, nil
-	}
-	v, err := passage.VerseNumber(v1)
-	if err != nil {
-		return "", err
-	}
-	ref := book + "." + c1 + "." + v
-	switch {
-	case x != "" && y == "":
-		v2, err := passage.VerseNumber(x)
-		if err != nil {
-			return "", err
-		}
-		ref += "-" + book + "." + c1 + "." + v2
-	case x != "":
-		c2, err := passage.ChapterNumber(x)
-		if err != nil {
-			return "", err
-		}
-		v2, err := passage.VerseNumber(y)
-		if err != nil {
-			return "", err
-		}
-		ref += "-" + book + "." + c2 + "." + v2
-	}
-	return ref, nil
-}
-
 // textPassages finds the passages a text names ("Genesis 18:16-33", "Psalm
 // 23", "Mark 6:35–44") as OSIS references, in the order they occur, and lists
 // separately the ones the book table refuses ("Romans 99:1"). A number with
@@ -461,7 +420,7 @@ func textRef(book, c1, v1, x, y string) (string, error) {
 func textPassages(s string) (refs, bad []string) {
 	for _, m := range passageRE.FindAllStringSubmatch(s, -1) {
 		book := bookOSIS[strings.ToLower(strings.Join(strings.Fields(m[1]), " "))]
-		ref, err := textRef(book, m[2], m[3], m[4], m[5])
+		ref, err := passage.RangeOSIS(book, m[2], m[3], m[4], m[5])
 		if err == nil {
 			var r passage.Range
 			r, err = passage.Parse(ref)

@@ -36,3 +36,59 @@ func ChapterNumber(s string) (string, error) {
 	}
 	return s, nil
 }
+
+// RangeOSIS writes one passage a person typed as an OSIS reference. The
+// arguments are the pieces a tool's grammar (built on NumberPattern) captured:
+// the book's OSIS name, the first chapter, the verse after its colon (or ""),
+// the number after the dash (or "") and the number after that number's colon
+// (or ""). The shapes are
+//
+//	4         chapter                   4:1       verse
+//	4-5       chapters                  4:1-10    verses of one chapter
+//	4:1-5:14  across chapters           4-5:14    chapter 4 verse 1 to 5:14
+//
+// A verse may carry a letter (VerseNumber); a chapter may not (ChapterNumber).
+// A number that cannot be read is an error, never a shorter reference.
+func RangeOSIS(book, c1, v1, x, y string) (string, error) {
+	if _, err := ChapterNumber(c1); err != nil {
+		return "", err
+	}
+	if v1 == "" {
+		switch {
+		case x == "" && y == "":
+			return book + "." + c1, nil
+		case y == "":
+			c2, err := ChapterNumber(x)
+			if err != nil {
+				return "", err
+			}
+			return book + "." + c1 + "-" + book + "." + c2, nil
+		}
+		// "4-5:14": from the start of chapter 4 to verse 14 of chapter 5.
+		v1 = "1"
+	}
+	v, err := VerseNumber(v1)
+	if err != nil {
+		return "", err
+	}
+	ref := book + "." + c1 + "." + v
+	switch {
+	case x != "" && y == "":
+		v2, err := VerseNumber(x)
+		if err != nil {
+			return "", err
+		}
+		ref += "-" + book + "." + c1 + "." + v2
+	case x != "":
+		c2, err := ChapterNumber(x)
+		if err != nil {
+			return "", err
+		}
+		v2, err := VerseNumber(y)
+		if err != nil {
+			return "", err
+		}
+		ref += "-" + book + "." + c2 + "." + v2
+	}
+	return ref, nil
+}
