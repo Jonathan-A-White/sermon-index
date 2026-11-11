@@ -501,4 +501,3 @@ func TestInstallEnablesTheHourlyTimerAndUninstallRemovesIt(t *testing.T) {
 		t.Errorf("uninstall did not disable the hourly timer:\n%s", r.calls())
 	}
 }
-
