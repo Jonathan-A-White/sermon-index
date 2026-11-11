@@ -31,7 +31,9 @@
 //
 // MATCHING. The slug is matched to the slug of a row's title; failing that,
 // to the slug of a title in the notes records (tools/subsplash-notes), and
-// that record's date finds the row. Two rows on one date, or none, are
+// that record's row id finds the row (the record's date is its Sunday, a row
+// may be dated the Saturday or the Monday); a record with no id, or an id no
+// row has, finds the row by its exact date. Two rows on one date, or none, are
 // reported, not written. The row's alt_url gets the full subsplash.com
 // address; url (YouTube) is never changed. A row that holds another alt_url
 // is a conflict and is left alone. A second run changes nothing.

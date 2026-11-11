@@ -29,7 +29,7 @@ func rows() []sources.Row {
 func recs() []Record {
 	return []Record{
 		{ID: "v2", Date: "2031-03-09", Title: "The Narrow Door", Ref: "Luke.13.22-Luke.13.30"},
-		{ID: "v3", Date: "2031-03-16", Title: "A Shared Sunday", Ref: "Luke.1.1"},
+		{ID: "", Date: "2031-03-16", Title: "A Shared Sunday", Ref: "Luke.1.1"},
 		{ID: "x", Date: "2031-03-30", Title: "The Lost Sheep", Ref: "Luke.15.1-Luke.15.7"},
 	}
 }
@@ -154,6 +154,40 @@ func TestLinkSameAddressTwice(t *testing.T) {
 	a := addr("aaa1111", "the-garden-gate")
 	res := Link(rows(), nil, []Address{a, a})
 	if len(res.Set) != 1 || len(res.Report) != 0 {
+		t.Errorf("set = %v, report = %v", res.Set, res.Report)
+	}
+}
+
+// A record's date is the Sunday, but a row may be dated the Saturday or the
+// Monday; the record's id names the row, and that row is the one linked.
+func TestLinkByRecordIDWhenRowIsOffTheSunday(t *testing.T) {
+	mk := func(id, title, date string) sources.Row {
+		return sources.Row{ID: id, Title: title, URL: "https://www.youtube.com/watch?v=" + id, Date: str(date)}
+	}
+	rs := []sources.Row{
+		mk("mon", "Brookfield First - Online Service | May 5, 2031", "2031-05-05"),
+		mk("sat", "Brookfield First - Online Service | May 10, 2031", "2031-05-10"),
+		mk("sun", "Brookfield First - Online Service | May 11, 2031", "2031-05-11"),
+	}
+	rc := []Record{
+		{ID: "mon", Date: "2031-05-04", Title: "Monday Child", Ref: "Luke.1.1"},
+		{ID: "sat", Date: "2031-05-11", Title: "Saturday Child", Ref: "Luke.1.2"},
+	}
+	res := Link(rs, rc, []Address{addr("mmm1111", "monday-child"), addr("sss2222", "saturday-child")})
+	if res.Set["mon"] != addr("mmm1111", "monday-child").URL || res.Set["sat"] != addr("sss2222", "saturday-child").URL || len(res.Set) != 2 {
+		t.Errorf("set = %v, report = %v", res.Set, res.Report)
+	}
+}
+
+// A record with no id, or an id no row has, falls back to its exact date.
+func TestLinkByRecordDateWhenIDIsMissingOrUnknown(t *testing.T) {
+	rs := rows()
+	rc := []Record{
+		{ID: "", Date: "2031-03-09", Title: "No Id Here", Ref: "Luke.1.1"},
+		{ID: "nobody", Date: "2031-03-23", Title: "Unknown Id", Ref: "Luke.1.2"},
+	}
+	res := Link(rs, rc, []Address{addr("ggg1111", "no-id-here"), addr("hhh2222", "unknown-id")})
+	if res.Set["v2"] != addr("ggg1111", "no-id-here").URL || res.Set["v5"] != addr("hhh2222", "unknown-id").URL {
 		t.Errorf("set = %v, report = %v", res.Set, res.Report)
 	}
 }

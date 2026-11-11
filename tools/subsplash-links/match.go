@@ -97,8 +97,11 @@ type claim struct {
 //
 //  1. a row whose title has the address's slug. Two such rows are reported,
 //     not guessed.
-//  2. else a record of the notes whose title has the slug, and the one row
-//     whose date is the record's date. Two rows on that date, or none, are
+//  2. else a record of the notes whose title has the slug, and the row the
+//     record's id names (the record's date is its Sunday, a row may be dated
+//     the Saturday or the Monday).
+//  3. else, for a record with no id or an id no row has, the one row whose
+//     date is the record's date. Two rows on that date, or none, are
 //     reported.
 //
 // A row whose alt_url holds another address, or that two links claim with
@@ -193,6 +196,13 @@ func find(rows []sources.Row, recs []Record, slug string) (int, string) {
 		return 0, fmt.Sprintf("%d notes have this title (dated %s and %s): not guessed", len(matched), matched[0].Date, matched[1].Date)
 	}
 	rec := matched[0]
+	if rec.ID != "" {
+		for i, r := range rows {
+			if r.ID == rec.ID {
+				return i, ""
+			}
+		}
+	}
 	var onDate []int
 	for i, r := range rows {
 		if r.Date != nil && *r.Date == rec.Date {
