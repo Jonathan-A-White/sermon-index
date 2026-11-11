@@ -45,7 +45,8 @@ type Alert struct {
 type Note struct {
 	AlertID     string
 	Title       string
-	Ref         string
+	Ref         string // the first place the passage names, as OSIS
+	Also        string // the other places it names, as OSIS joined by AlsoSep; empty for one place
 	Reference   string // the passage as the alert wrote it, for the report
 	Date        string
 	NotesSHA256 string
@@ -151,7 +152,7 @@ func (a Alert) note() (Note, error) {
 	if title == "" {
 		return Note{}, errors.New("no title")
 	}
-	ref, err := ReferenceToOSIS(a.Reference)
+	places, err := ReferencesToOSIS(a.Reference)
 	if err != nil {
 		return Note{}, err
 	}
@@ -164,7 +165,7 @@ func (a Alert) note() (Note, error) {
 	}
 	// The alert's own offset is Eastern: its date is the date the church's
 	// mail printed, not the UTC date of that instant.
-	n := Note{AlertID: a.ID, Title: title, Ref: ref, Reference: strings.TrimSpace(a.Reference), Date: t.Format("2006-01-02"), NotesSHA256: a.NotesSHA256, NotesSize: a.NotesSize}
+	n := Note{AlertID: a.ID, Title: title, Ref: places[0], Also: strings.Join(places[1:], AlsoSep), Reference: strings.TrimSpace(a.Reference), Date: t.Format("2006-01-02"), NotesSHA256: a.NotesSHA256, NotesSize: a.NotesSize}
 	switch {
 	case a.NotesSHA256 == "" && a.NotesSize == 0:
 	case a.NotesSHA256 == "" || a.NotesSize == 0:
@@ -202,6 +203,66 @@ var bookOSIS = func() map[string]string {
 	}
 	return m
 }()
+
+// AlsoSep joins the OSIS references of a note's other places in Note.Also and
+// Record.Also (a string, so a Note and a Record still compare by ==).
+const AlsoSep = ";"
+
+var contRE = regexp.MustCompile(`^(` + passage.NumberPattern + `)(?::(` + passage.NumberPattern + `))?(?:\s*[-–—]\s*(` + passage.NumberPattern + `)(?::(` + passage.NumberPattern + `))?)?$`)
+
+// ReferencesToOSIS reads the passage field of a notes mail, which may name
+// several places separated by '/', ';' or ',' ("Matthew 6:9/Romans 8:14-16",
+// "2 Corinthians 2:15; 10:13-16", "John 3:16, 18"), as one OSIS reference per
+// place, in the order written. A place with no book carries the book of the
+// one before it; one with a chapter and a colon ("10:13-16") is that chapter's
+// verses, and a bare number ("18", "13-16") is a verse of the chapter before
+// it when that place named verses, otherwise a chapter. One place is what
+// ReferenceToOSIS reads. A place that cannot be read refuses the whole field,
+// naming it: no place is dropped silently.
+func ReferencesToOSIS(s string) ([]string, error) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return nil, errors.New("no reference")
+	}
+	var out []string
+	var book, chapter string
+	var hadVerse bool
+	for _, piece := range strings.FieldsFunc(s, func(r rune) bool { return r == '/' || r == ';' || r == ',' }) {
+		piece = strings.TrimSpace(piece)
+		var osis string
+		var err error
+		if m := refRE.FindStringSubmatch(piece); m != nil {
+			book = bookOSIS[strings.ToLower(strings.Join(strings.Fields(m[1]), " "))]
+			chapter, hadVerse = m[2], m[3] != ""
+			osis, err = passage.RangeOSIS(book, m[2], m[3], m[4], m[5])
+		} else if m := contRE.FindStringSubmatch(piece); m != nil && book != "" {
+			switch {
+			case m[2] != "": // 10:13-16
+				chapter, hadVerse = m[1], true
+				osis, err = passage.RangeOSIS(book, m[1], m[2], m[3], m[4])
+			case hadVerse: // 18, 13-16: verses of the chapter before
+				osis, err = passage.RangeOSIS(book, chapter, m[1], m[3], m[4])
+			default: // a chapter after a chapter
+				chapter = m[1]
+				osis, err = passage.RangeOSIS(book, m[1], "", m[3], m[4])
+			}
+		} else {
+			return nil, fmt.Errorf("reference '%s' is not one passage of a book, chapter and verses (the place '%s' cannot be read)", s, piece)
+		}
+		if err != nil {
+			return nil, fmt.Errorf("reference '%s' is not one passage of a book, chapter and verses (the place '%s': %v)", s, piece, err)
+		}
+		r, err := passage.Parse(osis)
+		if err != nil {
+			return nil, fmt.Errorf("reference '%s' is refused: %w", s, err)
+		}
+		out = append(out, r.OSIS)
+	}
+	if len(out) == 0 {
+		return nil, fmt.Errorf("reference '%s' is not one passage of a book, chapter and verses", s)
+	}
+	return out, nil
+}
 
 // ReferenceToOSIS reads one passage as Subsplash prints it ("2 Peter
 // 3:10-18", "Psalm 23", "John 3:16-4:3", "2 Peter 2:4-10a") as an OSIS

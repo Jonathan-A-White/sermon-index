@@ -19,7 +19,8 @@ type Record struct {
 	ID    string `json:"id"` // the YouTube row's id
 	Date  string `json:"date"`
 	Title string `json:"title"`
-	Ref   string `json:"ref"`
+	Ref   string `json:"ref"`            // the first place the mail's passage names
+	Also  string `json:"also,omitempty"` // its other places, joined by AlsoSep; empty for one place
 }
 
 // SundayOf is the sermon's Sunday for an alert date: a Sunday stays, a
@@ -68,7 +69,7 @@ func Match(n Note, rows []sources.Row) (Record, error) {
 	case 0:
 		return Record{}, noRowError{sunday}
 	case 1:
-		return Record{ID: hits[0], Date: sunday, Title: n.Title, Ref: n.Ref}, nil
+		return Record{ID: hits[0], Date: sunday, Title: n.Title, Ref: n.Ref, Also: n.Also}, nil
 	}
 	sort.Strings(hits)
 	return Record{}, fmt.Errorf("more than one row within one day of Sunday %s (%s): not guessed", sunday, strings.Join(hits, ", "))
@@ -115,7 +116,7 @@ func MatchNote(n Note, rows []sources.Row) (rec Record, how string, err error) {
 			continue
 		}
 		rowDate[r.ID] = *r.Date
-		if r.Ref != nil && *r.Ref == n.Ref {
+		if sharesPlace(n, r) {
 			same = append(same, r.ID)
 		} else {
 			otherPassage = append(otherPassage, r.ID)
@@ -131,7 +132,7 @@ func MatchNote(n Note, rows []sources.Row) (rec Record, how string, err error) {
 	}
 	switch {
 	case len(same) == 1:
-		return Record{ID: same[0], Date: nr.sunday, Title: n.Title, Ref: n.Ref},
+		return Record{ID: same[0], Date: nr.sunday, Title: n.Title, Ref: n.Ref, Also: n.Also},
 			fmt.Sprintf("matched by title and passage, row dated %s, mail dated %s", rowDate[same[0]], n.Date), nil
 	case len(same) > 1:
 		return Record{}, "", fmt.Errorf("%w; more than one row within %d days has its title and passage (%s): not guessed", err, TitleWindowDays, name(same))
@@ -139,6 +140,27 @@ func MatchNote(n Note, rows []sources.Row) (rec Record, how string, err error) {
 		return Record{}, "", fmt.Errorf("%w; within %d days only a row with its title and another passage (%s): not guessed", err, TitleWindowDays, name(otherPassage))
 	}
 	return Record{}, "", err
+}
+
+// sharesPlace is whether the row's passage, or one it cites, is any of the
+// places the note's passage names.
+func sharesPlace(n Note, r sources.Row) bool {
+	places := []string{n.Ref}
+	if n.Also != "" {
+		places = append(places, strings.Split(n.Also, AlsoSep)...)
+	}
+	have := append([]string{}, r.Cited...)
+	if r.Ref != nil {
+		have = append(have, *r.Ref)
+	}
+	for _, h := range have {
+		for _, p := range places {
+			if h == p {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // foldTitle is a title with case, punctuation and spacing folded away.
