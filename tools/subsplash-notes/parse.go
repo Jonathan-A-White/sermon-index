@@ -46,17 +46,62 @@ type Note struct {
 	AlertID     string
 	Title       string
 	Ref         string
+	Reference   string // the passage as the alert wrote it, for the report
 	Date        string
 	NotesSHA256 string
 	NotesSize   int
 }
 
 // Problem is an alert the reader dropped, and why. Why never repeats a
-// field's value other than the reference the alert printed.
+// field's value other than the reference the alert printed. Says is what the
+// alert itself says (see Says), empty when it says nothing readable.
 type Problem struct {
 	AlertID string
 	Why     string
+	Says    string
 }
+
+// Says is what an alert says of its sermon, for a reported line: its title,
+// its passage as written and the date of its mail, each quoted so a stray
+// newline cannot split the line. Subsplash's pages are not read, so this is
+// the only way to tell which sermon a reported alert carries. An empty field
+// is left out; the date is the day the alert's own offset prints.
+func Says(title, reference, when string) string {
+	var parts []string
+	if t := strings.TrimSpace(title); t != "" {
+		parts = append(parts, fmt.Sprintf("title %q", t))
+	}
+	if r := strings.TrimSpace(reference); r != "" {
+		parts = append(parts, fmt.Sprintf("passage %q", r))
+	}
+	if when = strings.TrimSpace(when); when != "" {
+		if t, err := time.Parse(time.RFC3339, when); err == nil {
+			when = t.Format(dateLayout)
+		}
+		parts = append(parts, fmt.Sprintf("mail dated %q", when))
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return strings.Join(parts, ", ")
+}
+
+// alertSays reads title, reference and when out of a raw alert as far as they
+// are strings, whatever else the alert holds.
+func alertSays(raw []byte) string {
+	var a struct {
+		Title     string `json:"title"`
+		Reference string `json:"reference"`
+		When      string `json:"when"`
+	}
+	if json.Unmarshal(raw, &a) != nil {
+		return ""
+	}
+	return Says(a.Title, a.Reference, a.When)
+}
+
+// Says is what the note's alert says of it.
+func (n Note) Says() string { return Says(n.Title, n.Reference, n.Date) }
 
 // ReadAlerts reads the body of GET /api/alerts ({"alerts": [...], "next": n})
 // and returns the notes of its sermon-notes alerts. An alert of any other kind
@@ -78,7 +123,7 @@ func ReadAlerts(r io.Reader) ([]Note, []Problem, error) {
 			Kind string `json:"kind"`
 		}
 		if err := json.Unmarshal(raw, &head); err != nil {
-			problems = append(problems, Problem{fmt.Sprintf("#%d", i+1), "not an alert object"})
+			problems = append(problems, Problem{fmt.Sprintf("#%d", i+1), "not an alert object", ""})
 			continue
 		}
 		if head.Kind != KindSermonNotes {
@@ -88,12 +133,12 @@ func ReadAlerts(r io.Reader) ([]Note, []Problem, error) {
 		dec.DisallowUnknownFields()
 		var a Alert
 		if err := dec.Decode(&a); err != nil {
-			problems = append(problems, Problem{head.ID, "dropped: " + err.Error() + " (the reader takes only title, reference, when, notes_sha256 and notes_size)"})
+			problems = append(problems, Problem{head.ID, "dropped: " + err.Error() + " (the reader takes only title, reference, when, notes_sha256 and notes_size)", alertSays(raw)})
 			continue
 		}
 		n, err := a.note()
 		if err != nil {
-			problems = append(problems, Problem{a.ID, "dropped: " + err.Error()})
+			problems = append(problems, Problem{a.ID, "dropped: " + err.Error(), Says(a.Title, a.Reference, a.When)})
 			continue
 		}
 		notes = append(notes, n)
@@ -119,7 +164,7 @@ func (a Alert) note() (Note, error) {
 	}
 	// The alert's own offset is Eastern: its date is the date the church's
 	// mail printed, not the UTC date of that instant.
-	n := Note{AlertID: a.ID, Title: title, Ref: ref, Date: t.Format("2006-01-02"), NotesSHA256: a.NotesSHA256, NotesSize: a.NotesSize}
+	n := Note{AlertID: a.ID, Title: title, Ref: ref, Reference: strings.TrimSpace(a.Reference), Date: t.Format("2006-01-02"), NotesSHA256: a.NotesSHA256, NotesSize: a.NotesSize}
 	switch {
 	case a.NotesSHA256 == "" && a.NotesSize == 0:
 	case a.NotesSHA256 == "" || a.NotesSize == 0:
