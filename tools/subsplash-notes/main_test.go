@@ -420,3 +420,27 @@ func TestAReportedLineQuotesATitleWithControlCharacters(t *testing.T) {
 		t.Errorf("title not quoted: %s", line)
 	}
 }
+
+// A mail a week off its row's date, with the same title and passage, is kept
+// under that row's id, claimed, and its line says it was matched that way.
+func TestFetchMatchesByTitleAndPassageWhenTheDateIsAWeekOff(t *testing.T) {
+	r := newNotesRun(t, alertsJSON(notesAlert("n1", 1, "The Garden Gate", "Genesis 2:8-17", "2031-03-02T00:00:00-05:00", hexSum(pdf1), len(pdf1))))
+	rows := `{"id":"v9","title":"The garden gate","ref":"Gen.2.8-Gen.2.17","url":"https://example.com/9","date":"2031-03-09"}` + "\n"
+	code, out, errOut := r.fetchWithRows(t, rows)
+	if code != 0 {
+		t.Fatalf("fetch exited %d: %s", code, errOut)
+	}
+	line := reportedLine(t, errOut, "n1")
+	if !strings.Contains(line, "matched by title and passage, row dated 2031-03-09, mail dated 2031-03-02") {
+		t.Errorf("the line: %s", line)
+	}
+	if got := mustRead(t, filepath.Join(r.notes, "v9.pdf")); got != string(pdf1) {
+		t.Errorf("the PDF kept is %q", got)
+	}
+	if want := `{"id":"v9","date":"2031-03-02","title":"The Garden Gate","ref":"Gen.2.8-Gen.2.17"}` + "\n"; mustRead(t, r.records) != want {
+		t.Errorf("records:\n%s", mustRead(t, r.records))
+	}
+	if strings.Join(r.f.claimed, ",") != "n1" || !strings.Contains(out, "1 claimed") {
+		t.Errorf("claimed %v, stdout %q", r.f.claimed, out)
+	}
+}
