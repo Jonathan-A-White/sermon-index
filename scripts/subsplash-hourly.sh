@@ -29,12 +29,16 @@
 #   5. if rows.jsonl changed: commits it ('Subsplash links: N new (hourly)')
 #      and pushes, so the tree is never left dirty; a commit the remote does not
 #      have yet (a refused push) is pushed by the next run;
-#   6. loads sources/brookfield-first into the live database (sermons load, with
-#      DATABASE_URL from ~/.config/sermon-index/env in a subshell), but only if
-#      rows.jsonl is not the file the last load put there: the git hash of what
-#      was loaded is kept in .../subsplash-loaded, written only after a good
-#      load, so a failed load is tried again next hour and a run with nothing
-#      new loads nothing.
+#   6. asks the live service (SERMONS_URL, default https://sermons.allmymind.org)
+#      for every Brookfield row it serves and compares each with rows.jsonl
+#      (title, ref, date, preacher, url, alt_url: subsplash-links --compare).
+#      If any differs, whatever wrote the row, it loads sources/brookfield-first
+#      into the live database (sermons load, with DATABASE_URL from
+#      ~/.config/sermon-index/env in a subshell) and compares again; if rows
+#      still differ it writes one line naming the count and up to five row ids
+#      and fails, which is the alarm. With the two equal nothing is loaded. A
+#      service that cannot be asked fails the run; the git hash of the last load
+#      (.../subsplash-loaded) is then the guide to whether to load.
 # A failed step does not hide the later ones that can still run (a Postern that
 # is down does not stop the inbox's links); the script exits 1 at the end if
 # any step failed, and the timer's OnFailure= tells the Mayor.
@@ -54,6 +58,7 @@ INBOX=${POSTERN_INBOX:-$H/.local/state/mw/postern/inbox}
 BRANCH=${HOURLY_BRANCH:-main}
 GO=${GO:-go}
 SERMONS=${SERMONS:-sermons}
+SERVICE=${SERMONS_URL:-https://sermons.allmymind.org}
 ENVFILE=$H/.config/sermon-index/env
 ROWS=sources/brookfield-first/rows.jsonl
 SRC=sources/brookfield-first
@@ -136,27 +141,72 @@ if [ -n "$(git rev-list "origin/$BRANCH..HEAD")" ]; then
 	fi
 fi
 
-# 6. Load, only when rows.jsonl is not what the last load put in the database.
+# 6. Load what the live service lacks. THE SERVICE decides, not this run's own
+# changes: a row written by a story, a hand edit or the refresh is as unloaded as
+# one this run wrote. subsplash-links --compare asks the service
+# ($SERVICE/v1/sermons) for every Brookfield row it serves and sets it beside
+# rows.jsonl (title, ref, date, preacher, url, alt_url); if any differs it is
+# loaded, and the two are compared again. If rows still differ the run says so
+# in one line (the count and up to five row ids) and fails, which is the alarm:
+# the unit's OnFailure=. The git hash of what was last loaded (.../subsplash-loaded,
+# written after a good load and by the refresh) is only the fallback for a
+# service that cannot be asked: the load goes on when the hash says it is new.
+compare() {
+	cmp_n=
+	cmp_ids=
+	if "$GO" run ./tools/subsplash-links --compare "$SERVICE" --rows "$ROWS" > "$TMP/compare.out" 2> "$TMP/compare.err"; then
+		cmp_n=$(sed -n 's/^compare: \([0-9][0-9]*\) of .*/\1/p' "$TMP/compare.out" | head -n 1)
+		cmp_ids=$(sed -n 's/^ids: //p' "$TMP/compare.out" | head -n 1)
+		[ -n "$cmp_n" ] && return 0
+	fi
+	echo "subsplash-hourly: cannot compare rows.jsonl with $SERVICE: $(head -n 3 "$TMP/compare.err" | tr '\n' ' ')" >&2
+	return 1
+}
+
 want=$(git hash-object -- "$ROWS")
 have=$(cat "$LOADED" 2>/dev/null || true)
-if [ "$want" = "$have" ]; then
-	say "rows.jsonl is what the database holds; nothing loaded"
-elif [ ! -r "$ENVFILE" ]; then
-	echo "subsplash-hourly: cannot read $ENVFILE; $SRC was not loaded" >&2
-	status=1
-elif (
-	set -a
-	# shellcheck disable=SC1090
-	. "$ENVFILE"
-	set +a
-	exec "$SERMONS" load "$ROOT/$SRC"
-); then
-	echo "$want" > "$LOADED.new"
-	mv "$LOADED.new" "$LOADED"
-	say "loaded $ROOT/$SRC into the database"
+need=
+if compare; then
+	if [ "$cmp_n" = 0 ]; then
+		say "the service holds rows.jsonl as it is; nothing loaded"
+		echo "$want" > "$LOADED.new"
+		mv "$LOADED.new" "$LOADED"
+	else
+		say "$cmp_n row(s) differ from the service ($cmp_ids); loading"
+		need=1
+	fi
 else
-	echo "subsplash-hourly: sermons load $ROOT/$SRC failed (see above); the next run loads again" >&2
 	status=1
+	[ "$want" = "$have" ] || need=1
+fi
+if [ -n "$need" ]; then
+	if [ ! -r "$ENVFILE" ]; then
+		echo "subsplash-hourly: cannot read $ENVFILE; $SRC was not loaded" >&2
+		status=1
+	elif (
+		set -a
+		# shellcheck disable=SC1090
+		. "$ENVFILE"
+		set +a
+		exec "$SERMONS" load "$ROOT/$SRC"
+	); then
+		echo "$want" > "$LOADED.new"
+		mv "$LOADED.new" "$LOADED"
+		say "loaded $ROOT/$SRC into the database"
+		if compare; then
+			if [ "$cmp_n" = 0 ]; then
+				say "the service now holds rows.jsonl as it is"
+			else
+				echo "subsplash-hourly: after the load $cmp_n row(s) still differ from the service ($cmp_ids)" >&2
+				status=1
+			fi
+		else
+			status=1
+		fi
+	else
+		echo "subsplash-hourly: sermons load $ROOT/$SRC failed (see above); the next run loads again" >&2
+		status=1
+	fi
 fi
 
 [ "$status" = 0 ] || die "done with errors (see above)"

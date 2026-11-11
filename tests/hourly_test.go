@@ -11,9 +11,12 @@ package tests
 import (
 	"bufio"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -51,12 +54,15 @@ echo "sermons $*" >> "$FAKE_LOG"
 [ -n "$DATABASE_URL" ] && echo "database-url-in-environment" >> "$FAKE_LOG"
 [ "$(git -C "$HOURLY_ROOT" rev-parse HEAD)" = "$(git -C "$HOURLY_ROOT" rev-parse origin/main)" ] && echo "load-after-push" >> "$FAKE_LOG"
 if [ "$FAKE_LOAD" = fail ]; then echo "sermons: load: the database refused" >&2; exit 1; fi
+# A load puts the file in the fake service, unless the service ignores loads.
+[ "$FAKE_LOAD_IGNORED" = 1 ] || cp "$HOURLY_ROOT/sources/brookfield-first/rows.jsonl" "$FAKE_SERVICE"
 echo "loaded"
 `
 
-const hourlyRows = `{"id":"v1","title":"The Garden Gate","url":"https://www.youtube.com/watch?v=v1","kind":"link","date":"2031-03-02"}
-{"id":"v2","title":"Brookfield First - Online Service | March 9, 2031","url":"https://www.youtube.com/watch?v=v2","kind":"link","date":"2031-03-09"}
-{"id":"v5","title":"God's Quiet Work","url":"https://www.youtube.com/watch?v=v5","kind":"link","date":"2031-04-06"}
+const hourlyRows = `{"id":"v1","title":"The Garden Gate","ref":"Gen.2.8-Gen.2.15","url":"https://www.youtube.com/watch?v=v1","kind":"link","date":"2031-03-02"}
+{"id":"v2","title":"Brookfield First - Online Service | March 9, 2031","ref":"Luke.13.22-Luke.13.30","url":"https://www.youtube.com/watch?v=v2","kind":"link","date":"2031-03-09"}
+{"id":"v5","title":"God's Quiet Work","ref":"Mark.1.1-Mark.1.8","url":"https://www.youtube.com/watch?v=v5","kind":"link","date":"2031-04-06"}
+{"id":"v6","title":"No Passage Named","url":"https://www.youtube.com/watch?v=v6","kind":"link","date":"2031-04-13"}
 `
 
 const hourlyRecord = `{"id":"v2","date":"2031-03-09","title":"The Narrow Door","ref":"Luke.13.22-Luke.13.30"}`
@@ -68,7 +74,55 @@ const hourlyCache = `{"code":"aaa1111","address":"https://subsplash.com/u/brookf
 
 type hourlyRig struct {
 	*refreshRig
-	inbox string
+	inbox   string
+	service string // the file the fake service serves: a rows.jsonl as the last load left it
+}
+
+// fakeService answers GET /v1/sermons as the real service does for a row with
+// a passage: the rows of the file at path that have a ref and are not a
+// series, paged by limit and offset. A row with no ref is never served, as in
+// the real service.
+func fakeService(t *testing.T, path string) *httptest.Server {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/sermons" || r.URL.Query().Get("source") != "brookfield-first" || r.URL.Query().Get("ref") == "" {
+			http.Error(w, `{"error":"bad_ref"}`, http.StatusBadRequest)
+			return
+		}
+		b, err := os.ReadFile(path)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		var all []map[string]any
+		for _, line := range strings.Split(string(b), "\n") {
+			if strings.TrimSpace(line) == "" {
+				continue
+			}
+			var m map[string]any
+			if err := json.Unmarshal([]byte(line), &m); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			if m["ref"] == nil || m["series"] == true {
+				continue
+			}
+			all = append(all, map[string]any{"source": "brookfield-first", "id": m["id"], "title": m["title"], "preacher": m["preacher"],
+				"date": m["date"], "url": m["url"], "alt_url": m["alt_url"], "kind": m["kind"], "ref": m["ref"], "role": "text", "width": 1})
+		}
+		limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+		offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+		if limit < 1 || limit > 200 {
+			limit = 50
+		}
+		page := []map[string]any{}
+		for i := offset; i < len(all) && i < offset+limit; i++ {
+			page = append(page, all[i])
+		}
+		json.NewEncoder(w).Encode(map[string]any{"ref": r.URL.Query().Get("ref"), "total": len(all), "rows": page})
+	}))
+	t.Cleanup(srv.Close)
+	return srv
 }
 
 func newHourlyRig(t *testing.T) *hourlyRig {
@@ -105,7 +159,13 @@ func newHourlyRig(t *testing.T) *hourlyRig {
 	if err := os.WriteFile(filepath.Join(r.clone, "data/subsplash-links-cache.jsonl"), []byte(hourlyCache), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	r.env = append(r.env, "HOURLY_ROOT="+r.clone, "LINKS_BIN="+bin, "FAKE_NOTES_RECORDS="+hourlyRecord)
+	// The fake service holds what the last load left: the committed rows.
+	h.service = filepath.Join(t.TempDir(), "service-rows.jsonl")
+	if err := os.WriteFile(h.service, []byte(hourlyRows), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	srv := fakeService(t, h.service)
+	r.env = append(r.env, "HOURLY_ROOT="+r.clone, "LINKS_BIN="+bin, "FAKE_NOTES_RECORDS="+hourlyRecord, "SERMONS_URL="+srv.URL, "FAKE_SERVICE="+h.service)
 	h.message("m1", "https://brookfieldfirst.subspla.sh/aaa1111")
 	h.message("m2", "Look at this one https://brookfieldfirst.subspla.sh/bbb2222 and a stranger https://example.org/zzz")
 	return h
@@ -207,7 +267,7 @@ func TestHourlyRunsInOrderCommitsPushesLoadsAndTheSecondRunDoesNothing(t *testin
 	if len(p) != 1 {
 		t.Fatalf("%d progress lines, want 1", len(p))
 	}
-	for k, v := range map[string]any{"records": 1.0, "links": 2.0, "rows_linked": 2.0, "rows_total": 3.0, "new": 2.0, "oldest": "2031-03-02", "newest": "2031-03-09"} {
+	for k, v := range map[string]any{"records": 1.0, "links": 2.0, "rows_linked": 2.0, "rows_total": 4.0, "new": 2.0, "oldest": "2031-03-02", "newest": "2031-03-09"} {
 		if p[0][k] != v {
 			t.Errorf("progress %s = %v, want %v: %v", k, p[0][k], v, p[0])
 		}
@@ -248,6 +308,179 @@ func TestHourlyRunsInOrderCommitsPushesLoadsAndTheSecondRunDoesNothing(t *testin
 	}
 	if n := strings.Count(h.calls(), "sermons load"); n != 1 {
 		t.Errorf("third run loaded %d times, want 1:\n%s", n, h.calls())
+	}
+}
+
+// seedAltURLs writes alt_url on two committed rows and pushes, as a story or
+// a hand edit would, without the hourly run's own links: the service (still
+// holding the rows without them) lacks them. No inbox message, no record.
+func seedAltURLs(t *testing.T, h *hourlyRig) {
+	t.Helper()
+	rows := h.file("sources/brookfield-first/rows.jsonl")
+	rows = strings.Replace(rows, `"kind":"link","date":"2031-03-02"`, `"alt_url":"https://subsplash.com/u/brookfieldfirst/media/d/aaa1111-the-garden-gate","kind":"link","date":"2031-03-02"`, 1)
+	rows = strings.Replace(rows, `"kind":"link","date":"2031-04-06"`, `"alt_url":"https://subsplash.com/u/brookfieldfirst/media/d/ccc3333-gods-quiet-work","kind":"link","date":"2031-04-06"`, 1)
+	if err := os.WriteFile(filepath.Join(h.clone, "sources/brookfield-first/rows.jsonl"), []byte(rows), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	git(t, h.clone, "commit", "-qam", "alt_url written by something else")
+	git(t, h.clone, "push", "-q", "origin", "main")
+	for _, f := range []string{"m1.message.json", "m2.message.json"} {
+		os.Remove(filepath.Join(h.inbox, f))
+	}
+}
+
+// markLoaded writes the hash of rows.jsonl as the file of what the last load
+// put in the database, as the refresh does after its load.
+func markLoaded(t *testing.T, h *hourlyRig) {
+	t.Helper()
+	state := filepath.Join(h.home, ".local/state/sermon-index")
+	os.MkdirAll(state, 0o755)
+	os.WriteFile(filepath.Join(state, "subsplash-loaded"), []byte(git(t, h.clone, "hash-object", "sources/brookfield-first/rows.jsonl")+"\n"), 0o644)
+}
+
+// The story's acceptance 1: rows.jsonl holds alt_urls the service lacks, and
+// the run found nothing new from mail or links (it commits nothing); it loads
+// brookfield-first all the same, and the service then holds them. A second run
+// finds the two equal and loads nothing (acceptance 2).
+func TestHourlyLoadsWhatDiffersFromTheServiceWithNothingNewOfItsOwn(t *testing.T) {
+	h := newHourlyRig(t)
+	seedAltURLs(t, h)
+	h.env = append(h.env, "FAKE_NOTES_RECORDS=")
+	// The hash of what the last load put there says "nothing to load", as it
+	// did when 59.3's landing wrote the rows: the hash is not what decides.
+	markLoaded(t, h)
+	commits := h.commits()
+	out, code := h.hourly()
+	if code != 0 {
+		t.Fatalf("exit %d:\n%s", code, out)
+	}
+	if h.commits() != commits {
+		t.Error("the run committed though it had nothing new")
+	}
+	if n := strings.Count(h.calls(), "sermons load "+h.clone+"/sources/brookfield-first"); n != 1 {
+		t.Fatalf("loaded %d times, want 1 (the service lacked two alt_urls):\n%s\n%s", n, h.calls(), out)
+	}
+	if !strings.Contains(out, "2 of 3") && !strings.Contains(out, "2 rows") {
+		t.Logf("journal:\n%s", out)
+	}
+	if got, _ := os.ReadFile(h.service); !strings.Contains(string(got), "aaa1111-the-garden-gate") {
+		t.Errorf("the service does not hold the alt_url after the load:\n%s", got)
+	}
+
+	// Acceptance 2: with the two equal, nothing is loaded.
+	h.clearLog()
+	if out, code = h.hourly(); code != 0 {
+		t.Fatalf("second run exit %d:\n%s", code, out)
+	}
+	if strings.Contains(h.calls(), "sermons") {
+		t.Errorf("a run with the service equal to rows.jsonl loaded:\n%s", h.calls())
+	}
+}
+
+// Every field the service serves counts: a title, a date, a preacher, a url or
+// a ref that differs is loaded, and a row with no passage (never served) does
+// not make the run load forever.
+func TestHourlyComparesEveryServedField(t *testing.T) {
+	for name, edit := range map[string][2]string{
+		"title":    {`"title":"The Garden Gate"`, `"title":"The Garden Gate, Revised"`},
+		"date":     {`"date":"2031-03-02"`, `"date":"2031-03-03"`},
+		"url":      {`v=v1"`, `v=v1x"`},
+		"ref":      {`"ref":"Gen.2.8-Gen.2.15"`, `"ref":"Gen.2.8-Gen.2.16"`},
+		"preacher": {`"kind":"link","date":"2031-03-02"`, `"preacher":"Pat Doe","kind":"link","date":"2031-03-02"`},
+	} {
+		t.Run(name, func(t *testing.T) {
+			h := newHourlyRig(t)
+			seedAltURLs(t, h)
+			rows := strings.Replace(h.file("sources/brookfield-first/rows.jsonl"), edit[0], edit[1], 1)
+			os.WriteFile(filepath.Join(h.clone, "sources/brookfield-first/rows.jsonl"), []byte(rows), 0o644)
+			git(t, h.clone, "commit", "-qam", "edit")
+			git(t, h.clone, "push", "-q", "origin", "main")
+			// The service already has the alt_urls; only the one field differs.
+			os.WriteFile(h.service, []byte(strings.Replace(rows, edit[1], edit[0], 1)), 0o644)
+			h.env = append(h.env, "FAKE_NOTES_RECORDS=")
+			markLoaded(t, h)
+			if out, code := h.hourly(); code != 0 {
+				t.Fatalf("exit %d:\n%s", code, out)
+			}
+			if n := strings.Count(h.calls(), "sermons load"); n != 1 {
+				t.Errorf("a differing %s was loaded %d times, want 1:\n%s", name, n, h.calls())
+			}
+		})
+	}
+}
+
+// Acceptance 3: a load after which the service still differs (a fake service
+// that ignores it) is one journal line naming the count and up to five row
+// ids, and the run fails, so the unit's OnFailure= tells the Mayor.
+func TestHourlyAlarmsWhenTheServiceStillDiffersAfterTheLoad(t *testing.T) {
+	h := newHourlyRig(t)
+	seedAltURLs(t, h)
+	h.env = append(h.env, "FAKE_NOTES_RECORDS=", "FAKE_LOAD_IGNORED=1")
+	out, code := h.hourly()
+	if code == 0 {
+		t.Fatalf("exit 0 though the service still differs after the load:\n%s", out)
+	}
+	var lines []string
+	for _, l := range strings.Split(out, "\n") {
+		if strings.Contains(l, "still differ") {
+			lines = append(lines, l)
+		}
+	}
+	if len(lines) != 1 {
+		t.Fatalf("%d journal lines say the rows still differ, want 1:\n%s", len(lines), out)
+	}
+	for _, want := range []string{"2 ", "v1", "v5"} {
+		if !strings.Contains(lines[0], want) {
+			t.Errorf("the line lacks %q: %s", want, lines[0])
+		}
+	}
+	if strings.Contains(lines[0], "v2") {
+		t.Errorf("the line names a row that matches: %s", lines[0])
+	}
+	if n := strings.Count(h.calls(), "sermons load"); n != 1 {
+		t.Errorf("loaded %d times, want 1 (no retry loop):\n%s", n, h.calls())
+	}
+}
+
+// The line names at most five ids but counts them all.
+func TestHourlyAlarmNamesFiveIDsAtMost(t *testing.T) {
+	h := newHourlyRig(t)
+	var rows strings.Builder
+	for i := 1; i <= 8; i++ {
+		n := strconv.Itoa(i)
+		rows.WriteString(`{"id":"w` + n + `","title":"T` + n + `","ref":"Gen.1.` + n + `","url":"https://www.youtube.com/watch?v=w` + n + `","kind":"link","date":"2031-05-0` + n + `"}` + "\n")
+	}
+	os.WriteFile(filepath.Join(h.clone, "sources/brookfield-first/rows.jsonl"), []byte(rows.String()), 0o644)
+	os.WriteFile(h.service, nil, 0o644) // the service holds none of the eight
+	git(t, h.clone, "commit", "-qam", "eight rows")
+	git(t, h.clone, "push", "-q", "origin", "main")
+	h.env = append(h.env, "FAKE_NOTES_RECORDS=", "FAKE_LOAD_IGNORED=1")
+	out, code := h.hourly()
+	if code == 0 {
+		t.Fatalf("exit 0:\n%s", out)
+	}
+	for _, l := range strings.Split(out, "\n") {
+		if strings.Contains(l, "still differ") {
+			if !strings.Contains(l, "8 ") || !strings.Contains(l, "w1 w2 w3 w4 w5") || strings.Contains(l, "w6") {
+				t.Errorf("want the count 8 and the first five ids: %s", l)
+			}
+			return
+		}
+	}
+	t.Errorf("no line says the rows still differ:\n%s", out)
+}
+
+// A service that cannot be asked is not a pass: the run still loads what the
+// hash says is new, and it fails, since nothing was verified.
+func TestHourlyFailsWhenTheServiceCannotBeAsked(t *testing.T) {
+	h := newHourlyRig(t)
+	h.env = append(h.env, "SERMONS_URL=http://127.0.0.1:1")
+	out, code := h.hourly()
+	if code == 0 || !strings.Contains(out, "cannot compare") {
+		t.Errorf("exit %d, want non-zero and a line saying the comparison failed:\n%s", code, out)
+	}
+	if !strings.Contains(h.calls(), "sermons load") {
+		t.Errorf("the hash did not trigger the load when the service was down:\n%s", h.calls())
 	}
 }
 
