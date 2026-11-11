@@ -332,3 +332,91 @@ func TestFetchWritesNothingInTheCheckoutButTheRecords(t *testing.T) {
 		t.Error("a notes directory was made inside the checkout")
 	}
 }
+
+// fetchWithRows is fetch over a rows file of the test's own.
+func (r *notesRun) fetchWithRows(t *testing.T, rowsJSONL string) (int, string, string) {
+	t.Helper()
+	p := filepath.Join(t.TempDir(), "rows.jsonl")
+	if err := os.WriteFile(p, []byte(rowsJSONL), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return cliRun(t, "fetch", "--key", r.key, "--postern", r.postern, "--rows", p, "--out", r.records, "--notes", r.notes)
+}
+
+// reportedLine is the one stderr line that names the alert.
+func reportedLine(t *testing.T, errOut, id string) string {
+	t.Helper()
+	var hit []string
+	for _, l := range strings.Split(errOut, "\n") {
+		if strings.Contains(l, "alert "+id+":") {
+			hit = append(hit, l)
+		}
+	}
+	if len(hit) != 1 {
+		t.Fatalf("want one reported line for alert %s, got %d in:\n%s", id, len(hit), errOut)
+	}
+	return hit[0]
+}
+
+// A reported line says what the alert itself says: its title, its passage as
+// written and the date of its mail, so the reader of the line need not look
+// the alert up elsewhere.
+func TestFetchReportsNameTheAlertsTitlePassageAndDate(t *testing.T) {
+	const (
+		oneRow = `{"id":"v1","title":"One","url":"https://example.com/1","date":"2031-03-02"}` + "\n"
+		twoRow = oneRow + `{"id":"v1b","title":"One b","url":"https://example.com/1b","date":"2031-03-03"}` + "\n"
+	)
+	cases := []struct {
+		name  string
+		alert string
+		rows  string
+		want  []string // every one is in the line
+	}{
+		{"no row within a day of the Sunday",
+			plainAlert("u1", 1, "The Far Country", "Luke 15:11-32", "2031-03-09T00:00:00-05:00"), oneRow,
+			[]string{"alert u1:", "no row within one day of Sunday 2031-03-09", `"The Far Country"`, `"Luke 15:11-32"`, "2031-03-09"}},
+		{"more than one row",
+			plainAlert("m1", 1, "The Garden Gate", "Genesis 2:8-17", "2031-03-02T00:00:00-05:00"), twoRow,
+			[]string{"alert m1:", "more than one row", "v1, v1b", `"The Garden Gate"`, `"Genesis 2:8-17"`, "2031-03-02"}},
+		{"a passage that cannot be read",
+			plainAlert("d1", 1, "The Lost Sheep", "Hezekiah 3:1", "2031-03-02T00:00:00-05:00"), oneRow,
+			[]string{"alert d1:", "dropped", `"The Lost Sheep"`, `"Hezekiah 3:1"`, "2031-03-02"}},
+		{"a field the reader does not take",
+			`{"id":"x1","seq":1,"kind":"sermon-notes","title":"The Odd One","reference":"Psalm 23","when":"2031-03-02T00:00:00-05:00","attachment":"JVBERi0x"}`, oneRow,
+			[]string{"alert x1:", "dropped", `"The Odd One"`, `"Psalm 23"`, "2031-03-02"}},
+		{"a sha256 that disagrees",
+			notesAlert("n1", 1, "The Garden Gate", "Genesis 2:8-17", "2031-03-02T00:00:00-05:00", hexSum(pdf2), len(pdf1)), oneRow,
+			[]string{"alert n1:", "sha256", `"The Garden Gate"`, `"Genesis 2:8-17"`, "2031-03-02"}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			r := newNotesRun(t, alertsJSON(c.alert))
+			code, _, errOut := r.fetchWithRows(t, c.rows)
+			if code != 0 {
+				t.Fatalf("fetch exited %d: %s", code, errOut)
+			}
+			line := reportedLine(t, errOut, strings.Split(c.alert, `"`)[3])
+			for _, w := range c.want {
+				if !strings.Contains(line, w) {
+					t.Errorf("the line lacks %q:\n%s", w, line)
+				}
+			}
+			if strings.Contains(line, "JVBERi0x") {
+				t.Errorf("the line repeats the attachment: %s", line)
+			}
+			if len(r.f.claimed) != 0 {
+				t.Errorf("claimed %v; a reported alert stays unclaimed", r.f.claimed)
+			}
+		})
+	}
+}
+
+// A title with a newline or a quote cannot spoil the one-line report.
+func TestAReportedLineQuotesATitleWithControlCharacters(t *testing.T) {
+	r := newNotesRun(t, alertsJSON(plainAlert("q1", 1, "Two\nLines \"quoted\"", "Luke 15:11-32", "2031-03-09T00:00:00-05:00")))
+	_, _, errOut := r.fetchWithRows(t, `{"id":"v1","title":"One","url":"https://example.com/1","date":"2031-03-02"}`+"\n")
+	line := reportedLine(t, errOut, "q1")
+	if !strings.Contains(line, `"Two\nLines \"quoted\""`) {
+		t.Errorf("title not quoted: %s", line)
+	}
+}

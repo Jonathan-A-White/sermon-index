@@ -382,7 +382,7 @@ func merge(alerts io.Reader, rows []sources.Row, existing []Record, keep func(No
 		return nil, nil, nil, err
 	}
 	for _, p := range problems {
-		report = append(report, fmt.Sprintf("alert %s: %s", p.AlertID, p.Why))
+		report = append(report, reported(p.AlertID, p.Why, p.Says))
 	}
 	byID := map[string]Record{}
 	for _, r := range existing {
@@ -391,23 +391,23 @@ func merge(alerts io.Reader, rows []sources.Row, existing []Record, keep func(No
 	for _, n := range notes {
 		rec, err := Match(n, rows)
 		if err != nil {
-			report = append(report, fmt.Sprintf("alert %s: not written: %v", n.AlertID, err))
+			report = append(report, reported(n.AlertID, "not written: "+err.Error(), n.Says()))
 			continue
 		}
 		if have, ok := byID[rec.ID]; ok {
 			if have != rec {
-				report = append(report, fmt.Sprintf("alert %s: disagrees with the record kept for row %s (kept '%s', %s, %s); not replaced", n.AlertID, rec.ID, have.Title, have.Ref, have.Date))
+				report = append(report, reported(n.AlertID, fmt.Sprintf("disagrees with the record kept for row %s (kept '%s', %s, %s); not replaced", rec.ID, have.Title, have.Ref, have.Date), n.Says()))
 				continue
 			}
 			if err := keepNotes(keep, n, rec); err != nil {
-				report = append(report, fmt.Sprintf("alert %s: not recorded: %v", n.AlertID, err))
+				report = append(report, reported(n.AlertID, "not recorded: "+err.Error(), n.Says()))
 				continue
 			}
 			recorded = append(recorded, n.AlertID)
 			continue
 		}
 		if err := keepNotes(keep, n, rec); err != nil {
-			report = append(report, fmt.Sprintf("alert %s: not recorded: %v", n.AlertID, err))
+			report = append(report, reported(n.AlertID, "not recorded: "+err.Error(), n.Says()))
 			continue
 		}
 		byID[rec.ID] = rec
@@ -423,6 +423,16 @@ func merge(alerts io.Reader, rows []sources.Row, existing []Record, keep func(No
 		return records[i].ID < records[j].ID
 	})
 	return records, report, recorded, nil
+}
+
+// reported is one line of the report: the alert, what happened to it and,
+// when there is any, what the alert itself says (its title, passage and mail
+// date), so the line alone tells which sermon's notes it carries.
+func reported(id, what, says string) string {
+	if says == "" {
+		return fmt.Sprintf("alert %s: %s", id, what)
+	}
+	return fmt.Sprintf("alert %s: %s [alert says: %s]", id, what, says)
 }
 
 func keepNotes(keep func(Note, Record) error, n Note, rec Record) error {

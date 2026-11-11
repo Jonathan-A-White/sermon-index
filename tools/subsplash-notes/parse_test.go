@@ -27,7 +27,7 @@ func TestReadAlertsYieldsTitlePassageDate(t *testing.T) {
 	if len(notes) < 2 {
 		t.Fatalf("notes = %+v", notes)
 	}
-	want := Note{AlertID: "00000000000000a1", Title: "The Garden Gate", Ref: "Gen.2.8-Gen.2.17", Date: "2031-03-02"}
+	want := Note{AlertID: "00000000000000a1", Title: "The Garden Gate", Ref: "Gen.2.8-Gen.2.17", Reference: "Genesis 2:8-17", Date: "2031-03-02"}
 	if notes[0] != want {
 		t.Errorf("first note = %+v, want %+v", notes[0], want)
 	}
