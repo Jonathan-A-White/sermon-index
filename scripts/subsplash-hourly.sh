@@ -18,6 +18,16 @@
 #   2. subsplash-notes fetch: the notes mails Postern kept (the records file
 #      data/subsplash-notes.jsonl, git-ignored; the notes PDFs stay outside the
 #      checkout);
+#   2b. the sermons with no notes: subsplash-links --read-messages reads the
+#      Governor's messages in the Postern inbox that end 'No notes' (a title, an
+#      optional series, the date, the preacher and the passage, as he read them
+#      in the church's app), only those signed by his key (the public key in
+#      $GOVERNOR_KEY_FILE, default ~/.config/sermon-index/governor.pub), and adds
+#      each to sources/brookfield-first/passages.tsv and no-notes.tsv; then
+#      brookfield-youtube --merge-only (no API, no key) puts the title, preacher
+#      and passage on the sermon's row. A message it cannot read whole is named
+#      by txid and changes nothing. Before the link step, so that a link whose
+#      address names such a sermon finds its row by the new title;
 #   3. the link list: every https://brookfieldfirst.subspla.sh/<code> in the
 #      Postern inbox's messages ($POSTERN_INBOX, default ~/.local/state/mw/
 #      postern/inbox), in a temporary file outside the checkout, and every
@@ -26,8 +36,9 @@
 #      alt_url (one HEAD per short link it has never seen, the cache keeps the
 #      rest) and appends one line to $SERMON_INDEX_HOME/.local/state/sermon-index/
 #      subsplash-progress.jsonl;
-#   5. if rows.jsonl changed: commits it ('Subsplash links: N new (hourly)')
-#      and pushes, so the tree is never left dirty; a commit the remote does not
+#   5. if rows.jsonl, passages.tsv, no-notes.tsv, source.toml or REPORT.md
+#      changed: commits them ('Subsplash links: N new (hourly)', with ', M with
+#      no notes' when no-notes.tsv gained M lines) and pushes, so the tree is never left dirty; a commit the remote does not
 #      have yet (a refused push) is pushed by the next run;
 #   6. asks the live service (SERMONS_URL, default https://sermons.allmymind.org)
 #      for every Brookfield row it serves and compares each with rows.jsonl
@@ -68,6 +79,7 @@ SERMONS=${SERMONS:-sermons}
 SERVICE=${SERMONS_URL:-https://sermons.allmymind.org}
 ENVFILE=$H/.config/sermon-index/env
 ROWS=sources/brookfield-first/rows.jsonl
+KEYFILE=${GOVERNOR_KEY_FILE:-$H/.config/sermon-index/governor.pub}
 FEED=${POSTERN_DATA:-$H/.local/state/postern}/jobs/subsplash-links.json
 SRC=sources/brookfield-first
 
@@ -103,6 +115,23 @@ if ! "$GO" run ./tools/subsplash-notes fetch; then
 	status=1
 fi
 
+# 2b. The sermons with no notes, from the Governor's messages, onto their rows.
+if [ -r "$KEYFILE" ] && [ -n "$(tr -d ' \t\r\n' < "$KEYFILE")" ]; then
+	GKEY=$(tr -d ' \t\r\n' < "$KEYFILE")
+	if "$GO" run ./tools/subsplash-links --read-messages "$INBOX" --key "$GKEY" --rows "$ROWS" > "$TMP/nonotes.out"; then :; else
+		echo "subsplash-hourly: subsplash-links --read-messages failed (see above)" >&2
+		status=1
+	fi
+	cat "$TMP/nonotes.out"
+	if ! "$GO" run ./tools/brookfield-youtube --merge-only --out "$SRC"; then
+		echo "subsplash-hourly: brookfield-youtube --merge-only failed (see above)" >&2
+		status=1
+	fi
+else
+	echo "subsplash-hourly: cannot read the Governor's public key at $KEYFILE; his 'No notes' messages were not read" >&2
+	status=1
+fi
+
 # 3. The link list, from the messages in the inbox, and the search PDFs.
 : > "$TMP/links.txt"
 if [ -d "$INBOX" ]; then
@@ -130,15 +159,35 @@ fi
 cat "$TMP/links.out"
 
 # 5. Commit and push what changed.
-if [ -n "$(git status --porcelain -- "$ROWS")" ]; then
-	new=$(git diff --numstat -- "$ROWS" | cut -f1)
-	git add -- "$ROWS"
-	if ! git commit -q -m "Subsplash links: $new new (hourly)" -- "$ROWS"; then
-		git reset -q -- "$ROWS" || true
-		git checkout -q -- "$ROWS"
-		die "git commit failed; $ROWS was put back as it was"
+PATHS=
+for f in rows.jsonl passages.tsv no-notes.tsv source.toml REPORT.md; do
+	[ -e "$SRC/$f" ] && PATHS="$PATHS $SRC/$f"
+done
+# shellcheck disable=SC2086
+if [ -n "$(git status --porcelain -- $PATHS)" ]; then
+	# shellcheck disable=SC2086
+	git add -- $PATHS
+	new=$(git diff --cached --numstat -- "$ROWS" | cut -f1)
+	[ -n "$new" ] || new=0
+	nn=$(git diff --cached --numstat -- "$SRC/no-notes.tsv" | cut -f1)
+	[ -n "$nn" ] || nn=0
+	# a new no-notes.tsv counts its header line too
+	if [ "$nn" -gt 0 ] && ! git cat-file -e "HEAD:$SRC/no-notes.tsv" 2>/dev/null; then nn=$((nn - 1)); fi
+	if [ "$nn" -gt 0 ]; then
+		msg="Subsplash links: $new new, $nn with no notes (hourly)"
+	else
+		msg="Subsplash links: $new new (hourly)"
 	fi
-	say "committed $(git rev-parse --short HEAD): Subsplash links: $new new (hourly)"
+	# shellcheck disable=SC2086
+	if ! git commit -q -m "$msg" -- $PATHS; then
+		# shellcheck disable=SC2086
+		git reset -q -- $PATHS || true
+		for f in $PATHS; do
+			if git ls-files --error-unmatch "$f" >/dev/null 2>&1; then git checkout -q -- "$f"; else rm -f -- "$f"; fi
+		done
+		die "git commit failed; $SRC was put back as it was"
+	fi
+	say "committed $(git rev-parse --short HEAD): $msg"
 fi
 if [ -n "$(git rev-list "origin/$BRANCH..HEAD")" ]; then
 	if git push -q origin "$BRANCH"; then
@@ -218,7 +267,7 @@ if [ -n "$need" ]; then
 fi
 
 # 7. The job feed, last, so that "live" is what the service holds now.
-if ! "$GO" run ./tools/subsplash-links --feed "$FEED" --service "$SERVICE" --rows "$ROWS"; then
+if ! "$GO" run ./tools/subsplash-links --feed "$FEED" --service "$SERVICE" --rows "$ROWS" --no-notes-file "$SRC/no-notes.tsv"; then
 	echo "subsplash-hourly: the job feed $FEED was not written (see above)" >&2
 	status=1
 fi

@@ -43,6 +43,10 @@ case "$2" in
 		prev=$a
 	done
 	exec "$LINKS_BIN" "$@" ;;
+./tools/brookfield-youtube)
+	shift 2
+	echo "merge-only: $*" >> "$FAKE_LOG"
+	exec "$YOUTUBE_BIN" "$@" ;;
 esac
 exit 2
 `
@@ -135,6 +139,12 @@ func newHourlyRig(t *testing.T) *hourlyRig {
 	if out, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("go build subsplash-links: %v\n%s", err, out)
 	}
+	ybin := filepath.Join(t.TempDir(), "brookfield-youtube")
+	build = exec.Command("go", "build", "-o", ybin, "./tools/brookfield-youtube")
+	build.Dir = root
+	if out, err := build.CombinedOutput(); err != nil {
+		t.Fatalf("go build brookfield-youtube: %v\n%s", err, out)
+	}
 	for name, body := range map[string]string{"go": fakeGoHourly, "sermons": fakeSermonsHourly} {
 		if err := os.WriteFile(filepath.Join(r.stubs, name), []byte(body), 0o755); err != nil {
 			t.Fatal(err)
@@ -146,8 +156,9 @@ func newHourlyRig(t *testing.T) *hourlyRig {
 	}
 	// The private files the tools keep are git-ignored, as in the real repo.
 	for rel, body := range map[string]string{
-		"sources/brookfield-first/rows.jsonl": hourlyRows,
-		".gitignore":                          "data/subsplash-links-cache.jsonl\ndata/subsplash-notes.jsonl\n",
+		"sources/brookfield-first/rows.jsonl":   hourlyRows,
+		"sources/brookfield-first/passages.tsv": "series\tdate\ttitle\tspeaker\tpassage\trow\n",
+		".gitignore":                            "data/subsplash-links-cache.jsonl\ndata/subsplash-notes.jsonl\n",
 	} {
 		if err := os.WriteFile(filepath.Join(r.clone, rel), []byte(body), 0o644); err != nil {
 			t.Fatal(err)
@@ -165,7 +176,15 @@ func newHourlyRig(t *testing.T) *hourlyRig {
 		t.Fatal(err)
 	}
 	srv := fakeService(t, h.service)
-	r.env = append(r.env, "HOURLY_ROOT="+r.clone, "LINKS_BIN="+bin, "FAKE_NOTES_RECORDS="+hourlyRecord, "SERMONS_URL="+srv.URL, "FAKE_SERVICE="+h.service)
+	r.env = append(r.env, "HOURLY_ROOT="+r.clone, "LINKS_BIN="+bin, "YOUTUBE_BIN="+ybin, "FAKE_NOTES_RECORDS="+hourlyRecord, "SERMONS_URL="+srv.URL, "FAKE_SERVICE="+h.service)
+	// The Governor's public key, where the script reads it.
+	keyDir := filepath.Join(r.home, ".config/sermon-index")
+	if err := os.MkdirAll(keyDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(keyDir, "governor.pub"), []byte(hourlyGovKey+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	h.message("m1", "https://brookfieldfirst.subspla.sh/aaa1111")
 	h.message("m2", "Look at this one https://brookfieldfirst.subspla.sh/bbb2222 and a stranger https://example.org/zzz")
 	return h
@@ -174,6 +193,18 @@ func newHourlyRig(t *testing.T) *hourlyRig {
 func (h *hourlyRig) message(name, text string) {
 	h.t.Helper()
 	b, _ := json.Marshal(map[string]any{"seq": 1, "class": "message", "thread": "general", "text": text})
+	if err := os.WriteFile(filepath.Join(h.inbox, name+".message.json"), b, 0o644); err != nil {
+		h.t.Fatal(err)
+	}
+}
+
+const hourlyGovKey = "02cccc00000000000000000000000000000000000000000000000000000000000003"
+
+// signedMessage puts a message in the inbox as Postern keeps one: with its txid
+// and the key that signed it.
+func (h *hourlyRig) signedMessage(name, tx, from string, signed bool, text string) {
+	h.t.Helper()
+	b, _ := json.Marshal(map[string]any{"seq": 1, "txid": tx, "class": "message", "from": from, "verified": signed, "signer_checked": signed, "ts": "2031-04-07T10:00:00Z", "thread": "general", "text": text})
 	if err := os.WriteFile(filepath.Join(h.inbox, name+".message.json"), b, 0o644); err != nil {
 		h.t.Fatal(err)
 	}
@@ -801,4 +832,94 @@ func TestInstallEnablesTheHourlyTimerAndUninstallRemovesIt(t *testing.T) {
 	if !strings.Contains(r.calls(), "systemctl --user disable --now sermon-index-subsplash-hourly.timer") {
 		t.Errorf("uninstall did not disable the hourly timer:\n%s", r.calls())
 	}
+}
+
+// A message of the Governor's that ends 'No notes' is read before the link
+// step, put on its row (title, preacher, passage) by the tool's own merge, and
+// committed with the rows in one commit, under the same lock; a second run
+// changes nothing.
+func TestHourlyReadsASermonWithNoNotesBeforeTheLinksAndCommitsOnce(t *testing.T) {
+	h := newHourlyRig(t)
+	// v2 is dated 2031-03-09; the sermon is the Sunday before's: Mar 8, 2031 is a Saturday here, within a day.
+	h.signedMessage("n1", "direct:nonotes1", hourlyGovKey, true, "The Narrow Gate\n\nEaster Sunday 2031\n\nMar 8, 2031 Phil Morgan Luke 13:22-30\n\n(No notes)")
+	h.signedMessage("n2", "direct:stranger", "02dddd00000000000000000000000000000000000000000000000000000000000004", true, "Not Mine\n\nApr 6, 2031 Phil Morgan Mark 1:1-8\n\nNo notes")
+	before := h.commits()
+	out, code := h.hourly()
+	if code != 0 {
+		t.Fatalf("exit %d:\n%s", code, out)
+	}
+	if !strings.Contains(out, "no-notes: 1 sermon(s) read, 1 added") {
+		t.Errorf("the run's line is missing:\n%s", out)
+	}
+	log := h.calls()
+	read := strings.Index(log, "go run ./tools/subsplash-links --read-messages")
+	merge := strings.Index(log, "merge-only:")
+	links := strings.Index(log, "go run ./tools/subsplash-links --links")
+	if read < 0 || merge < read || links < merge {
+		t.Errorf("want read-messages, then merge-only, then the links (%d, %d, %d):\n%s", read, merge, links, log)
+	}
+	rows := h.file("sources/brookfield-first/rows.jsonl")
+	if !strings.Contains(rows, `"title":"The Narrow Gate"`) || !strings.Contains(rows, `"preacher":"Phil Morgan"`) || strings.Contains(rows, "Not Mine") {
+		t.Errorf("rows.jsonl:\n%s", rows)
+	}
+	if !strings.Contains(h.file("sources/brookfield-first/no-notes.tsv"), "2031-03-08\tv2\tdirect:nonotes1") {
+		t.Errorf("no-notes.tsv:\n%s", h.file("sources/brookfield-first/no-notes.tsv"))
+	}
+	if a, b := before, h.commits(); b != strconv.Itoa(mustAtoi(t, a)+1) {
+		t.Errorf("commits went from %s to %s, want one more", a, b)
+	}
+	if got := h.lastMessage(); got != "Subsplash links: 2 new, 1 with no notes (hourly)" {
+		t.Errorf("commit message %q", got)
+	}
+	if st := git(t, h.clone, "status", "--porcelain"); st != "" {
+		t.Errorf("the tree is not clean:\n%s", st)
+	}
+	files := strings.Fields(git(t, h.clone, "show", "--name-only", "--format=", "HEAD"))
+	if strings.Join(files, " ") != "sources/brookfield-first/no-notes.tsv sources/brookfield-first/passages.tsv sources/brookfield-first/rows.jsonl" {
+		t.Errorf("the commit holds %v", files)
+	}
+	if !h.pushed() {
+		t.Error("not pushed")
+	}
+	// The second run changes nothing and commits nothing.
+	h.clearLog()
+	commits := h.commits()
+	if out, code = h.hourly(); code != 0 {
+		t.Fatalf("second run exit %d:\n%s", code, out)
+	}
+	if h.commits() != commits || git(t, h.clone, "status", "--porcelain") != "" {
+		t.Error("the second run committed or left the tree dirty")
+	}
+	// The job feed marks the row.
+	b, err := os.ReadFile(filepath.Join(h.home, ".local/state/postern/jobs/subsplash-links.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(b), "The Narrow Gate (no notes)") {
+		t.Errorf("feed:\n%s", b)
+	}
+}
+
+// Without the Governor's key file the messages are not read, and the run says so.
+func TestHourlyWithoutTheKeyFileFailsLoudlyButLinks(t *testing.T) {
+	h := newHourlyRig(t)
+	if err := os.Remove(filepath.Join(h.home, ".config/sermon-index/governor.pub")); err != nil {
+		t.Fatal(err)
+	}
+	out, code := h.hourly()
+	if code == 0 || !strings.Contains(out, "governor.pub") {
+		t.Errorf("exit %d:\n%s", code, out)
+	}
+	if h.altURLs() != 2 {
+		t.Errorf("the links were not written: %d", h.altURLs())
+	}
+}
+
+func mustAtoi(t *testing.T, s string) int {
+	t.Helper()
+	n, err := strconv.Atoi(strings.TrimSpace(s))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return n
 }
