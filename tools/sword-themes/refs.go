@@ -184,6 +184,15 @@ func parseItem(b *passage.Book, chapter *int, rest string) ([]string, string) {
 				out = append(out, fmt.Sprintf("%s.%d", b.OSIS, c))
 				continue
 			}
+			if hiC, hiV, colon := strings.Cut(hi, ":"); colon {
+				// "4-5:14": chapter 4 to verse 14 of chapter 5.
+				o, err := passage.RangeOSIS(b.OSIS, lo, "", hiC, hiV)
+				if err != nil {
+					return nil, fmt.Sprintf("'%s': %v", el, err)
+				}
+				out = append(out, o)
+				continue
+			}
 			c2 := atoi(hi)
 			if c2 == 0 {
 				return nil, fmt.Sprintf("'%s': the end of a range is not a number", el)

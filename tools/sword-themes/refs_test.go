@@ -24,6 +24,9 @@ func TestParseGroup(t *testing.T) {
 		{"Isa 52:13b-53:12a; Jude 5a-7", []string{"Isa.52.13-Isa.53.12", "Jude.1.5-Jude.1.7"}},
 		{"Isa 52:13-53:12", []string{"Isa.52.13-Isa.53.12"}},
 		{"Ps 23; Isa 40-42", []string{"Ps.23", "Isa.40-Isa.42"}},
+		// Chapter 4 to verse 14 of chapter 5: the range starts at 4:1, as
+		// passage.RangeOSIS writes it for every other reader.
+		{"Eph 4-5:14; Re 4-5:14", []string{"Eph.4.1-Eph.5.14", "Rev.4.1-Rev.5.14"}},
 		{"Ps 19:8-10,14; 119:20", []string{"Ps.19.8-Ps.19.10", "Ps.19.14", "Ps.119.20"}},
 		// A book of one chapter: a number alone is a verse.
 		{"Jude 21; Phm 5-7; 3Jo 1:4", []string{"Jude.1.21", "Phlm.1.5-Phlm.1.7", "3John.1.4"}},

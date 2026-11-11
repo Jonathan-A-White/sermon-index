@@ -68,6 +68,19 @@ func LogosToOSIS(s string) (string, error) {
 		}
 		osis = append(osis, strings.Join(parts, "."))
 	}
+	// A chapter to a verse of a later chapter of the same book
+	// (bible.87.4-87.5.14) starts at the chapter's first verse, written by
+	// passage.RangeOSIS like every other reader's "Revelation 4-5:14".
+	if len(osis) == 2 {
+		a, b := strings.Split(osis[0], "."), strings.Split(osis[1], ".")
+		if len(a) == 2 && len(b) == 3 && a[0] == b[0] {
+			o, err := passage.RangeOSIS(a[0], a[1], "", b[1], b[2])
+			if err != nil {
+				return fail(err.Error())
+			}
+			osis = []string{o}
+		}
+	}
 	r, err := passage.Parse(strings.Join(osis, "-"))
 	if err != nil {
 		return fail(err.Error())
@@ -253,24 +266,14 @@ func LabelToOSIS(label string) ([]string, error) {
 					ref += fmt.Sprintf("-%s.%s.%s", book, chapter, x)
 				}
 			case v1 == "":
-				chap(&c1)
-				if x != "" {
-					chap(&x)
-				}
-				if y != "" {
-					verse(&y)
-				}
-				if bad != nil {
+				// A chapter, chapters, or "4-5:14": passage.RangeOSIS writes
+				// them all, as every other reader of a range does.
+				r, err := passage.RangeOSIS(book, c1, "", x, y)
+				if err != nil {
 					return fail("cannot read " + strconv.Quote(tok))
 				}
-				ref = fmt.Sprintf("%s.%s", book, c1)
+				ref = r
 				chapter, verseCtx = c1, false
-				if x != "" {
-					ref += fmt.Sprintf("-%s.%s", book, x)
-					if y != "" {
-						ref += "." + y
-					}
-				}
 			default:
 				chap(&c1)
 				verse(&v1)

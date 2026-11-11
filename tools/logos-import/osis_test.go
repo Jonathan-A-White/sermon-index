@@ -16,7 +16,7 @@ func TestLogosToOSIS(t *testing.T) {
 		{"bible.87.22.21", "Rev.22.21"},                    // and Revelation the last
 		{"bible.19.51.1-19.51.19", "Ps.51.1-Ps.51.19"},     // a range of verses
 		{"bible.1.1-1.3", "Gen.1-Gen.3"},                   // a range of chapters
-		{"bible.87.4-87.5.14", "Rev.4-Rev.5.14"},           // a chapter to a verse
+		{"bible.87.4-87.5.14", "Rev.4.1-Rev.5.14"},         // a chapter to a verse
 		{"bible.9.28.13-9.28.20", "1Sam.28.13-1Sam.28.20"}, // a numbered book
 		{"bible.10.12.1-10.12.31", "2Sam.12.1-2Sam.12.31"}, // and its twin
 		{"bible.64.1.35-64.1.42", "John.1.35-John.1.42"},   // John
@@ -98,7 +98,8 @@ func TestLabelToOSIS(t *testing.T) {
 		{"2 Samuel 11; 12:1–31; Psalm 51:1–19", []string{"2Sam.11", "2Sam.12.1-2Sam.12.31", "Ps.51.1-Ps.51.19"}},
 		{"1 Corinthians 15:3–4, 15:20–28", []string{"1Cor.15.3-1Cor.15.4", "1Cor.15.20-1Cor.15.28"}},
 		{"Acts 1:12–15; 2:1, 7–13", []string{"Acts.1.12-Acts.1.15", "Acts.2.1", "Acts.2.7-Acts.2.13"}},
-		{"Acts 2:47; Revelation 4–5:14", []string{"Acts.2.47", "Rev.4-Rev.5.14"}},
+		{"Acts 2:47; Revelation 4–5:14", []string{"Acts.2.47", "Rev.4.1-Rev.5.14"}},
+		{"Ephesians 4-5:14", []string{"Eph.4.1-Eph.5.14"}},
 		{"Job 1:1–2:13; Revelation 12:1–17", []string{"Job.1.1-Job.2.13", "Rev.12.1-Rev.12.17"}},
 		{"Titus 2; Proverbs 31", []string{"Titus.2", "Prov.31"}},
 		// A stray comma after the book, and an OCR l for a 1 in a number.

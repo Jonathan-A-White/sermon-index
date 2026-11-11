@@ -89,7 +89,7 @@ func TestBuildRowsMapsTheFields(t *testing.T) {
 
 	// The Revelation row's range of chapters to a verse.
 	r = byID(rows, "SERIES8.14")
-	if r == nil || str(r.Ref) != "Acts.2.47" || strings.Join(r.Cited, " ") != "Rev.4-Rev.5.14" {
+	if r == nil || str(r.Ref) != "Acts.2.47" || strings.Join(r.Cited, " ") != "Rev.4.1-Rev.5.14" {
 		t.Fatalf("Hands up: %+v", r)
 	}
 	if rep.Rows != len(rows) {
@@ -499,7 +499,7 @@ func TestRefsInTitle(t *testing.T) {
 		{"Exodus 3–4", []string{"Exod.3-Exod.4"}},
 		// A range that ends in another chapter's verse is read whole, never cut at the colon.
 		{"Sermon 7: On Ephesians 4:1–5:14", []string{"Eph.4.1-Eph.5.14"}},
-		{"Sermon 7: On Ephesians 4-5:14, the walk", []string{"Eph.4-Eph.5.14"}},
+		{"Sermon 7: On Ephesians 4-5:14, the walk", []string{"Eph.4.1-Eph.5.14"}},
 		{"Sermon 7: On Ephesians 4-5, the walk", []string{"Eph.4-Eph.5"}},
 		{"Sermon 145: On the Words of John’s Gospel 16:24: Until Now, and on the Words of Luke 10:17, 20: Lord, Behold", []string{"John.16.24", "Luke.10.17", "Luke.10.20"}},
 		// A title with no passage in it, and a number that is not one.
