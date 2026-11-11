@@ -389,10 +389,13 @@ func merge(alerts io.Reader, rows []sources.Row, existing []Record, keep func(No
 		byID[r.ID] = r
 	}
 	for _, n := range notes {
-		rec, err := Match(n, rows)
+		rec, how, err := MatchNote(n, rows)
 		if err != nil {
 			report = append(report, reported(n.AlertID, "not written: "+err.Error(), n.Says()))
 			continue
+		}
+		if how != "" {
+			report = append(report, reported(n.AlertID, how, n.Says()))
 		}
 		if have, ok := byID[rec.ID]; ok {
 			if have != rec {

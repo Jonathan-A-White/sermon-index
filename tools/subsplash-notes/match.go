@@ -1,10 +1,12 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/Jonathan-A-White/sermon-index/internal/sources"
 )
@@ -64,10 +66,88 @@ func Match(n Note, rows []sources.Row) (Record, error) {
 	}
 	switch len(hits) {
 	case 0:
-		return Record{}, fmt.Errorf("no row within one day of Sunday %s", sunday)
+		return Record{}, noRowError{sunday}
 	case 1:
 		return Record{ID: hits[0], Date: sunday, Title: n.Title, Ref: n.Ref}, nil
 	}
 	sort.Strings(hits)
 	return Record{}, fmt.Errorf("more than one row within one day of Sunday %s (%s): not guessed", sunday, strings.Join(hits, ", "))
+}
+
+// noRowError is Match's answer when no row is within one day of the Sunday:
+// the one failure MatchNote tries a second way on.
+type noRowError struct{ sunday string }
+
+func (e noRowError) Error() string {
+	return fmt.Sprintf("no row within one day of Sunday %s", e.sunday)
+}
+
+// TitleWindowDays is how far from the mail's Sunday a row may be dated for
+// MatchNote to take it by its title and passage alone.
+const TitleWindowDays = 14
+
+// MatchNote is Match and, when no row is within one day of the Sunday, a
+// second try: the one row within TitleWindowDays of the Sunday that has the
+// note's title (case, punctuation and spacing folded) and the same passage.
+// The church's list and the mail may differ by a week, and which is right is
+// not known, so the date is not asked. Two such rows, or only rows with
+// another passage, are an error naming them. how is empty for a match by
+// date, and says so for one by title and passage.
+func MatchNote(n Note, rows []sources.Row) (rec Record, how string, err error) {
+	rec, err = Match(n, rows)
+	var nr noRowError
+	if !errors.As(err, &nr) {
+		return rec, "", err
+	}
+	st, _ := time.Parse(dateLayout, nr.sunday)
+	want := foldTitle(n.Title)
+	var same, otherPassage []string
+	rowDate := map[string]string{}
+	for _, r := range rows {
+		if r.Date == nil || want == "" || foldTitle(r.Title) != want {
+			continue
+		}
+		rt, perr := time.Parse(dateLayout, *r.Date)
+		if perr != nil {
+			continue
+		}
+		if d := rt.Sub(st); d < -TitleWindowDays*24*time.Hour || d > TitleWindowDays*24*time.Hour {
+			continue
+		}
+		rowDate[r.ID] = *r.Date
+		if r.Ref != nil && *r.Ref == n.Ref {
+			same = append(same, r.ID)
+		} else {
+			otherPassage = append(otherPassage, r.ID)
+		}
+	}
+	name := func(ids []string) string {
+		sort.Strings(ids)
+		var parts []string
+		for _, id := range ids {
+			parts = append(parts, fmt.Sprintf("%s dated %s", id, rowDate[id]))
+		}
+		return strings.Join(parts, ", ")
+	}
+	switch {
+	case len(same) == 1:
+		return Record{ID: same[0], Date: nr.sunday, Title: n.Title, Ref: n.Ref},
+			fmt.Sprintf("matched by title and passage, row dated %s, mail dated %s", rowDate[same[0]], n.Date), nil
+	case len(same) > 1:
+		return Record{}, "", fmt.Errorf("%w; more than one row within %d days has its title and passage (%s): not guessed", err, TitleWindowDays, name(same))
+	case len(otherPassage) > 0:
+		return Record{}, "", fmt.Errorf("%w; within %d days only a row with its title and another passage (%s): not guessed", err, TitleWindowDays, name(otherPassage))
+	}
+	return Record{}, "", err
+}
+
+// foldTitle is a title with case, punctuation and spacing folded away.
+func foldTitle(s string) string {
+	var b strings.Builder
+	for _, r := range s {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			b.WriteRune(unicode.ToLower(r))
+		}
+	}
+	return b.String()
 }

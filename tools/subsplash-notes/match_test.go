@@ -258,3 +258,74 @@ func TestRunWritesTheSameBytesTwice(t *testing.T) {
 		t.Errorf("stderr does not report the bad alert: %s", se.String())
 	}
 }
+
+// titledRow is a row dated d with a title and a passage.
+func titledRow(id, d, title, ref string) sources.Row {
+	return sources.Row{ID: id, Title: title, Ref: &ref, Date: &d}
+}
+
+func runOne(t *testing.T, rows []sources.Row) ([]Record, []string) {
+	t.Helper()
+	alert := alertsJSON(plainAlert("w1", 1, "Blessed in the Fire!", "1 Peter 3:13-17", "2031-03-02T00:00:00-05:00"))
+	recs, report, err := Run(strings.NewReader(alert), rows, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return recs, report
+}
+
+// A mail a week off its row's date, with no row within a day, is written to
+// the one row in 14 days with the same title (case and punctuation folded)
+// and the same passage, and the report line says how it was matched.
+func TestMatchByTitleAndPassageWhenTheDateIsAWeekOff(t *testing.T) {
+	rows := append(vids("2031-02-23"), titledRow("blessed", "2031-03-09", "Blessed in the fire", "1Pet.3.13-1Pet.3.17"))
+	recs, report := runOne(t, rows)
+	if len(recs) != 1 || recs[0].ID != "blessed" || recs[0].Date != "2031-03-02" || recs[0].Ref != "1Pet.3.13-1Pet.3.17" {
+		t.Fatalf("records = %+v", recs)
+	}
+	text := strings.Join(report, "\n")
+	for _, w := range []string{"alert w1:", "matched by title and passage, row dated 2031-03-09, mail dated 2031-03-02"} {
+		if !strings.Contains(text, w) {
+			t.Errorf("the report lacks %q:\n%s", w, text)
+		}
+	}
+}
+
+// A row more than 14 days away is not taken.
+func TestMatchByTitleStopsAtFourteenDays(t *testing.T) {
+	recs, report := runOne(t, []sources.Row{titledRow("far", "2031-03-17", "Blessed in the Fire", "1Pet.3.13-1Pet.3.17")})
+	if len(recs) != 0 || !strings.Contains(strings.Join(report, "\n"), "no row within one day of Sunday 2031-03-02") {
+		t.Errorf("records %+v report %v", recs, report)
+	}
+}
+
+// Two rows with that title and passage are not guessed between: the line
+// names both.
+func TestMatchByTitleTwoCandidatesAreNotGuessed(t *testing.T) {
+	recs, report := runOne(t, []sources.Row{
+		titledRow("b1", "2031-03-09", "Blessed in the Fire", "1Pet.3.13-1Pet.3.17"),
+		titledRow("b2", "2031-02-23", "Blessed in the fire.", "1Pet.3.13-1Pet.3.17"),
+	})
+	text := strings.Join(report, "\n")
+	if len(recs) != 0 || !strings.Contains(text, "not written") || !strings.Contains(text, "b1") || !strings.Contains(text, "b2") {
+		t.Errorf("records %+v report %v", recs, report)
+	}
+}
+
+// The same title with another passage is not a match: reported, with the row named.
+func TestMatchByTitleWithAnotherPassageIsNotWritten(t *testing.T) {
+	recs, report := runOne(t, []sources.Row{titledRow("other", "2031-03-09", "Blessed in the Fire", "Ps.23")})
+	text := strings.Join(report, "\n")
+	if len(recs) != 0 || !strings.Contains(text, "not written") || !strings.Contains(text, "other") || strings.Contains(text, "matched by") {
+		t.Errorf("records %+v report %v", recs, report)
+	}
+}
+
+// A row within a day always wins; the fallback is only for no row there.
+func TestMatchByTitleIsNotTriedWhenARowIsWithinADay(t *testing.T) {
+	rows := append(vids("2031-03-02"), titledRow("blessed", "2031-03-09", "Blessed in the Fire", "1Pet.3.13-1Pet.3.17"))
+	recs, report := runOne(t, rows)
+	if len(recs) != 1 || recs[0].ID != "vid-2031-03-02" || strings.Contains(strings.Join(report, "\n"), "matched by") {
+		t.Errorf("records %+v report %v", recs, report)
+	}
+}
