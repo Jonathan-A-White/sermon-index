@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 )
 
@@ -85,18 +86,8 @@ func (r *Result) listMarkdown(w func(string, ...any)) {
 		return
 	}
 	w("\n## The church's list\n\n")
-	w("`passages.tsv` is the church's own list of its sermons (series, Sunday, title, speaker, passage), typed by hand from screenshots of the church's app that the Governor took; no tool reads the app. Each entry is matched to the one YouTube row of its date, and that row takes the sermon's title, its preacher and its passage and keeps its watch link. An entry that cannot be matched to exactly one row, or whose passage the book table refuses, is named here and changes nothing; nothing is guessed.\n\n")
-	w("- Entries in the list: %d\n", m.Entries)
-	w("- Merged into a row: %d\n", m.Merged)
-	w("- Not merged: %d", len(m.Problems))
-	if len(m.Problems) == 0 {
-		w(".\n")
-	} else {
-		w(":\n")
-		for _, p := range m.Problems {
-			w("  - %s %q (%s, %s): %s\n", p.Entry.Date, p.Entry.Title, p.Entry.Speaker, p.Entry.Passage, p.Why)
-		}
-	}
+	w("%s\n\n", listParagraph)
+	w("%s", m.countsMarkdown())
 	w("- Unsure, left out of the list and never merged: %d", len(m.Unsure))
 	if len(m.Unsure) == 0 {
 		w(".\n")
@@ -133,8 +124,8 @@ func (r *Result) neither() int {
 func (r *Result) SourceTOML() string {
 	var listComment, listNote string
 	if m := r.Merge; m != nil {
-		listComment = fmt.Sprintf("\n#   %d of them carry the title, preacher and passage of the church's own list\n#   (passages.tsv, merged by date; see REPORT.md).", m.Merged)
-		listNote = fmt.Sprintf("\nThe title, preacher and passage of %d rows come instead from the church's own list of its sermons, sources/brookfield-first/passages.tsv: typed by hand from screenshots of the church's app that the Governor took (no tool read the app, so Subsplash's terms on automated reading are not engaged) and matched to the videos by date. The Governor shows the list to the pastor and removes it on an objection. It holds no YouTube data, so the 30 days do not bind it.", m.Merged)
+		listComment = "\n" + listCommentText(m)
+		listNote = "\n" + listNoteText(m)
 	}
 	return fmt.Sprintf(`# Brookfield First (Brookfield Assembly of God, Brookfield CT), %[1]d sermon
 # videos of its YouTube channel %[2]s, written by
@@ -174,3 +165,71 @@ added = 2026-11-09
 on_by_default = false
 `, len(r.Rows), r.Handle, r.Seen, r.WithPreacher, r.WithPassage, r.SeriesRows, len(r.Rephil), r.First, r.Last, listComment, listNote)
 }
+
+// The sentences about the church's list that source.toml carries, and
+// REPORT.md's counts, are written here so that MergeRowsFile can bring them to
+// the new counts without a run of the API.
+
+func listCommentText(m *Merge) string {
+	return fmt.Sprintf("#   %d of them carry the title, preacher and passage of the church's own list\n#   (passages.tsv, merged by date; see REPORT.md).", m.Merged)
+}
+
+func listNoteText(m *Merge) string {
+	return fmt.Sprintf("The title, preacher and passage of %d rows come instead from the church's own list of its sermons, sources/brookfield-first/passages.tsv, matched to the videos by date: %d typed by hand from screenshots of the church's app that the Governor took, and %d from messages the Governor sent, each read by him in the church's app (these are sermons that have no notes). No tool read the app, so Subsplash's terms on automated reading are not engaged. The Governor shows the list to the pastor and removes it on an objection. It holds no YouTube data, so the 30 days do not bind it.", m.Merged, m.Merged-m.FromMessages, m.FromMessages)
+}
+
+// countsMarkdown is the counts of REPORT.md's section on the list, up to the
+// line on the unsure sermons.
+func (m *Merge) countsMarkdown() string {
+	var b strings.Builder
+	w := func(f string, a ...any) { fmt.Fprintf(&b, f, a...) }
+	w("- Entries in the list: %d\n", m.Entries)
+	w("- Merged into a row: %d\n", m.Merged)
+	w("- Of them from the Governor's messages: %d\n", m.FromMessages)
+	w("- Not merged: %d", len(m.Problems))
+	if len(m.Problems) == 0 {
+		w(".\n")
+	} else {
+		w(":\n")
+		for _, p := range m.Problems {
+			w("  - %s %q (%s, %s): %s\n", p.Entry.Date, p.Entry.Title, p.Entry.Speaker, p.Entry.Passage, p.Why)
+		}
+	}
+	return b.String()
+}
+
+var (
+	commentRE    = regexp.MustCompile(`#   \d+ of them carry the title, preacher and passage of the church's own list\n#   \(passages\.tsv, merged by date; see REPORT\.md\)\.`)
+	noteRE       = regexp.MustCompile(`(?s)The title, preacher and passage of \d+ rows come instead from the church's own list.*?the 30 days do not bind it\.`)
+	headCountsRE = regexp.MustCompile(`(sermons, )\d+ with a preacher, \d+ with a passage\n#   \(\d+ of them series`)
+	repCountsRE  = regexp.MustCompile(`(  - with a preacher: )\d+(\n  - with a passage: )\d+( \(series among them: )\d+((?s:.*?\n  - with neither: ))\d+`)
+	repNeitherRE = regexp.MustCompile(`(no passage and no preacher: )\d+(\.\*\*)`)
+	repSplitRE   = regexp.MustCompile(`(with a passage but no preacher: )\d+(; with a preacher but no passage: )\d+(\.)`)
+	countsRE     = regexp.MustCompile(`(?s)- Entries in the list: \d+\n.*?(- Unsure, left out)`)
+)
+
+// renewSourceTOML sets the two sentences about the list in source.toml to the
+// counts of m.
+func renewSourceTOML(s string, m *Merge) string {
+	if m.Counted {
+		s = headCountsRE.ReplaceAllString(s, fmt.Sprintf("${1}%d with a preacher, %d with a passage\n#   (%d of them series", m.RowsPreacher, m.RowsPassage, m.RowsSeries))
+	}
+	s = commentRE.ReplaceAllLiteralString(s, listCommentText(m))
+	return noteRE.ReplaceAllLiteralString(s, listNoteText(m))
+}
+
+// renewReport sets the counts of REPORT.md's section on the list to m's.
+func renewReport(s string, m *Merge) string {
+	s = paragraphRE.ReplaceAllLiteralString(s, listParagraph)
+	if m.Counted {
+		s = repCountsRE.ReplaceAllString(s, fmt.Sprintf("${1}%d${2}%d${3}%d${4}%d", m.RowsPreacher, m.RowsPassage, m.RowsSeries, m.RowsNeither))
+		s = repNeitherRE.ReplaceAllString(s, fmt.Sprintf("${1}%d${2}", m.RowsNeither))
+		s = repSplitRE.ReplaceAllString(s, fmt.Sprintf("${1}%d${2}%d${3}", m.RowsPassage-m.RowsBoth, m.RowsPreacher-m.RowsBoth))
+	}
+	return countsRE.ReplaceAllString(s, strings.ReplaceAll(m.countsMarkdown(), "$", "$$")+"$1")
+}
+
+// listParagraph opens REPORT.md's section on the church's list.
+const listParagraph = "`passages.tsv` is the church's own list of its sermons (series, Sunday, title, speaker, passage), typed by hand from screenshots of the church's app that the Governor took, or (the lines with a `row`) copied from a message in which he gave a sermon's title, date, preacher and passage as he read them in the app, for a sermon that has no notes; no tool reads the app. Each entry is matched to the one YouTube row of its date (a line with a `row` to that row, which tools/subsplash-links found within a day of the date), and that row takes the sermon's title, its preacher and its passage and keeps its watch link. An entry that cannot be matched to exactly one row, or whose passage the book table refuses, is named here and changes nothing; nothing is guessed."
+
+var paragraphRE = regexp.MustCompile("(?s)`passages\\.tsv` is the church's own list of its sermons.*?nothing is guessed\\.")

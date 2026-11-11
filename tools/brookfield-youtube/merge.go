@@ -18,9 +18,15 @@ import (
 // from the Governor's screenshots of the church's app (no tool reads the app),
 // kept in sources/brookfield-first/passages.tsv. Columns, with a header line:
 //
-//	series  date  title  speaker  passage
+//	series  date  title  speaker  passage  [row]
 //
-// The date is the Sunday. A line that starts with "#" is a comment, except
+// The date is the Sunday. The sixth column, row, is optional (the header may
+// stop at passage): a line from one of the Governor's messages names the id of
+// the row it belongs to, because that row is dated the day the video was
+// published, which need not be the Sunday; tools/subsplash-links writes those
+// lines, with a line in no-notes.tsv for each. A line with a row is matched to
+// that row by id and not by date, and an empty passage sets the title and the
+// preacher and leaves the row's passage as it was. A line that starts with "#" is a comment, except
 // "# unsure:", whose text REPORT.md prints as a sermon the list could not pin
 // down and which is never merged.
 //
@@ -31,6 +37,7 @@ import (
 // Entry is one sermon of the list.
 type Entry struct {
 	Series, Date, Title, Speaker, Passage string
+	Row                                   string // the id of the row a message entry belongs to; empty = match by date
 	Line                                  int
 }
 
@@ -61,11 +68,14 @@ func ReadList(path string) (*List, error) {
 		}
 		f := strings.Split(line, "\t")
 		if !header {
-			want := []string{"series", "date", "title", "speaker", "passage"}
-			if len(f) < len(want) {
+			want := []string{"series", "date", "title", "speaker", "passage", "row"}
+			if len(f) < 5 {
 				return nil, fmt.Errorf("%s:%d: the header names %d columns, want series, date, title, speaker, passage", path, i+1, len(f))
 			}
 			for j, w := range want {
+				if j >= len(f) {
+					break
+				}
 				if strings.TrimSpace(f[j]) != w {
 					return nil, fmt.Errorf("%s:%d: column %d is %q, want %q", path, i+1, j+1, f[j], w)
 				}
@@ -79,6 +89,9 @@ func ReadList(path string) (*List, error) {
 		e := Entry{
 			Series: strings.TrimSpace(f[0]), Date: strings.TrimSpace(f[1]), Title: strings.TrimSpace(f[2]),
 			Speaker: strings.TrimSpace(f[3]), Passage: strings.TrimSpace(f[4]), Line: i + 1,
+		}
+		if len(f) > 5 {
+			e.Row = strings.TrimSpace(f[5])
 		}
 		if _, err := time.Parse("2006-01-02", e.Date); err != nil {
 			return nil, fmt.Errorf("%s:%d: date %q is not YYYY-MM-DD", path, i+1, e.Date)
@@ -102,60 +115,111 @@ type Problem struct {
 
 // Merge is what MergeList did.
 type Merge struct {
-	Merged   int
-	Problems []Problem
-	Unsure   []string
-	Entries  int // entries in the list
+	Merged int
+	// FromMessages is how many of Merged are lines with a row: sermons the
+	// Governor sent in a message, read by him in the church's app.
+	FromMessages int
+	Problems     []Problem
+	// Counted is set by MergeRowsFile, which counts the rows after the merge:
+	// the rows with a preacher, with a passage, and series rows.
+	Counted                               bool
+	RowsPreacher, RowsPassage, RowsSeries int
+	RowsBoth, RowsNeither                 int
+	Unsure                                []string
+	Entries                               int // entries in the list
 }
 
 // MergeList applies the list to rows, in place.
 func MergeList(rows []sources.Row, l *List) *Merge {
 	m := &Merge{Unsure: l.Unsure, Entries: len(l.Entries)}
-	perDate := map[string]int{}
+	// An entry is matched to one row: by id when it names one, else by date.
+	// Two entries for one row (or one date) are each refused.
+	key := func(e Entry) string {
+		if e.Row != "" {
+			return "row " + e.Row
+		}
+		return "date " + e.Date
+	}
+	perKey := map[string]int{}
 	for _, e := range l.Entries {
-		perDate[e.Date]++
+		perKey[key(e)]++
 	}
 	byDate := map[string][]int{}
+	byID := map[string]int{}
 	for i, r := range rows {
 		if r.Date != nil {
 			byDate[*r.Date] = append(byDate[*r.Date], i)
 		}
+		byID[r.ID] = i
 	}
 	for _, e := range l.Entries {
 		fail := func(why string) { m.Problems = append(m.Problems, Problem{e, why}) }
-		if perDate[e.Date] > 1 {
-			fail(fmt.Sprintf("the list has %d entries on this date, a date is matched by one entry only", perDate[e.Date]))
+		if n := perKey[key(e)]; n > 1 {
+			if e.Row != "" {
+				fail(fmt.Sprintf("the list has %d entries for this row, a row is matched by one entry only", n))
+			} else {
+				fail(fmt.Sprintf("the list has %d entries on this date, a date is matched by one entry only", n))
+			}
 			continue
 		}
-		ref, why := listPassage(e.Passage)
-		if why != "" {
-			fail(why)
-			continue
+		ref := ""
+		if e.Passage != "" || e.Row == "" {
+			var why string
+			ref, why = listPassage(e.Passage)
+			if why != "" {
+				fail(why)
+				continue
+			}
 		}
-		idx := byDate[e.Date]
-		switch len(idx) {
-		case 0:
-			fail("no row of the YouTube list has this date")
-			continue
-		case 1:
-		default:
-			fail(fmt.Sprintf("%d rows of the YouTube list have this date, so none is chosen", len(idx)))
-			continue
+		var at int
+		if e.Row != "" {
+			i, ok := byID[e.Row]
+			if !ok {
+				fail(fmt.Sprintf("no row of the YouTube list has the id %q", e.Row))
+				continue
+			}
+			at = i
+		} else {
+			idx := byDate[e.Date]
+			switch len(idx) {
+			case 0:
+				fail("no row of the YouTube list has this date")
+				continue
+			case 1:
+			default:
+				fail(fmt.Sprintf("%d rows of the YouTube list have this date, so none is chosen", len(idx)))
+				continue
+			}
+			at = idx[0]
 		}
-		r := &rows[idx[0]]
+		r := &rows[at]
 		r.Title = e.Title
 		if e.Speaker != "" {
 			r.Preacher = ptr(e.Speaker)
 		}
-		r.Ref = ptr(ref)
-		r.Cited = nil
-		r.Series = nil
-		note := "Title, preacher and passage from the church's own list of its sermons (passages.tsv), matched to the video by date."
+		var note string
+		switch {
+		case e.Row == "":
+			r.Ref = ptr(ref)
+			r.Cited = nil
+			r.Series = nil
+			note = "Title, preacher and passage from the church's own list of its sermons (passages.tsv), matched to the video by date."
+		case ref != "":
+			r.Ref = ptr(ref)
+			r.Cited = nil
+			r.Series = nil
+			note = "Title, preacher and passage from a message the Governor sent, read by him in the church's app (passages.tsv; no notes exist for this sermon), matched to the video by its date."
+		default:
+			note = "Title and preacher from a message the Governor sent, read by him in the church's app (passages.tsv; no notes exist for this sermon), matched to the video by its date; the message names no passage."
+		}
 		if e.Series != "" {
 			note = fmt.Sprintf("Series: %s. %s", e.Series, note)
 		}
 		r.Notes = ptr(note)
 		m.Merged++
+		if e.Row != "" {
+			m.FromMessages++
+		}
 	}
 	return m
 }
@@ -242,4 +306,86 @@ func KeepAltURLs(rows []sources.Row, alts map[string]string) {
 			rows[i].AltURL = ptr(u)
 		}
 	}
+}
+
+// MergeRowsFile applies the list at listPath to the rows already in the
+// rows.jsonl at rowsPath, with no call to the API: the run that the hourly
+// script makes after a message of the Governor's has added a line to the list.
+// A row the list does not change is left byte for byte as it was, and the file
+// is not written when no row changes. It returns the merge and how many rows
+// changed.
+func MergeRowsFile(rowsPath, listPath string) (*Merge, int, error) {
+	l, err := ReadList(listPath)
+	if err != nil {
+		return nil, 0, err
+	}
+	b, err := os.ReadFile(rowsPath)
+	if err != nil {
+		return nil, 0, err
+	}
+	lines := strings.Split(string(b), "\n")
+	var rows []sources.Row
+	var at []int
+	for i, line := range lines {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		dec := json.NewDecoder(strings.NewReader(line))
+		dec.DisallowUnknownFields() // a rewritten line must lose nothing
+		var r sources.Row
+		if err := dec.Decode(&r); err != nil {
+			return nil, 0, fmt.Errorf("%s:%d: %w", rowsPath, i+1, err)
+		}
+		rows = append(rows, r)
+		at = append(at, i)
+	}
+	encode := func(r sources.Row) (string, error) {
+		var buf bytes.Buffer
+		if err := writeLine(&buf, r); err != nil {
+			return "", err
+		}
+		return strings.TrimRight(buf.String(), "\n"), nil
+	}
+	before := make([]string, len(rows))
+	for i, r := range rows {
+		if before[i], err = encode(r); err != nil {
+			return nil, 0, err
+		}
+	}
+	m := MergeList(rows, l)
+	m.Counted = true
+	for _, r := range rows {
+		if r.Preacher != nil {
+			m.RowsPreacher++
+		}
+		if r.Ref != nil {
+			m.RowsPassage++
+		}
+		if r.IsSeries() {
+			m.RowsSeries++
+		}
+		if r.Ref != nil && r.Preacher != nil {
+			m.RowsBoth++
+		}
+		if r.Ref == nil && r.Preacher == nil {
+			m.RowsNeither++
+		}
+	}
+	changed := 0
+	for i, r := range rows {
+		now, err := encode(r)
+		if err != nil {
+			return nil, 0, err
+		}
+		if now != before[i] {
+			lines[at[i]] = now
+			changed++
+		}
+	}
+	if changed > 0 {
+		if err := os.WriteFile(rowsPath, []byte(strings.Join(lines, "\n")), 0o644); err != nil {
+			return nil, 0, err
+		}
+	}
+	return m, changed, nil
 }

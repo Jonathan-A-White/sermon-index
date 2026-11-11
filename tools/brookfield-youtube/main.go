@@ -20,6 +20,13 @@
 // the row with the same id. A row the channel no longer lists loses it; a new
 // row has none. url (the watch link) is always the API's.
 //
+// --merge-only applies passages.tsv to the rows already in rows.jsonl with no
+// call to the API and no key (MergeRowsFile), and brings the counts in
+// source.toml and REPORT.md to the list's. scripts/subsplash-hourly.sh runs it
+// after tools/subsplash-links --read-messages has added the Governor's
+// messages about sermons with no notes to passages.tsv (the lines with a row
+// id, which are matched by that id and not by date).
+//
 // A second run over the same channel writes the same bytes (the order is
 // publish order, oldest first), so a diff shows only new videos.
 package main
@@ -32,6 +39,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -58,10 +66,26 @@ func main() {
 	rephil := flag.String("rephil", "data/morning-rephil.jsonl", "the Morning RePhil list to write")
 	report := flag.String("report", "", "write the report here (default: REPORT.md in --out)")
 	list := flag.String("passages", "", "the church's list of its sermons, merged by date into the rows (default: passages.tsv in --out; \"none\" merges nothing)")
+	mergeOnly := flag.Bool("merge-only", false, "apply passages.tsv to the rows already in rows.jsonl, with no call to the API and no key")
 	flag.Parse()
 	if flag.NArg() != 0 {
-		fmt.Fprintln(os.Stderr, "usage: "+keyVar+"=<key> brookfield-youtube [--handle @BrookfieldFirst] [--out sources/brookfield-first] [--rephil data/morning-rephil.jsonl] [--report <file>] [--passages <file>|none]")
+		fmt.Fprintln(os.Stderr, "usage: "+keyVar+"=<key> brookfield-youtube [--handle @BrookfieldFirst] [--out sources/brookfield-first] [--rephil data/morning-rephil.jsonl] [--report <file>] [--passages <file>|none]\n       brookfield-youtube --merge-only [--out sources/brookfield-first] [--passages <file>]")
 		os.Exit(2)
+	}
+	if *mergeOnly {
+		list := *list
+		if list == "" || list == "none" {
+			list = filepath.Join(*out, "passages.tsv")
+		}
+		rep := *report
+		if rep == "" {
+			rep = filepath.Join(*out, "REPORT.md")
+		}
+		if err := runMergeOnly(*out, list, rep, os.Stdout); err != nil {
+			fmt.Fprintln(os.Stderr, "brookfield-youtube:", err)
+			os.Exit(1)
+		}
+		return
 	}
 	key, err := keyFromEnv(os.Getenv)
 	if err != nil {
@@ -90,6 +114,42 @@ func main() {
 		fmt.Fprintln(os.Stderr, "brookfield-youtube:", err)
 		os.Exit(1)
 	}
+}
+
+// runMergeOnly applies the church's list to the rows in out/rows.jsonl without
+// the API (see MergeRowsFile) and brings the counts in
+// out/source.toml and the report to the list's. It prints what it did and any
+// entry it could not merge.
+func runMergeOnly(out, listPath, reportPath string, stdout io.Writer) error {
+	rowsPath := filepath.Join(out, "rows.jsonl")
+	m, changed, err := MergeRowsFile(rowsPath, listPath)
+	if err != nil {
+		return err
+	}
+	for _, p := range m.Problems {
+		fmt.Fprintf(stdout, "merge: %s %q: not merged: %s\n", p.Entry.Date, p.Entry.Title, p.Why)
+	}
+	patch := func(path string, f func(string, *Merge) string) error {
+		b, err := os.ReadFile(path)
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if got := f(string(b), m); got != string(b) {
+			return os.WriteFile(path, []byte(got), 0o644)
+		}
+		return nil
+	}
+	if err := patch(filepath.Join(out, "source.toml"), renewSourceTOML); err != nil {
+		return err
+	}
+	if err := patch(reportPath, renewReport); err != nil {
+		return err
+	}
+	fmt.Fprintf(stdout, "merge: %d entries in the list, %d merged (%d from the Governor's messages), %d row(s) changed\n", m.Entries, m.Merged, m.FromMessages, changed)
+	return nil
 }
 
 // keyFromEnv reads the API key from the environment, or says plainly that it
