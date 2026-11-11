@@ -52,8 +52,9 @@ var titleRefRE = func() *regexp.Regexp {
 		names[i] = regexp.QuoteMeta(n)
 	}
 	const dash = `[–—-]`
+	// A range may end in another chapter's verse ("4:1–5:14", "4–5:14").
 	return regexp.MustCompile(`\b(?:` + strings.Join(names, "|") + `)(?:[’']s\s+Gospel)?,?\s+(?:Chapter\s+)?\d+` +
-		`(?::\d+(?:\s?` + dash + `\s?\d+)?(?:,\s*\d+(?:` + dash + `\d+)?)*|\s?` + dash + `\s?\d+)?\b`)
+		`(?::\d+(?:\s?` + dash + `\s?\d+(?::\d+)?)?(?:,\s*\d+(?:` + dash + `\d+)?)*|\s?` + dash + `\s?\d+(?::\d+)?)?\b`)
 }()
 
 // RefsInTitle reads the passages named in a title, in the order they come, as
