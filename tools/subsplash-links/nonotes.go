@@ -89,7 +89,9 @@ var bookOSIS = func() map[string]string {
 // splitPassage splits text into what comes before its passage (the preacher)
 // and the passage, which is the longest ending of the text that the book table
 // reads. A text that has none gives ("", "", ""); one whose ending looks like
-// a passage but is refused gives the reason in why.
+// a passage but is refused gives the passage as written and the reason in why.
+// A passage of any width is read: the Governor wrote it, and a whole series
+// ("Genesis 37-49") is what he read in the app.
 func splitPassage(text string) (before, pass, why string) {
 	m := tailPassageRE.FindStringSubmatchIndex(text)
 	if m == nil {
@@ -97,21 +99,80 @@ func splitPassage(text string) (before, pass, why string) {
 	}
 	sub := tailPassageRE.FindStringSubmatch(text)
 	pass = strings.TrimSpace(sub[1])
+	before = strings.TrimSpace(text[:m[2]])
 	osis, ok := bookOSIS[strings.ToLower(strings.Join(strings.Fields(sub[2]), " "))]
 	if !ok {
-		return "", "", fmt.Sprintf("the passage %q is refused by the book table", pass)
+		return before, pass, fmt.Sprintf("the passage %q is refused by the book table", pass)
 	}
 	ref, err := passage.RangeOSIS(osis, sub[3], sub[4], sub[5], sub[6])
 	if err == nil {
-		var r passage.Range
-		if r, err = passage.Parse(ref); err == nil && r.Chapters() > 3 {
-			return "", "", fmt.Sprintf("the passage %q spans %d chapters, which is a series and not a text", pass, r.Chapters())
-		}
+		_, err = passage.Parse(ref)
 	}
 	if err != nil {
-		return "", "", fmt.Sprintf("the passage %q is refused by the book table", pass)
+		return before, pass, fmt.Sprintf("the passage %q is refused by the book table", pass)
 	}
-	return strings.TrimSpace(text[:m[2]]), pass, ""
+	return before, pass, ""
+}
+
+// joinParts moves a passage that ends the preacher's words into the passage
+// when a comma or semicolon joins them: "Sam Morgan Luke 24," and "John 5" are
+// the preacher Sam Morgan and the passage "Luke 24, John 5".
+func joinParts(before, pass string) (string, string) {
+	for {
+		t := strings.TrimSpace(before)
+		if t == "" {
+			return before, pass
+		}
+		sep := t[len(t)-1]
+		if sep != ',' && sep != ';' {
+			return before, pass
+		}
+		b2, p2, w := splitPassage(strings.TrimRight(t, ",; "))
+		if p2 == "" || w != "" {
+			return before, pass
+		}
+		before, pass = b2, p2+string(sep)+" "+pass
+	}
+}
+
+// joinWraps puts back a passage that the app's copy wrapped around a date line:
+// a book's name left above the date ("Thessalonians" above "Aug 22, 2021 Phil
+// Morgan 1") and the first part of a two-part passage left above it with its
+// comma ("Exodus 2:1-10,"). Each moves onto the date line, where it follows the
+// preacher and meets the lines that come after it.
+func joinWraps(lines []string) []string {
+	var out []string
+	for _, l := range lines {
+		m := dateRE.FindStringSubmatch(l)
+		if m != nil && len(out) > 0 {
+			prev := out[len(out)-1]
+			if !dateRE.MatchString(prev) {
+				rest := strings.Fields(m[4])
+				if n := len(rest); n > 0 && len(rest[n-1]) <= 3 && isDigits(rest[n-1]) {
+					if _, ok := bookOSIS[strings.ToLower(rest[n-1]+" "+prev)]; ok {
+						out = out[:len(out)-1]
+						l += " " + prev
+					}
+				} else if last := prev[len(prev)-1]; last == ',' || last == ';' {
+					if b, p, w := splitPassage(strings.TrimRight(prev, ",; ")); b == "" && p != "" && w == "" {
+						out = out[:len(out)-1]
+						l += " " + prev
+					}
+				}
+			}
+		}
+		out = append(out, l)
+	}
+	return out
+}
+
+func isDigits(s string) bool {
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return s != ""
 }
 
 func cleanLine(s string) string {
@@ -165,6 +226,7 @@ func ParseNoNotes(tx, text string) (sermons []Sermon, unread []Unread, candidate
 // end of the message). The lines after the last "No notes" that hold no date
 // are not a sermon ("Stopping for now.") and are skipped.
 func parseBlock(tx string, lines []string, closed bool) ([]Sermon, []Unread) {
+	lines = joinWraps(lines)
 	var dates []int
 	for i, l := range lines {
 		if dateRE.MatchString(l) {
@@ -192,28 +254,30 @@ func parseBlock(tx string, lines []string, closed bool) ([]Sermon, []Unread) {
 		year, _ := strconv.Atoi(m[3])
 		d := time.Date(year, monthNum[strings.ToLower(m[1])], day, 0, 0, 0, 0, time.UTC)
 		date := d.Format("2006-01-02")
-		if d.Day() != day {
-			bad = append(bad, Unread{tx, firstOr(titleLines, lines[di]), fmt.Sprintf("%q is not a date", lines[di])})
-			titleLines, titleOK = nil, false
-			continue
-		}
+		own := firstOr(titleLines, date)
 		rest := m[4]
 		S := lines[di+1 : end]
 
+		// Where this entry's body ends is read from its lines whether or not the
+		// entry itself can be placed, so that the lines after it are the next
+		// entry's title and one entry that is garbled does not hide the next.
 		speaker, pass, consumed, why := readBody(rest, S, last)
-		fail := func(w string) {
-			bad = append(bad, Unread{tx, firstOr(titleLines, date), w})
+		if d.Day() != day {
+			why = fmt.Sprintf("%q is not a date", lines[di])
 		}
-		var left []string
-		switch {
-		case why != "":
-			fail(why)
-			// Where the next title starts is not known either.
-			titleLines, titleOK = nil, false
+		if why != "" {
+			bad = append(bad, Unread{tx, own, why})
+			if consumed < 0 {
+				// Where the next title starts is not known.
+				titleLines, titleOK = nil, false
+			} else if last {
+				titleLines, titleOK = nil, true
+			} else {
+				titleLines, titleOK = S[consumed:], true
+			}
 			continue
-		default:
-			left = S[consumed:]
 		}
+		left := S[consumed:]
 		ok := titleOK
 		reason := "its title follows an entry that could not be read, so which line is the title is not known"
 		var title, series string
@@ -238,7 +302,7 @@ func parseBlock(tx string, lines []string, closed bool) ([]Sermon, []Unread) {
 			titleLines, titleOK = left, true
 		}
 		if !ok {
-			bad = append(bad, Unread{tx, firstOr(titleLines, date), reason})
+			bad = append(bad, Unread{tx, own, reason})
 			if title != "" {
 				bad[len(bad)-1].Title = title
 			}
@@ -261,15 +325,20 @@ func firstOr(l []string, def string) string {
 // title. It takes lines one at a time until what it has ends in a passage (at
 // most three more lines). With no passage, the body is the preacher alone;
 // where the lines end at the next entry's title, that is only certain when the
-// number of lines says which are the preacher and which the title.
+// number of lines says which are the preacher and which the title; a line that
+// is only the name of a book is the passage (the whole book). consumed is how
+// many of s the body took, or -1 when that is not known (and so where the next
+// entry's title begins is not); it is known when a passage was found even if
+// the passage is refused (why says so).
 func readBody(rest string, s []string, last bool) (speaker, pass string, consumed int, why string) {
 	acc := rest
 	for k := 0; ; k++ {
 		before, p, w := splitPassage(acc)
-		if w != "" {
-			return "", "", 0, w
-		}
 		if p != "" {
+			if w != "" {
+				return "", "", k, w
+			}
+			before, p = joinParts(before, p)
 			return cleanSpeaker(before), p, k, ""
 		}
 		if k >= len(s) || k >= 3 {
@@ -278,19 +347,27 @@ func readBody(rest string, s []string, last bool) (speaker, pass string, consume
 		acc = strings.TrimSpace(acc + " " + s[k])
 	}
 	// No passage.
+	isBook := func(l string) bool { _, ok := bookOSIS[strings.ToLower(l)]; return ok }
 	if last {
 		if len(s) > 2 {
-			return "", "", 0, fmt.Sprintf("%d lines after the date and no passage in them", len(s))
+			return "", "", -1, fmt.Sprintf("%d lines after the date and no passage in them", len(s))
+		}
+		if n := len(s); n > 0 && isBook(s[n-1]) {
+			return cleanSpeaker(strings.TrimSpace(rest + " " + strings.Join(s[:n-1], " "))), s[n-1], n, ""
 		}
 		return cleanSpeaker(strings.TrimSpace(rest + " " + strings.Join(s, " "))), "", len(s), ""
 	}
 	switch len(s) {
 	case 1:
 		return cleanSpeaker(rest), "", 0, ""
+	case 2:
+		if isBook(s[0]) {
+			return cleanSpeaker(rest), s[0], 1, ""
+		}
 	case 3:
 		return cleanSpeaker(strings.TrimSpace(rest + " " + s[0])), "", 1, ""
 	}
-	return "", "", 0, "no passage, and it cannot be told where the preacher ends and the next title begins"
+	return "", "", -1, "no passage, and it cannot be told where the preacher ends and the next title begins"
 }
 
 // --- the inbox ---
@@ -569,13 +646,17 @@ func RunNoNotes(inbox, key, passagesPath, noNotesPath, rowsPath string) (*NoNote
 	return res, nil
 }
 
-// rowWithin is the id of the one row dated within a day of date.
+// rowWithin is the id of the one row dated within a day of date. Where two or
+// more are, the one row with no passage and a generic title (the church's
+// "Brookfield First - Easter Online 2021", "Online Service") is the one: a row
+// that already holds a title and a passage is another sermon's. With none such,
+// or several, none is chosen.
 func rowWithin(rows []sources.Row, date string) (string, string) {
 	d, err := time.Parse("2006-01-02", date)
 	if err != nil {
 		return "", fmt.Sprintf("%q is not a date", date)
 	}
-	var found []string
+	var found []sources.Row
 	for _, r := range rows {
 		if r.Date == nil {
 			continue
@@ -585,16 +666,36 @@ func rowWithin(rows []sources.Row, date string) (string, string) {
 			continue
 		}
 		if diff := rd.Sub(d); diff >= -24*time.Hour && diff <= 24*time.Hour {
-			found = append(found, r.ID)
+			found = append(found, r)
 		}
 	}
 	switch len(found) {
 	case 1:
-		return found[0], ""
+		return found[0].ID, ""
 	case 0:
 		return "", fmt.Sprintf("no row of the rows file is dated within a day of %s", date)
 	}
-	return "", fmt.Sprintf("%d rows (%s) are dated within a day of %s, so none is chosen", len(found), strings.Join(found, ", "), date)
+	var open, ids []string
+	for _, r := range found {
+		ids = append(ids, r.ID)
+		if genericRow(r) {
+			open = append(open, r.ID)
+		}
+	}
+	if len(open) == 1 {
+		return open[0], ""
+	}
+	return "", fmt.Sprintf("%d rows (%s) are dated within a day of %s, and %d of them have no passage and a generic title, so none is chosen", len(found), strings.Join(ids, ", "), date, len(open))
+}
+
+// genericRow is a row that holds no passage and only the church's generic
+// title for a service.
+func genericRow(r sources.Row) bool {
+	if r.Ref != nil && *r.Ref != "" {
+		return false
+	}
+	t := strings.ToLower(strings.TrimSpace(r.Title))
+	return strings.HasPrefix(t, "brookfield first") || strings.Contains(t, "online service")
 }
 
 // appendLines adds text to the file, first writing header if the file is new,
