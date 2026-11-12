@@ -49,9 +49,9 @@ func TestSavedDroppedAlertsAreRecordedForTheirRows(t *testing.T) {
 		t.Fatal(err)
 	}
 	kept := map[string]string{}
-	records, report, recorded, err := merge(bytes.NewReader(body), droppedRows(), nil, func(n Note, rec Record) error {
+	records, report, recorded, _, err := merge(bytes.NewReader(body), droppedRows(), nil, func(n Note, rec Record, same bool) (string, error) {
 		kept[n.AlertID] = rec.ID
-		return nil
+		return "", nil
 	})
 	if err != nil {
 		t.Fatal(err)

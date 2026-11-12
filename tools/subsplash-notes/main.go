@@ -53,9 +53,15 @@
 // file in place, and only then the alert claimed. A failed download, a wrong
 // size or a wrong sha256 is reported, writes no record for that alert and
 // leaves it unclaimed; the other alerts go on. A file already there with the
-// same sha256 is not downloaded again; one with another sha256 is reported
-// and not replaced. The no-subcommand reader accepts the two fields and
-// downloads nothing.
+// same sha256 is not downloaded again. One with another sha256 is the notes of
+// a second mail for the same sermon (the same title, passage and Sunday as the
+// record kept for the row, the church's PDF made again): the newer mail's
+// notes are kept as <row id>.pdf and the older beside them as
+// <row id>.prev.pdf. A mail for another sermon that falls on the row is
+// reported with both titles and writes nothing, and so is a file with no
+// record to say it is the same sermon's; each says what to do, and the
+// summary line counts them ("n not replaced"). The no-subcommand reader
+// accepts the two fields and downloads nothing.
 //
 // The date an alert gives can be the Saturday or the Monday of the Sunday it
 // is about (the mail's date is when the notes went out), so a Saturday or a
@@ -240,11 +246,11 @@ func fetchCmd(args []string, stdout, stderr io.Writer) int {
 		return fail(stderr, err)
 	}
 	// An alert with notes is recorded only once its PDF is on disk.
-	records, report, recorded, err := merge(bytes.NewReader(body), rows, existing, func(n Note, rec Record) error {
+	records, report, recorded, refused, err := merge(bytes.NewReader(body), rows, existing, func(n Note, rec Record, same bool) (string, error) {
 		if n.NotesSHA256 == "" {
-			return nil
+			return "", nil
 		}
-		return store.Keep(ctx, n, rec.ID)
+		return store.Keep(ctx, n, rec.ID, same)
 	})
 	if err != nil {
 		return fail(stderr, err)
@@ -265,7 +271,7 @@ func fetchCmd(args []string, stdout, stderr io.Writer) int {
 		}
 		claimed++
 	}
-	fmt.Fprintf(stdout, "%d records in %s (%d before), %d reported, %d claimed\n", len(records), *out, len(existing), len(report), claimed)
+	fmt.Fprintf(stdout, "%d records in %s (%d before), %d reported, %d not replaced, %d claimed\n", len(records), *out, len(existing), len(report), refused, claimed)
 	if store.Asked > 0 {
 		fmt.Fprintf(stdout, "%d notes downloaded to %s\n", store.Asked, store.Dir)
 	}
@@ -304,7 +310,7 @@ func run(alertsPath, rowsPath, out string, stdin io.Reader, stdout, stderr io.Wr
 	if err != nil {
 		return err
 	}
-	records, report, err := Run(alerts, rows, existing)
+	records, report, _, refused, err := merge(alerts, rows, existing, nil)
 	if err != nil {
 		return err
 	}
@@ -314,7 +320,7 @@ func run(alertsPath, rowsPath, out string, stdin io.Reader, stdout, stderr io.Wr
 	for _, line := range report {
 		fmt.Fprintln(stderr, line)
 	}
-	fmt.Fprintf(stdout, "%d records in %s (%d before), %d reported\n", len(records), out, len(existing), len(report))
+	fmt.Fprintf(stdout, "%d records in %s (%d before), %d reported, %d not replaced\n", len(records), out, len(existing), len(report), refused)
 	return nil
 }
 
@@ -366,20 +372,23 @@ func writeRecords(out string, records []Record) error {
 // with the existing ones by row id. report lists, one line each, what was
 // dropped or not guessed.
 func Run(alerts io.Reader, rows []sources.Row, existing []Record) (records []Record, report []string, err error) {
-	records, report, _, err = merge(alerts, rows, existing, nil)
+	records, report, _, _, err = merge(alerts, rows, existing, nil)
 	return records, report, err
 }
 
 // merge is Run, also naming the alerts whose record the merged records hold
-// (written now, or kept already and the same), in the order they came: the
-// alerts that may be claimed once the records are on disk. keep, when not nil,
-// is asked of each note about to be recorded (its record new or already kept
-// and the same) and an error from it is reported, the alert neither recorded
-// nor named: fetch keeps the notes PDF there.
-func merge(alerts io.Reader, rows []sources.Row, existing []Record, keep func(Note, Record) error) (records []Record, report, recorded []string, err error) {
+// (written now, or kept already and the same) in the order they came: the
+// alerts that may be claimed once the records are on disk. refused counts the
+// alerts left as they were because a record or a file was there and would not
+// be written over (the summary line says how many). keep, when not nil, is
+// asked of each note about to be recorded (its record new or already kept and
+// the same; same says which) and an error from it is reported, the alert
+// neither recorded nor named: fetch keeps the notes PDF there. A non-empty
+// line it returns is reported too, as news and not as a problem.
+func merge(alerts io.Reader, rows []sources.Row, existing []Record, keep func(n Note, rec Record, same bool) (string, error)) (records []Record, report, recorded []string, refused int, err error) {
 	notes, problems, err := ReadAlerts(alerts)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, 0, err
 	}
 	for _, p := range problems {
 		report = append(report, reported(p.AlertID, p.Why, p.Says))
@@ -397,23 +406,27 @@ func merge(alerts io.Reader, rows []sources.Row, existing []Record, keep func(No
 		if how != "" {
 			report = append(report, reported(n.AlertID, how, n.Says()))
 		}
-		if have, ok := byID[rec.ID]; ok {
-			if have != rec {
-				report = append(report, reported(n.AlertID, fmt.Sprintf("disagrees with the record kept for row %s (kept '%s', %s, %s); not replaced", rec.ID, have.Title, have.Ref, have.Date), n.Says()))
-				continue
-			}
-			if err := keepNotes(keep, n, rec); err != nil {
-				report = append(report, reported(n.AlertID, "not recorded: "+err.Error(), n.Says()))
-				continue
-			}
-			recorded = append(recorded, n.AlertID)
+		have, same := byID[rec.ID]
+		if same && have != rec {
+			refused++
+			report = append(report, reported(n.AlertID, fmt.Sprintf("disagrees with the record kept for row %s (kept '%s', %s, %s): another sermon, so its notes and record are not written over that row's; not replaced (if the kept record is the wrong one, delete its line from the records file and the next run writes this one)", rec.ID, have.Title, have.Ref, have.Date), n.Says()))
 			continue
 		}
-		if err := keepNotes(keep, n, rec); err != nil {
+		news, err := keepNotes(keep, n, rec, same)
+		if err != nil {
+			var nr notReplaced
+			if errors.As(err, &nr) {
+				refused++
+			}
 			report = append(report, reported(n.AlertID, "not recorded: "+err.Error(), n.Says()))
 			continue
 		}
-		byID[rec.ID] = rec
+		if news != "" {
+			report = append(report, reported(n.AlertID, news, n.Says()))
+		}
+		if !same {
+			byID[rec.ID] = rec
+		}
 		recorded = append(recorded, n.AlertID)
 	}
 	for _, r := range byID {
@@ -425,7 +438,7 @@ func merge(alerts io.Reader, rows []sources.Row, existing []Record, keep func(No
 		}
 		return records[i].ID < records[j].ID
 	})
-	return records, report, recorded, nil
+	return records, report, recorded, refused, nil
 }
 
 // reported is one line of the report: the alert, what happened to it and,
@@ -438,11 +451,11 @@ func reported(id, what, says string) string {
 	return fmt.Sprintf("alert %s: %s [alert says: %s]", id, what, says)
 }
 
-func keepNotes(keep func(Note, Record) error, n Note, rec Record) error {
+func keepNotes(keep func(Note, Record, bool) (string, error), n Note, rec Record, same bool) (string, error) {
 	if keep == nil {
-		return nil
+		return "", nil
 	}
-	return keep(n, rec)
+	return keep(n, rec, same)
 }
 
 func readRows(path string) ([]sources.Row, error) {

@@ -87,7 +87,7 @@ func Keygen(path string) (pubHex string, err error) {
 		return "", fmt.Errorf("%s is inside the git work tree %s: a key is never written where it could be committed", path, repo)
 	}
 	if _, err := os.Lstat(path); err == nil {
-		return "", fmt.Errorf("a key is already at %s: keygen never replaces one", path)
+		return "", fmt.Errorf("a key is already at %s: keygen never replaces one; to make a new key, move that file away first", path)
 	}
 	priv, err := btcec.NewPrivateKey()
 	if err != nil {
@@ -118,7 +118,7 @@ func Keygen(path string) (pubHex string, err error) {
 	}
 	if err := os.Link(tmp.Name(), path); err != nil {
 		if errors.Is(err, os.ErrExist) {
-			return "", fmt.Errorf("a key is already at %s: keygen never replaces one", path)
+			return "", fmt.Errorf("a key is already at %s: keygen never replaces one; to make a new key, move that file away first", path)
 		}
 		return "", fmt.Errorf("putting the key at %s: %w", path, err)
 	}
