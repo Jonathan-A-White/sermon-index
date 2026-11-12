@@ -24,9 +24,10 @@ import (
 // A record is written only for a row that has no passage and a generic title
 // ("Brookfield First - Online Service | October 19, 2025"). A row that has a
 // passage, a row that has a title of its own, a row the list already has a line
-// for (his message's, or an earlier run's), a record with no passage and a
-// record no single row holds are left as they are; the ones that call for a
-// person's look are named with why.
+// for (his message's, or an earlier run's) and a record no single row holds are
+// left as they are. A record whose mail names no passage takes the one its
+// notes PDF's header prints (pdfPassage); when the PDF holds none the row is
+// named. The ones that call for a person's look are named with why.
 
 // NotesResult is what RunNotes did.
 type NotesResult struct {
@@ -254,8 +255,7 @@ func pdfPassage(text string) (string, bool) {
 	if cut < 0 {
 		return "", false
 	}
-	// The closing quote's own width is not known by byte: drop the quote and
-	// what is before it, then a dash and the speaker.
+	// Drop the title (up to its closing quote), then a dash and the speaker.
 	rest := joined[cut:]
 	rest = strings.TrimLeft(rest, pdfQuoteCuts)
 	rest = strings.TrimSpace(strings.TrimLeft(strings.TrimSpace(rest), "—–-"))
