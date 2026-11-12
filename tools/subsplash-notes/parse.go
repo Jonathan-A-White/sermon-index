@@ -35,6 +35,8 @@ type Alert struct {
 	When        string `json:"when"`
 	NotesSHA256 string `json:"notes_sha256"`
 	NotesSize   int    `json:"notes_size"`
+	// Speaker is the preacher the mail names; Postern's alert may omit it.
+	Speaker string `json:"speaker,omitempty"`
 }
 
 // Note is what one alert says about a sermon: its title, its passage as an
@@ -50,6 +52,7 @@ type Note struct {
 	Date        string
 	NotesSHA256 string
 	NotesSize   int
+	Speaker     string // the preacher the alert names, trimmed; empty when it names none
 }
 
 // Problem is an alert the reader dropped, and why. Why never repeats a
@@ -133,7 +136,7 @@ func ReadAlerts(r io.Reader) ([]Note, []Problem, error) {
 		dec.DisallowUnknownFields()
 		var a Alert
 		if err := dec.Decode(&a); err != nil {
-			problems = append(problems, Problem{head.ID, "dropped: " + err.Error() + " (the reader takes only title, reference, when, notes_sha256 and notes_size)", alertSays(raw)})
+			problems = append(problems, Problem{head.ID, "dropped: " + err.Error() + " (the reader takes only title, reference, when, speaker, notes_sha256 and notes_size)", alertSays(raw)})
 			continue
 		}
 		n, err := a.note()
@@ -171,7 +174,7 @@ func (a Alert) note() (Note, error) {
 	}
 	// The alert's own offset is Eastern: its date is the date the church's
 	// mail printed, not the UTC date of that instant.
-	n := Note{AlertID: a.ID, Title: title, Ref: places[0], Also: strings.Join(places[1:], AlsoSep), Reference: strings.TrimSpace(a.Reference), Date: t.Format("2006-01-02"), NotesSHA256: a.NotesSHA256, NotesSize: a.NotesSize}
+	n := Note{AlertID: a.ID, Title: title, Ref: places[0], Also: strings.Join(places[1:], AlsoSep), Reference: strings.TrimSpace(a.Reference), Date: t.Format("2006-01-02"), NotesSHA256: a.NotesSHA256, NotesSize: a.NotesSize, Speaker: strings.TrimSpace(a.Speaker)}
 	switch {
 	case a.NotesSHA256 == "" && a.NotesSize == 0:
 	case a.NotesSHA256 == "" || a.NotesSize == 0:

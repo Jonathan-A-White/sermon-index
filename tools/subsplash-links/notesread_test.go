@@ -405,3 +405,37 @@ func TestPDFPassageReadsTheHeadersPassageAndNotABodyLine(t *testing.T) {
 		}
 	}
 }
+
+// A record may carry the speaker the notes mail's alert named (mw-qtu3zvz.100):
+// it is written to the list as the line's speaker for a row that names none,
+// and a row that already has a preacher is not given another.
+func TestReadNotesWritesTheSpeakerTheRecordNamesOnlyWhereTheRowHasNone(t *testing.T) {
+	rows := `{"id":"a1","title":"Brookfield First - Online Service | October 19, 2025","url":"y1","kind":"link","date":"2025-10-19"}
+{"id":"b1","title":"Brookfield First - Online Service | October 26, 2025","url":"y2","kind":"link","date":"2025-10-26","preacher":"Sam Morgan"}
+{"id":"c1","title":"Brookfield First - Online Service | November 2, 2025","url":"y3","kind":"link","date":"2025-11-02"}
+`
+	recs := `{"id":"a1","date":"2025-10-19","title":"When Angels Go to Church","ref":"Acts.12.1-Acts.12.17","speaker":"Phil Morgan"}
+{"id":"b1","date":"2025-10-26","title":"Second One","ref":"Ps.23","speaker":"Phil Morgan"}
+{"id":"c1","date":"2025-11-02","title":"Third One","ref":"Ps.24"}
+`
+	dir := t.TempDir()
+	rp, np, lp := filepath.Join(dir, "rows.jsonl"), filepath.Join(dir, "notes.jsonl"), filepath.Join(dir, "passages.tsv")
+	for p, b := range map[string]string{rp: rows, np: recs, lp: passagesHeader} {
+		if err := os.WriteFile(p, []byte(b), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := RunNotes(np, lp, rp); err != nil {
+		t.Fatal(err)
+	}
+	got := readFile(t, lp)
+	if !strings.Contains(got, "\t2025-10-19\tWhen Angels Go to Church\tPhil Morgan\tActs 12:1-17\ta1\tnotes\n") {
+		t.Errorf("a1 has no speaker from its record:\n%s", got)
+	}
+	if !strings.Contains(got, "\t2025-10-26\tSecond One\t\tPsalms 23\tb1\tnotes\n") {
+		t.Errorf("b1 has a preacher already and must get no speaker:\n%s", got)
+	}
+	if !strings.Contains(got, "\t2025-11-02\tThird One\t\tPsalms 24\tc1\tnotes\n") {
+		t.Errorf("c1's record names none:\n%s", got)
+	}
+}

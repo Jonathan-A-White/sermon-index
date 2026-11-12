@@ -405,7 +405,12 @@ func RunNotesWithSpeakers(notesPath, passagesPath, rowsPath, pdfDir string, text
 		}
 		taken[row.ID] = true
 		var speaker string
-		if pdfDir != "" && text != nil {
+		// The alert's speaker goes to a row that names no preacher; a row
+		// that has one is not given another.
+		if row.Preacher == nil || strings.TrimSpace(*row.Preacher) == "" {
+			speaker = tsvField(strings.TrimSpace(rec.Speaker))
+		}
+		if speaker == "" && pdfDir != "" && text != nil {
 			if t, err := text(filepath.Join(pdfDir, row.ID+".pdf")); err == nil {
 				speaker = tsvField(notesSpeaker(t))
 			}

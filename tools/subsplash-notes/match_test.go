@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 	"strings"
 	"testing"
@@ -327,5 +328,18 @@ func TestMatchByTitleIsNotTriedWhenARowIsWithinADay(t *testing.T) {
 	recs, report := runOne(t, rows)
 	if len(recs) != 1 || recs[0].ID != "vid-2031-03-02" || strings.Contains(strings.Join(report, "\n"), "matched by") {
 		t.Errorf("records %+v report %v", recs, report)
+	}
+}
+
+// A note's speaker travels into its record (omitted from the line when empty).
+func TestMatchNoteCarriesTheSpeakerIntoTheRecord(t *testing.T) {
+	rows := vids("2031-03-02")
+	rec, err := Match(Note{Title: "T", Ref: "Ps.23", Date: "2031-03-02", Speaker: "Phil Morgan"}, rows)
+	if err != nil || rec.Speaker != "Phil Morgan" {
+		t.Fatalf("rec %+v err %v", rec, err)
+	}
+	b, _ := json.Marshal(Record{ID: "r1", Date: "2031-03-02", Title: "T", Ref: "Ps.23"})
+	if strings.Contains(string(b), "speaker") {
+		t.Errorf("an empty speaker is written: %s", b)
 	}
 }

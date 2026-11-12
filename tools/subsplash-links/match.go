@@ -21,6 +21,8 @@ type Record struct {
 	Ref   string `json:"ref"`
 	// Also is a second passage the notes name (a Governor-read "cited" text).
 	Also string `json:"also,omitempty"`
+	// Speaker is the preacher the notes mail's alert named, when it named one.
+	Speaker string `json:"speaker,omitempty"`
 }
 
 // ReadRecords reads the records file; a file that does not exist holds none.

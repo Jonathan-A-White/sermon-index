@@ -230,3 +230,26 @@ func TestReadAlertsTakesTheNotesFields(t *testing.T) {
 		}
 	}
 }
+
+// An alert may carry an optional "speaker" (the preacher the mail names). The
+// reader takes it when it is there, keeps the other fields as they were, and
+// still refuses a field it does not know.
+func TestReadAlertsTakesAnOptionalSpeaker(t *testing.T) {
+	head := `{"id":"x1","kind":"sermon-notes","title":"T","reference":"Romans 5:1","when":"2031-03-02T00:00:00-05:00"`
+	notes, problems, err := ReadAlerts(strings.NewReader(`{"alerts":[` + head + `,"speaker":"  Phil Morgan "}]}`))
+	if err != nil || len(problems) != 0 || len(notes) != 1 {
+		t.Fatalf("with speaker: notes %+v problems %+v err %v", notes, problems, err)
+	}
+	if notes[0].Speaker != "Phil Morgan" {
+		t.Errorf("speaker = %q, want %q", notes[0].Speaker, "Phil Morgan")
+	}
+	notes, problems, err = ReadAlerts(strings.NewReader(`{"alerts":[` + head + `}]}`))
+	if err != nil || len(problems) != 0 || len(notes) != 1 || notes[0].Speaker != "" {
+		t.Fatalf("without speaker: notes %+v problems %+v err %v", notes, problems, err)
+	}
+	// An unknown field is still refused (DisallowUnknownFields kept).
+	notes, problems, err = ReadAlerts(strings.NewReader(`{"alerts":[` + head + `,"pastor":"X"}]}`))
+	if err != nil || len(notes) != 0 || len(problems) != 1 {
+		t.Errorf("unknown field: notes %+v problems %+v err %v", notes, problems, err)
+	}
+}
