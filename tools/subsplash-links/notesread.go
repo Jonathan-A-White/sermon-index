@@ -194,6 +194,88 @@ func notesSpeaker(text string) string {
 	return ""
 }
 
+// pdfPlaceRE reads a line that is one passage and nothing else, in the grammar
+// the notes mail's reader uses (book, chapter, verses, built on
+// passage.NumberPattern and written by passage.RangeOSIS).
+var pdfPlaceRE = regexp.MustCompile(`(?i)^(` + passage.BookNamePattern() + `)\.?\s+(\d{1,3})(?::(` + passage.NumberPattern + `))?(?:\s*[-–—]\s*(` + passage.NumberPattern + `)(?::(` + passage.NumberPattern + `))?)?$`)
+
+// pdfOSIS is the OSIS reference of a string that is one passage and nothing
+// else, or false.
+func pdfOSIS(s string) (string, bool) {
+	m := pdfPlaceRE.FindStringSubmatch(strings.TrimSpace(s))
+	if m == nil {
+		return "", false
+	}
+	book, ok := passage.BookOSIS(m[1])
+	if !ok {
+		return "", false
+	}
+	osis, err := passage.RangeOSIS(book, m[2], m[3], m[4], m[5])
+	if err != nil {
+		return "", false
+	}
+	if r, err := passage.Parse(osis); err != nil || r.OSIS != osis {
+		return "", false
+	}
+	return osis, true
+}
+
+var (
+	pdfDateRE    = regexp.MustCompile(`^[A-Z][A-Za-z ]+ \d{1,2}, \d{4}$`)
+	pdfPastorRE  = regexp.MustCompile(`\s*\bPas ?tor\s.*$`)
+	pdfNoDashRE  = strings.NewReplacer("-", "", "–", "", "—", "", " ", "", "\u00a0", "")
+	pdfQuoteCuts = "\"“”"
+)
+
+// pdfPassage is the passage a notes PDF names, as OSIS, from the text of its
+// first page (pdftotext). The header prints the title in quotes and the passage
+// after it ("Title" — 2 Corinthians 8:10-15, or on a line of its own), then the
+// speaker, then 'Part of <series>' and the date. A line wrap in the header
+// drops the dash of a range (pdftotext gives "Luke 8:115" for 8:1-15), so the
+// header's passage is taken as it is only when it keeps its dash; otherwise it
+// is taken from a line of the notes' body that is one passage and reads the
+// same without dashes (the heading above the outline: "Luke 8:1-15"), and
+// when no such line confirms it there is no passage (a passage is never
+// guessed). The body's other lines (a sub-passage, a verse quoted) are never
+// read for themselves. False when there is none.
+func pdfPassage(text string) (string, bool) {
+	lines := strings.Split(text, "\n")
+	var header []string
+	n := 0
+	for ; n < len(lines) && n < 10; n++ {
+		l := strings.TrimSpace(lines[n])
+		if l == "" || strings.HasPrefix(l, "Part of ") || pdfDateRE.MatchString(l) {
+			break
+		}
+		header = append(header, l)
+	}
+	joined := strings.Join(header, " ")
+	cut := strings.LastIndexAny(joined, pdfQuoteCuts)
+	if cut < 0 {
+		return "", false
+	}
+	// The closing quote's own width is not known by byte: drop the quote and
+	// what is before it, then a dash and the speaker.
+	rest := joined[cut:]
+	rest = strings.TrimLeft(rest, pdfQuoteCuts)
+	rest = strings.TrimSpace(strings.TrimLeft(strings.TrimSpace(rest), "—–-"))
+	rest = strings.TrimSpace(pdfPastorRE.ReplaceAllString(rest, ""))
+	if strings.ContainsAny(rest, "-–—") {
+		return pdfOSIS(rest)
+	}
+	// No dash: the line may have lost one, so the string need not be a
+	// passage that exists ("Luke 8:115"); a body line must say the same.
+	if !pdfPlaceRE.MatchString(rest) {
+		return "", false
+	}
+	for _, l := range lines[n:] {
+		if b, ok := pdfOSIS(l); ok && pdfNoDashRE.Replace(strings.TrimSpace(l)) == pdfNoDashRE.Replace(rest) {
+			return b, true
+		}
+	}
+	return "", false
+}
+
 // pdftotextFirstPage is the text of a PDF's first page, from poppler's pdftotext.
 func pdftotextFirstPage(path string) (string, error) {
 	out, err := exec.Command("pdftotext", "-l", "1", path, "-").Output()
@@ -237,15 +319,37 @@ func RunNotesWithSpeakers(notesPath, passagesPath, rowsPath, pdfDir string, text
 	var add strings.Builder
 	for _, rec := range recs {
 		if strings.TrimSpace(rec.Ref) == "" {
-			// The mail names no passage (its notes PDF may). Its title and a
-			// passage are on the list when a person put them there, from the
-			// notes; that is not a problem, anything else is.
+			// The mail names no passage. Its title and a passage are on the
+			// list when a person (or an earlier run) put them there; that is
+			// not a problem. Otherwise the passage is read from the row's
+			// notes PDF, and the record goes on as if the mail had named it.
+			// A title and a date the mail always has (subsplash-notes drops a
+			// mail without), so those are never read from the PDF.
 			if listHoldsTitle(entries, rows, rec) {
 				res.Already++
-			} else {
-				problem(rec, "the mail names no passage; not added")
+				continue
 			}
-			continue
+			why := "no notes PDF to read (no directory)"
+			if at := recordRow(rows, rec); at < 0 {
+				why = "no one row holds this record, so there is no notes PDF to read"
+			} else if pdfDir != "" && text != nil {
+				t, err := text(filepath.Join(pdfDir, rows[at].ID+".pdf"))
+				switch {
+				case err != nil:
+					why = fmt.Sprintf("its notes PDF cannot be read (%v)", err)
+				default:
+					if osis, ok := pdfPassage(t); ok {
+						rec.Ref = osis
+						why = ""
+					} else {
+						why = "its notes PDF's text holds no passage line"
+					}
+				}
+			}
+			if why != "" {
+				problem(rec, "the mail names no passage and "+why+"; not added")
+				continue
+			}
 		}
 		if strings.TrimSpace(rec.Title) == "" {
 			problem(rec, "the mail has no title; not added")
