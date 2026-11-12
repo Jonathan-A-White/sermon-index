@@ -54,7 +54,7 @@ never a word of a sermon or of the Archive's OCR. The 1979 Baker reprint of \
 the Complete Works is a lending copy of the Archive and is not used."""
 
 credit = "Matthew Henry; Internet Archive (scans of the 1830 Miscellaneous Works and the 1847 Complete Works)"
-homepage = "https://archive.org"
+homepage = "https://archive.org/details/miscellaneouswor00henr"
 terms_url = "https://archive.org/about/terms.php"
 added = 2026-11-05
 on_by_default = true

@@ -1,6 +1,7 @@
 package sources
 
 import (
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -58,5 +59,42 @@ func TestBrookfieldFirstHomepageIsSubsplash(t *testing.T) {
 	}
 	if strings.Contains(s.Name, "YouTube") || !strings.Contains(s.Name, "Subsplash") {
 		t.Errorf("name %q", s.Name)
+	}
+}
+
+// No source's credit link is a bare site root (https://archive.org,
+// https://www.youtube.com, https://logos.com): it must open the thing the
+// source is made from. Henry's is the Archive's Miscellaneous Works, the book
+// of 44 of its 51 rows.
+func TestNoSourceHomepageIsABareSiteRoot(t *testing.T) {
+	files, err := filepath.Glob("../../sources/*/source.toml")
+	if err != nil || len(files) == 0 {
+		t.Fatalf("no source.toml found (%v)", err)
+	}
+	for _, f := range files {
+		id := filepath.Base(filepath.Dir(f))
+		var s Source
+		if _, err := toml.DecodeFile(f, &s); err != nil {
+			t.Errorf("%s: %v", id, err)
+			continue
+		}
+		u, err := url.Parse(s.Homepage)
+		if err != nil || u.Host == "" {
+			t.Errorf("%s: homepage %q is not a URL", id, s.Homepage)
+			continue
+		}
+		if p := strings.Trim(u.Path, "/"); p == "" && u.RawQuery == "" && u.Fragment == "" {
+			t.Errorf("%s: homepage %q is a bare site root", id, s.Homepage)
+		}
+	}
+}
+
+func TestHenryHomepageIsMiscellaneousWorks(t *testing.T) {
+	var s Source
+	if _, err := toml.DecodeFile("../../sources/henry-sermons/source.toml", &s); err != nil {
+		t.Fatal(err)
+	}
+	if want := "https://archive.org/details/miscellaneouswor00henr"; s.Homepage != want {
+		t.Errorf("homepage %q, want %q", s.Homepage, want)
 	}
 }
