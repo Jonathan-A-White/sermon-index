@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/Jonathan-A-White/sermon-index/internal/passage"
 	"os"
 	"path/filepath"
 	"strings"
@@ -165,5 +166,92 @@ func TestReadNotesFlagPrintsItsLine(t *testing.T) {
 	code := cli([]string{"--read-notes", "--notes", recs, "--passages", list, "--rows", rows}, &out, &errb, deps{})
 	if code != 0 || !strings.Contains(out.String(), "notes: 7 record(s), 3 added") {
 		t.Errorf("exit %d\nout %s\nerr %s", code, out.String(), errb.String())
+	}
+}
+
+// notesRecordsFile is where the sweep below finds the notes records: the
+// git-ignored data/subsplash-notes.jsonl of the checkout, or the file
+// SERMON_INDEX_NOTES names (a Builder's worktree has no data/ of its own).
+func notesRecordsFile() string {
+	if p := os.Getenv("SERMON_INDEX_NOTES"); p != "" {
+		return p
+	}
+	return filepath.Join("..", "..", "data", "subsplash-notes.jsonl")
+}
+
+// Sweep (mw-qtu3zvz.59.28): every notes record's title, and its passage when
+// the mail names one, is on its sermon's row in the tracked rows.jsonl. The
+// row of L4mXkwT7tW4 stayed 'Brookfield First - Online Service | August 17,
+// 2025' because its mail names no passage and --read-notes wrote nothing for
+// a record with none. The records file is private, so a checkout without it
+// skips this.
+func TestEveryNotesRecordsTitleAndPassageIsOnItsRow(t *testing.T) {
+	path := notesRecordsFile()
+	if _, err := os.Stat(path); err != nil {
+		t.Skipf("no notes records at %s (set SERMON_INDEX_NOTES)", path)
+	}
+	recs, err := ReadRecords(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows, err := readRows(filepath.Join("..", "..", "sources", "brookfield-first", "rows.jsonl"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(recs) == 0 {
+		t.Fatalf("%s holds no records", path)
+	}
+	for _, rec := range recs {
+		at := recordRow(rows, rec)
+		if at < 0 {
+			t.Errorf("%s %q: no one row holds this record", rec.ID, rec.Title)
+			continue
+		}
+		row := rows[at]
+		// The church's own list may spell a title's case its own way ("How to
+		// Spot a Fable"); the words are the same.
+		if !strings.EqualFold(row.Title, rec.Title) {
+			t.Errorf("%s: the row's title is %q, the mail's is %q", rec.ID, row.Title, rec.Title)
+		}
+		if rec.Ref == "" {
+			continue
+		}
+		if row.Ref == nil || *row.Ref == "" {
+			t.Errorf("%s %q: the row has no passage, the mail says %s", rec.ID, rec.Title, rec.Ref)
+			continue
+		}
+		a, aerr := passage.Parse(*row.Ref)
+		b, berr := passage.Parse(rec.Ref)
+		if aerr != nil || berr != nil {
+			t.Errorf("%s: row %q or mail %q passage unreadable: %v %v", rec.ID, *row.Ref, rec.Ref, aerr, berr)
+		} else if a.OSIS != b.OSIS && (row.Series == nil || !*row.Series) {
+			t.Errorf("%s: the row's passage is %s, the mail's is %s", rec.ID, a.OSIS, b.OSIS)
+		}
+	}
+}
+
+// A mail that names no passage (L4mXkwT7tW4, 'From Good Intentions to Godly
+// Impact', whose notes PDF names 2 Corinthians 8:10-15) has its title and
+// passage put on the list by hand; --read-notes then finds the line already
+// holds the mail's title and has nothing to report. With no such line the
+// record is still reported as having no passage.
+func TestReadNotesOfAMailWithNoPassageFindsTheLineAlreadyHoldingItsTitle(t *testing.T) {
+	rows, recs, list := notesRig(t, passagesHeader+"\t2026-01-04\tNo Ref Here\t\t2 Corinthians 8:10-15\tnoref1\tnotes\n")
+	res, err := RunNotes(recs, list, rows)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range res.Problems {
+		if strings.Contains(p, "noref1") {
+			t.Errorf("reported though the list holds its title: %v", res.Problems)
+		}
+	}
+	rows, recs, list = notesRig(t, passagesHeader)
+	res, err = RunNotes(recs, list, rows)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(strings.Join(res.Problems, "\n"), "noref1") {
+		t.Errorf("a record with no passage and no line is not reported: %v", res.Problems)
 	}
 }

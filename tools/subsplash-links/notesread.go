@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/Jonathan-A-White/sermon-index/internal/passage"
+	"github.com/Jonathan-A-White/sermon-index/internal/sources"
 )
 
 // The notes mails give a sermon its title and passage, but the records file
@@ -135,6 +136,22 @@ func osisText(ref string) (string, error) {
 	return "", fmt.Errorf("passage %q mixes a chapter and a verse", ref)
 }
 
+// listHoldsTitle reports whether the list has a line, for the record's row (by
+// id, or by date when it has no row column), that carries the record's title
+// and a passage.
+func listHoldsTitle(entries []listEntry, rows []sources.Row, rec Record) bool {
+	at := recordRow(rows, rec)
+	if at < 0 || strings.TrimSpace(rec.Title) == "" {
+		return false
+	}
+	for _, e := range entries {
+		if (e.Row == rows[at].ID || (e.Row == "" && e.Date == rec.Date)) && e.Passage != "" && strings.EqualFold(e.Title, tsvField(rec.Title)) {
+			return true
+		}
+	}
+	return false
+}
+
 // recordPassage is the passage cell of a record: its ref, then its also.
 func recordPassage(rec Record) (string, error) {
 	cell, err := osisText(rec.Ref)
@@ -177,7 +194,14 @@ func RunNotes(notesPath, passagesPath, rowsPath string) (*NotesResult, error) {
 	var add strings.Builder
 	for _, rec := range recs {
 		if strings.TrimSpace(rec.Ref) == "" {
-			problem(rec, "the mail names no passage; not added")
+			// The mail names no passage (its notes PDF may). Its title and a
+			// passage are on the list when a person put them there, from the
+			// notes; that is not a problem, anything else is.
+			if listHoldsTitle(entries, rows, rec) {
+				res.Already++
+			} else {
+				problem(rec, "the mail names no passage; not added")
+			}
 			continue
 		}
 		if strings.TrimSpace(rec.Title) == "" {
