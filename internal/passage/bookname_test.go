@@ -51,3 +51,35 @@ func TestBookNamesAreAllReadAndMatched(t *testing.T) {
 		}
 	}
 }
+
+// The odd label forms of the Authorized-Version era, which logos-import used to
+// keep a table of its own for (mw-qtu3zvz.59.21), are read here.
+func TestBookOSISReadsTheOldLabelForms(t *testing.T) {
+	cases := map[string]string{
+		"Math.": "Matt", "Math": "Matt", "Matth.": "Matt", "Colos.": "Col", "Colos": "Col",
+		"Hebr.": "Heb", "Hebr": "Heb", "Philip.": "Phil", "Jerem.": "Jer", "Eccles.": "Eccl",
+		"Jam": "Jas", "1 Chron.": "1Chr", "2 Sam.": "2Sam",
+	}
+	for in, want := range cases {
+		if got, ok := BookOSIS(in); !ok || got != want {
+			t.Errorf("BookOSIS(%q) = %q, %v; want %q", in, got, ok, want)
+		}
+	}
+	if _, ok := BookOSIS("Mathematics"); ok {
+		t.Error("BookOSIS reads Mathematics as a book")
+	}
+}
+
+// FullBookOSIS reads a full name only, never an abbreviation.
+func TestFullBookOSISReadsOnlyFullNames(t *testing.T) {
+	for in, want := range map[string]string{"Genesis": "Gen", "psalm": "Ps", "Psalms": "Ps", "Song of Songs": "Song", "1  Corinthians": "1Cor"} {
+		if got, ok := FullBookOSIS(in); !ok || got != want {
+			t.Errorf("FullBookOSIS(%q) = %q, %v; want %q", in, got, ok, want)
+		}
+	}
+	for _, in := range []string{"Gen", "Phil.", "Math", "Genesis.", "Tobit", ""} {
+		if got, ok := FullBookOSIS(in); ok {
+			t.Errorf("FullBookOSIS(%q) = %q; want none", in, got)
+		}
+	}
+}

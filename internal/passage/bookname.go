@@ -26,8 +26,8 @@ var bookAbbreviations = map[string]string{
 	"prov": "Prov", "pro": "Prov", "prv": "Prov",
 	"eccl": "Eccl", "eccles": "Eccl", "ecc": "Eccl",
 	"song": "Song", "song of songs": "Song", "song of sol": "Song", "sos": "Song",
-	"isa":  "Isa",
-	"jer":  "Jer",
+	"isa": "Isa",
+	"jer": "Jer", "jerem": "Jer",
 	"lam":  "Lam",
 	"ezek": "Ezek", "eze": "Ezek",
 	"dan":  "Dan",
@@ -40,7 +40,7 @@ var bookAbbreviations = map[string]string{
 	"hag":  "Hag",
 	"zech": "Zech", "zec": "Zech",
 	"mal":  "Mal",
-	"matt": "Matt", "mat": "Matt", "mt": "Matt",
+	"matt": "Matt", "mat": "Matt", "mt": "Matt", "matth": "Matt", "math": "Matt",
 	"mk": "Mark", "mrk": "Mark",
 	"lk": "Luke", "luk": "Luke",
 	"jn": "John", "joh": "John",
@@ -48,13 +48,13 @@ var bookAbbreviations = map[string]string{
 	"1 cor": "1Cor", "1 co": "1Cor", "2 cor": "2Cor", "2 co": "2Cor",
 	"gal": "Gal",
 	"eph": "Eph", "ephes": "Eph",
-	"phil": "Phil", "php": "Phil",
-	"col":     "Col",
+	"phil": "Phil", "php": "Phil", "philip": "Phil",
+	"col": "Col", "colos": "Col",
 	"1 thess": "1Thess", "1 thes": "1Thess", "1 th": "1Thess", "2 thess": "2Thess", "2 thes": "2Thess", "2 th": "2Thess",
 	"1 tim": "1Tim", "1 ti": "1Tim", "2 tim": "2Tim", "2 ti": "2Tim",
 	"tit":    "Titus",
 	"philem": "Phlm", "phlm": "Phlm", "phm": "Phlm",
-	"heb": "Heb",
+	"heb": "Heb", "hebr": "Heb",
 	"jas": "Jas", "jam": "Jas",
 	"1 pet": "1Pet", "1 pe": "1Pet", "1 pt": "1Pet", "2 pet": "2Pet", "2 pe": "2Pet", "2 pt": "2Pet",
 	"1 jn": "1John", "1 jo": "1John", "2 jn": "2John", "2 jo": "2John", "3 jn": "3John", "3 jo": "3John",
@@ -82,6 +82,24 @@ func BookOSIS(name string) (string, bool) {
 	s := strings.ToLower(strings.Join(strings.Fields(name), " "))
 	s = strings.TrimSpace(strings.TrimSuffix(s, "."))
 	o, ok := bookNames[s]
+	return o, ok
+}
+
+// fullNames maps only the full names a book is printed with: the book table's
+// own names and "Psalm", "Psalms" and "Song of Songs", each in lower case.
+var fullNames = func() map[string]string {
+	m := map[string]string{"psalm": "Ps", "psalms": "Ps", "song of songs": "Song"}
+	for _, b := range books {
+		m[strings.ToLower(b.Name)] = b.OSIS
+	}
+	return m
+}()
+
+// FullBookOSIS is BookOSIS for a full name only: a book of the table, "Psalm",
+// "Psalms" or "Song of Songs", in any case and with single spaces, and no
+// abbreviation ("Gen", "Phil.") nor a final point.
+func FullBookOSIS(name string) (string, bool) {
+	o, ok := fullNames[strings.ToLower(strings.Join(strings.Fields(name), " "))]
 	return o, ok
 }
 

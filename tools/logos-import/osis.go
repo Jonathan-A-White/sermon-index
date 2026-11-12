@@ -88,34 +88,6 @@ func LogosToOSIS(s string) (string, error) {
 	return r.OSIS, nil
 }
 
-var aliases = map[string]string{
-	"psalm":         "Ps",
-	"psalms":        "Ps",
-	"song of songs": "Song",
-}
-
-// oldAbbreviations are the short forms of a book's name that a label is
-// printed with, read from the labels of every archive (the sweep of
-// mw-qtu3zvz.34): the abbreviations the Authorized-Version era used ("Math.",
-// "Matth.", "Colos.", "Hebr.", "Philip.", "Jerem.", "Eccles.") and the
-// ordinary ones ("Matt.", "Rom.", "1 Cor.", "Isa."). Only a label is read
-// with them; a title's "Chapter I: Gen. 19:15" is still spelled out by
-// ReadableTitle from the book table.
-var oldAbbreviations = map[string]string{
-	"gen": "Gen", "ex": "Exod", "exod": "Exod", "lev": "Lev", "num": "Num",
-	"deut": "Deut", "josh": "Josh", "judg": "Judg", "neh": "Neh",
-	"1 sam": "1Sam", "2 sam": "2Sam", "1 chron": "1Chr", "2 chron": "2Chr",
-	"ps": "Ps", "psa": "Ps", "prov": "Prov", "eccles": "Eccl", "eccl": "Eccl",
-	"isa": "Isa", "jer": "Jer", "jerem": "Jer", "ezek": "Ezek", "dan": "Dan",
-	"zech": "Zech", "mal": "Mal",
-	"mat": "Matt", "matt": "Matt", "matth": "Matt", "math": "Matt",
-	"rom": "Rom", "1 cor": "1Cor", "2 cor": "2Cor", "gal": "Gal", "eph": "Eph",
-	"phil": "Phil", "philip": "Phil", "col": "Col", "colos": "Col",
-	"1 thess": "1Thess", "2 thess": "2Thess", "1 tim": "1Tim", "2 tim": "2Tim",
-	"heb": "Heb", "hebr": "Heb", "jam": "Jas", "1 pet": "1Pet", "2 pet": "2Pet",
-	"rev": "Rev",
-}
-
 // bookPrefix finds the book a label starts with (the longest name, followed
 // by a space or the end) and returns its OSIS name and the rest.
 func bookPrefix(s string) (osis, rest string, ok bool) {
@@ -139,40 +111,40 @@ func findBook(s string, tolerant bool) (osis, rest string, ok bool) {
 			skip = len(m)
 		}
 	}
-	low := strings.ToLower(s[skip:])
+	text := s[skip:]
 	best := 0
-	try := func(name, o string) {
-		n := strings.ToLower(name)
-		if !strings.HasPrefix(low, n) {
-			return
+	// Each end of a word of the text is tried as the end of the book's name; the
+	// longest name that passage reads (passage.BookOSIS, or only a full name
+	// for a title: passage.FullBookOSIS) is the book.
+	for e := 1; e <= len(text); e++ {
+		if e < len(text) && text[e] != ' ' {
+			continue
 		}
-		end := len(n)
+		name := text[:e]
+		var o string
+		var found bool
+		end := e
 		if tolerant {
+			o, found = passage.BookOSIS(name)
 			// A space, then a point or a colon, may follow the name.
-			j := end
-			for j < len(low) && low[j] == ' ' {
+			j := e
+			for j < len(text) && text[j] == ' ' {
 				j++
 			}
-			if j < len(low) && (low[j] == '.' || low[j] == ':') {
+			if j < len(text) && (text[j] == '.' || text[j] == ':') {
 				end = j + 1
 			}
+			if !found && strings.HasSuffix(name, ":") {
+				o, found = passage.BookOSIS(strings.TrimSuffix(name, ":"))
+			}
+		} else {
+			o, found = passage.FullBookOSIS(name)
 		}
-		if end < len(low) && low[end] != ' ' {
-			return
+		if found && end < len(text) && text[end] != ' ' {
+			found = false
 		}
-		if end > best {
+		if found && end > best {
 			best, osis = end, o
-		}
-	}
-	for _, b := range passage.Books() {
-		try(b.Name, b.OSIS)
-	}
-	for a, o := range aliases {
-		try(a, o)
-	}
-	if tolerant {
-		for a, o := range oldAbbreviations {
-			try(a, o)
 		}
 	}
 	if best == 0 {
