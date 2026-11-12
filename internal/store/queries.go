@@ -204,7 +204,8 @@ func Themes(ctx context.Context, db *pgxpool.Pool, span passage.Range) ([]ThemeR
 }
 
 // ThemeMaxVerses is the widest topic the theme tier uses: a topic whose
-// links cover more verses than this is left out. The probe that set it
+// links cover more verses than this is left out of a passage's own themes
+// (a topic named by ThemeQuery.Themes is used whatever its width). The probe that set it
 // (Lampas docs/sources/sermon-index.md, section 4) found Nave's whole-subject
 // topics (JESUS, THE CHRIST 4,821 verses, GOD 4,051, SIN 916) put 2,735
 // sermons on Romans 5 and the topics of 300 verses or fewer still 799; the
@@ -275,9 +276,14 @@ func (r ThemeSermonRow) MarshalJSON() ([]byte, error) {
 
 // themeTier is each sermon's one theme-tier row; it takes $1 the span, $2
 // whether to filter by sermon source, $3 the sources, $4 whether to filter by
-// topic, $5 the topics ("source:topic"), $6 the cap and $7 whether to answer
-// direct rows only. A sermon with a passage overlapping the span is a passage
-// row and is never in it.
+// topic, $5 the topics ("source:topic"), $6 the cap, $7 whether to answer
+// direct rows only and $8 whether to keep the sermons with a passage on the
+// span. A sermon with a passage overlapping the span is a passage row and is
+// never in it, unless $8 (a named topic asked over the whole Bible, where
+// every sermon is a passage row and nothing else would be left).
+//
+// The cap $6 applies to a topic the span's own themes offer; a topic named
+// ($4) is used however wide it is: a person chose it.
 //
 // d, the direct rows: a sermon linked in sermon_topics to a topic that links
 // the span, whatever the topic's size (a person chose the link). Each sermon
@@ -298,13 +304,13 @@ const themeTier = `
 		WHERE (NOT $2::bool OR st.source_id = ANY($3::text[]))
 		  AND (NOT $4::bool OR t.source_id || ':' || t.id = ANY($5::text[]))
 		  AND EXISTS (SELECT 1 FROM theme_links l WHERE l.source_id = t.source_id AND l.theme_id = t.id AND l.span && $1::int4range)
-		  AND NOT EXISTS (SELECT 1 FROM sermon_passages q
-		                  WHERE q.source_id = st.source_id AND q.sermon_id = st.sermon_id AND q.span && $1::int4range)
+		  AND ($8::bool OR NOT EXISTS (SELECT 1 FROM sermon_passages q
+		                  WHERE q.source_id = st.source_id AND q.sermon_id = st.sermon_id AND q.span && $1::int4range))
 		ORDER BY st.source_id, st.sermon_id, t.verses NULLS LAST, t.source_id, t.id),
 	topics AS (
 		SELECT t.source_id, t.id, t.label, t.verses
 		FROM themes t
-		WHERE NOT $7::bool AND t.verses <= $6
+		WHERE NOT $7::bool AND ($4::bool OR t.verses <= $6)
 		  AND (NOT $4::bool OR t.source_id || ':' || t.id = ANY($5::text[]))
 		  AND EXISTS (SELECT 1 FROM theme_links l WHERE l.source_id = t.source_id AND l.theme_id = t.id AND l.span && $1::int4range)),
 	x AS (
@@ -316,8 +322,8 @@ const themeTier = `
 		JOIN topics t ON t.source_id = l.source_id AND t.id = l.theme_id
 		LEFT JOIN theme_parts pt ON pt.theme_source_id = l.source_id AND pt.theme_id = l.theme_id AND pt.n = l.part_n
 		WHERE p.role = 'text' AND (NOT $2::bool OR p.source_id = ANY($3::text[]))
-		  AND NOT EXISTS (SELECT 1 FROM sermon_passages q
-		                  WHERE q.source_id = p.source_id AND q.sermon_id = p.sermon_id AND q.span && $1::int4range)
+		  AND ($8::bool OR NOT EXISTS (SELECT 1 FROM sermon_passages q
+		                  WHERE q.source_id = p.source_id AND q.sermon_id = p.sermon_id AND q.span && $1::int4range))
 		  AND NOT EXISTS (SELECT 1 FROM d WHERE d.source_id = p.source_id AND d.sermon_id = p.sermon_id)
 		ORDER BY p.source_id, p.sermon_id, t.verses, t.source_id, t.id, upper(l.span) - lower(l.span), l.part_n NULLS FIRST, p.ref_osis)
 	SELECT d.source_id, d.sermon_id, true AS direct, tp.ref_osis, lower(tp.span) AS lo, upper(tp.span) AS hi,
@@ -330,6 +336,12 @@ const themeTier = `
 	SELECT x.source_id, x.sermon_id, false, x.ref_osis, x.lo, x.hi,
 	       x.theme_source, x.theme_id, x.label, x.verses, x.part_n, x.part_label
 	FROM x`
+
+// wholeBible is whether span is Genesis 1:1 to Revelation 22:21, an ask in
+// which every sermon with a passage is a passage row.
+func wholeBible(span passage.Range) bool {
+	return span.Lo == passage.Ordinal(1, 1, 1) && span.Hi == passage.Ordinal(len(passage.Books()), 22, 21)
+}
 
 // ThemeSermons answers the theme tier for q: how many sermons, and the page
 // of them Limit and Offset name. Every direct row comes first, ordered by its
@@ -345,7 +357,7 @@ func ThemeSermons(ctx context.Context, db *pgxpool.Pool, q ThemeQuery) (int, []T
 	if themes == nil {
 		themes = []string{}
 	}
-	args := []any{q.Span.PG(), len(q.Sources) > 0, srcs, len(q.Themes) > 0, themes, ThemeMaxVerses, q.DirectOnly}
+	args := []any{q.Span.PG(), len(q.Sources) > 0, srcs, len(q.Themes) > 0, themes, ThemeMaxVerses, q.DirectOnly, len(q.Themes) > 0 && wholeBible(q.Span)}
 	var total int
 	if err := db.QueryRow(ctx, `SELECT count(*) FROM (`+themeTier+`) b`, args...).Scan(&total); err != nil {
 		return 0, nil, err
@@ -358,7 +370,7 @@ func ThemeSermons(ctx context.Context, db *pgxpool.Pool, q ThemeQuery) (int, []T
 		ORDER BY b.direct DESC, b.verses NULLS LAST,
 		         CASE WHEN b.direct THEN b.theme_source END, CASE WHEN b.direct THEN b.theme_id END,
 		         s.source_id, `+fmt.Sprintf(naturalID, "s.id")+`
-		LIMIT $8 OFFSET $9`, append(args, q.Limit, q.Offset)...)
+		LIMIT $9 OFFSET $10`, append(args, q.Limit, q.Offset)...)
 	if err != nil {
 		return 0, nil, err
 	}

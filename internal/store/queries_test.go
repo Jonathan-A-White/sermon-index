@@ -441,9 +441,12 @@ func TestThemeSermons(t *testing.T) {
 	if want := []string{"a/3 text Luke.15.17 via tx:mid Middle", "a/4 text John.6.37 via tx:mid Middle", "a/9 text John.6.37 via tx:mid Middle", "a/10 text John.6.37 via tx:mid Middle"}; total != 4 || !reflect.DeepEqual(themeKeys(rows), want) {
 		t.Errorf("theme=tx:mid: %d %q", total, themeKeys(rows))
 	}
+	// A topic named by theme= is not capped by width (it is only offered
+	// by a passage's own themes when it is narrow): wide is over 300 verses.
 	q.Themes = []string{"tx:wide"}
-	if total, rows, _ = store.ThemeSermons(ctx, db, q); total != 0 || len(rows) != 0 || rows == nil {
-		t.Errorf("theme=tx:wide is past the cap: %d %v", total, rows)
+	total, rows, _ = store.ThemeSermons(ctx, db, q)
+	if want := []string{"a/2 text Isa.53.5 via tx:wide Wide", "a/5 text Isa.1.1 via tx:wide Wide"}; total != 2 || !reflect.DeepEqual(themeKeys(rows), want) {
+		t.Errorf("theme=tx:wide is named, so not capped: %d %q", total, themeKeys(rows))
 	}
 	q.Themes = nil
 
@@ -462,6 +465,32 @@ func TestThemeSermons(t *testing.T) {
 	q = store.ThemeQuery{Span: ref(t, "Jude"), Limit: 50}
 	if total, rows, _ = store.ThemeSermons(ctx, db, q); total != 0 || rows == nil || len(rows) != 0 {
 		t.Errorf("Jude: %d %v", total, rows)
+	}
+}
+
+// A theme asked by name over the whole Bible (what Lampas's Sermons search
+// does for each theme hit) answers the topic's sermons, however wide the
+// topic is; asked with no theme the same span still leaves the wide topic out.
+func TestThemeSermonsNamedWholeBible(t *testing.T) {
+	a, tx := tierSources(t)
+	db := loaded(t, a, tx)
+	ctx := context.Background()
+	whole := ref(t, "Gen.1.1-Rev.22.21")
+	q := store.ThemeQuery{Span: whole, Themes: []string{"tx:wide"}, Limit: 50}
+	total, rows, err := store.ThemeSermons(ctx, db, q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"a/1 text Rom.5.8 via tx:wide Wide", "a/2 text Isa.53.5 via tx:wide Wide", "a/5 text Isa.1.1 via tx:wide Wide"}
+	if got := themeKeys(rows); total != 3 || !reflect.DeepEqual(got, want) {
+		t.Errorf("tx:wide over the whole Bible: total %d\n got %q\nwant %q", total, got, want)
+	}
+	// No theme named: the cap stands (a passage's own themes leave wide out;
+	// TestThemeSermons asks Rom.5.8), and over the whole Bible every sermon
+	// is a passage row, so nothing is left.
+	q.Themes = nil
+	if total, rows, _ = store.ThemeSermons(ctx, db, q); total != 0 || len(rows) != 0 {
+		t.Errorf("an unnamed ask over the whole Bible: %d %q", total, themeKeys(rows))
 	}
 }
 
@@ -659,9 +688,10 @@ func TestThemeSermonsDirectByTopic(t *testing.T) {
 	if got := directKeys(rows); total != 6 || !reflect.DeepEqual(got, want) {
 		t.Errorf("theme=tx:mid: %d\n got %q\nwant %q", total, got, want)
 	}
-	// The cap does not drop a direct link: wide is over 300 verses.
+	// The cap does not drop a topic named: wide is over 300 verses, and its
+	// direct link comes first, then the two sermons whose text meets it.
 	q.Themes = []string{"tx:wide"}
-	if total, rows, _ = store.ThemeSermons(ctx, db, q); total != 1 || !reflect.DeepEqual(directKeys(rows), []string{"direct a/22 text Gen.1.1 via tx:wide Wide"}) {
+	if total, rows, _ = store.ThemeSermons(ctx, db, q); total != 3 || !reflect.DeepEqual(directKeys(rows), []string{"direct a/22 text Gen.1.1 via tx:wide Wide", "a/2 text Isa.53.5 via tx:wide Wide", "a/5 text Isa.1.1 via tx:wide Wide"}) {
 		t.Errorf("theme=tx:wide: %d %q", total, directKeys(rows))
 	}
 	// A topic that does not link the place answers nothing, direct or not.
