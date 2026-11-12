@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -264,26 +265,84 @@ func listPassage(cell string) (string, string) {
 	return r.OSIS, ""
 }
 
+// barePlaceRE is a place with no book before it: chapter:verse, with an
+// optional end ("10:13-16", "10:13-11:2"). A chapter alone is not one.
+var barePlaceRE = regexp.MustCompile(`(?i)^(\d{1,3}):(` + passage.NumberPattern + `)(?:\s*[-–—]\s*(` + passage.NumberPattern + `)(?::(` + passage.NumberPattern + `))?)?$`)
+
+// separatorRE is what may stand between the passages of a message's cell.
+var separatorRE = regexp.MustCompile(`(?i)[,;/&]|\band\b`)
+
 // messagePassages reads the passage cell of a line from the Governor's
 // message: one or more passages, in order, as OSIS ranges, with nothing else
 // but separators (",", ";", "/", "&", "and") between them ("Luke 24, John 5").
-// A passage may be wider than a text (the caller marks the row a series); a
-// cell with other words in it, or a book the table refuses, is refused with
-// the reason. Every passage after the first must be a text, not a series.
+// A place with no book ("2 Corinthians 2:15; 10:13-16") takes the book of the
+// place before it, and a bare book ("Job") is the whole book. A passage may be
+// wider than a text (the caller marks the row a series); a cell with other
+// words in it, a place with no book before it, or a book the table refuses, is
+// refused with the reason. Every passage after the first must be a text, not a
+// series.
 func messagePassages(cell string) ([]string, string) {
-	refs, bad := textPassages(cell)
-	if len(bad) > 0 {
-		return nil, fmt.Sprintf("the passage %q is refused by the book table", cell)
+	var refs []string
+	add := func(ref string) {
+		for _, have := range refs {
+			if have == ref {
+				return
+			}
+		}
+		refs = append(refs, ref)
+	}
+	refused := fmt.Sprintf("the passage %q is refused by the book table", cell)
+	book := "" // the book of the last place read
+	// The gap before, between and after the passages the book table reads.
+	gap := func(g string) string {
+		for _, seg := range separatorRE.Split(g, -1) {
+			seg = strings.TrimSpace(seg)
+			if seg == "" {
+				continue
+			}
+			if m := barePlaceRE.FindStringSubmatch(seg); m != nil {
+				if book == "" {
+					return fmt.Sprintf("the passage %q has %q with no book before it", cell, seg)
+				}
+				ref, err := placeRef(book, m[1], m[2], m[3], m[4])
+				if err != nil {
+					return refused
+				}
+				add(ref)
+			} else if o, ok := passage.BookOSIS(seg); ok {
+				book = o
+				add(o)
+			} else {
+				return fmt.Sprintf("the passage %q holds more than the passages (%q is left over)", cell, seg)
+			}
+		}
+		return ""
+	}
+	at := 0
+	for _, m := range passageRE.FindAllStringSubmatchIndex(cell, -1) {
+		if why := gap(cell[at:m[0]]); why != "" {
+			return nil, why
+		}
+		at = m[1]
+		sub := func(i int) string {
+			if m[2*i] < 0 {
+				return ""
+			}
+			return cell[m[2*i]:m[2*i+1]]
+		}
+		o, _ := passage.BookOSIS(sub(1))
+		ref, err := placeRef(o, sub(2), sub(3), sub(4), sub(5))
+		if err != nil {
+			return nil, refused
+		}
+		book = o
+		add(ref)
+	}
+	if why := gap(cell[at:]); why != "" {
+		return nil, why
 	}
 	if len(refs) == 0 {
 		return nil, fmt.Sprintf("the passage %q is not a passage", cell)
-	}
-	rest := passageRE.ReplaceAllString(cell, " ")
-	rest = strings.NewReplacer(",", " ", ";", " ", "/", " ", "&", " ").Replace(rest)
-	for _, w := range strings.Fields(rest) {
-		if !strings.EqualFold(w, "and") {
-			return nil, fmt.Sprintf("the passage %q holds more than the passages (%q is left over)", cell, w)
-		}
 	}
 	for i, ref := range refs {
 		r, err := passage.Parse(ref)

@@ -408,3 +408,55 @@ func TestMessageEntryTakesATwoPassageCellAndAWidePassage(t *testing.T) {
 		t.Errorf("series mark kept: %+v", c)
 	}
 }
+
+// A place with no book takes the book of the place before it
+// ("2 Corinthians 2:15; 10:13-16"); a bare book is read like a wide passage
+// (mw-qtu3zvz.59.22).
+func TestMessagePassagesTakesTheBookBeforeAndABareBook(t *testing.T) {
+	for cell, want := range map[string][]string{
+		"2 Corinthians 2:15; 10:13-16":    {"2Cor.2.15", "2Cor.10.13-2Cor.10.16"},
+		"Matthew 6:9/Romans 8:14-16":      {"Matt.6.9", "Rom.8.14-Rom.8.16"},
+		"John 3:16, 18":                   nil, // a bare verse with no colon is still no place
+		"Job":                             {"Job"},
+		"Job, Luke 24":                    {"Job", "Luke.24"},
+		"2 Corinthians 2:15 and 10:13-16": {"2Cor.2.15", "2Cor.10.13-2Cor.10.16"},
+		"Romans 8:1; 10:13-16; 12:1-2":    {"Rom.8.1", "Rom.10.13-Rom.10.16", "Rom.12.1-Rom.12.2"},
+	} {
+		got, why := messagePassages(cell)
+		if want == nil {
+			if why == "" || got != nil {
+				t.Errorf("messagePassages(%q) = %q, %q; want a refusal", cell, got, why)
+			}
+			continue
+		}
+		if why != "" || strings.Join(got, "|") != strings.Join(want, "|") {
+			t.Errorf("messagePassages(%q) = %q, %q; want %q", cell, got, why, want)
+		}
+	}
+	// a place with no book before it, and a cell with other words, are still refused
+	for _, cell := range []string{"10:13-16", "Luke 24, the empty tomb", "Luke 24, Romans 99:1", "Luke 24, Job", "Job the sufferer", "", "; 10:13"} {
+		if got, why := messagePassages(cell); why == "" || got != nil {
+			t.Errorf("messagePassages(%q) = %q, %q; want a refusal", cell, got, why)
+		}
+	}
+	if _, why := messagePassages("10:13-16"); !strings.Contains(why, "10:13-16") {
+		t.Errorf("the refusal names no reason: %q", why)
+	}
+}
+
+// A message whose cell is a bare book is a series with its first chapter as
+// ref ("Job" -> Job.1), like Genesis 37-49.
+func TestMessageEntryWithABareBookIsASeries(t *testing.T) {
+	rows := rowsForMerge()
+	l, err := ReadList(writeTSV(t, listHeader6+"\t2020-07-12\tIt Ain't Over\tPhil Morgan\tJob\tvidC\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m := MergeList(rows, l); m.Merged != 1 || len(m.Problems) != 0 {
+		t.Fatalf("%+v", m)
+	}
+	c := rowByID(rows, "vidC")
+	if str(c.Ref) != "Job.1" || !c.IsSeries() || len(c.Cited) != 0 || str(c.Preacher) != "Phil Morgan" {
+		t.Errorf("Job: %+v", c)
+	}
+}

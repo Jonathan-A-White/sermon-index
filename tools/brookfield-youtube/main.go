@@ -454,6 +454,20 @@ func textPreacher(s string) string {
 // chapter, and verses.
 var passageRE = regexp.MustCompile(`(?i)\b(` + passage.BookNamePattern() + `)\.?\s+(\d{1,3})(?::(` + passage.NumberPattern + `))?(?:\s*[-–—]\s*(` + passage.NumberPattern + `)(?::(` + passage.NumberPattern + `))?)?\b`)
 
+// placeRef writes a captured place (book, chapter, verse, end, end verse) as
+// an OSIS reference the book table accepts, in its canonical form.
+func placeRef(book, c1, v1, x, y string) (string, error) {
+	ref, err := passage.RangeOSIS(book, c1, v1, x, y)
+	if err != nil {
+		return "", err
+	}
+	r, err := passage.Parse(ref)
+	if err != nil {
+		return "", err
+	}
+	return r.OSIS, nil
+}
+
 // textPassages finds the passages a text names ("Genesis 18:16-33", "Psalm
 // 23", "Mark 6:35–44") as OSIS references, in the order they occur, and lists
 // separately the ones the book table refuses ("Romans 99:1"). A number with
@@ -461,12 +475,7 @@ var passageRE = regexp.MustCompile(`(?i)\b(` + passage.BookNamePattern() + `)\.?
 func textPassages(s string) (refs, bad []string) {
 	for _, m := range passageRE.FindAllStringSubmatch(s, -1) {
 		book, _ := passage.BookOSIS(m[1])
-		ref, err := passage.RangeOSIS(book, m[2], m[3], m[4], m[5])
-		if err == nil {
-			var r passage.Range
-			r, err = passage.Parse(ref)
-			ref = r.OSIS
-		}
+		ref, err := placeRef(book, m[2], m[3], m[4], m[5])
 		if err != nil {
 			bad = append(bad, strings.TrimSpace(m[0]))
 			continue
