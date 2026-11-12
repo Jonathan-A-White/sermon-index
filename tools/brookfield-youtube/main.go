@@ -449,29 +449,10 @@ func textPreacher(s string) string {
 	return ""
 }
 
-var passageRE = func() *regexp.Regexp {
-	names := map[string]string{"Psalm": "Ps", "Song of Songs": "Song"}
-	for _, b := range passage.Books() {
-		names[b.Name] = b.OSIS
-	}
-	list := make([]string, 0, len(names))
-	for n := range names {
-		list = append(list, n)
-	}
-	sort.Slice(list, func(i, j int) bool { return len(list[i]) > len(list[j]) })
-	for i, n := range list {
-		list[i] = strings.ReplaceAll(regexp.QuoteMeta(n), `\ `, `\s+`)
-	}
-	return regexp.MustCompile(`(?i)\b(` + strings.Join(list, "|") + `)\.?\s+(\d{1,3})(?::(` + passage.NumberPattern + `))?(?:\s*[-–—]\s*(` + passage.NumberPattern + `)(?::(` + passage.NumberPattern + `))?)?\b`)
-}()
-
-var bookOSIS = func() map[string]string {
-	m := map[string]string{"psalm": "Ps", "song of songs": "Song"}
-	for _, b := range passage.Books() {
-		m[strings.ToLower(b.Name)] = b.OSIS
-	}
-	return m
-}()
+// passageRE finds a passage in a text: a book as passage.BookOSIS reads it
+// (full name, "Psalm", "Song of Songs" or a usual abbreviation, "2 Cor."), a
+// chapter, and verses.
+var passageRE = regexp.MustCompile(`(?i)\b(` + passage.BookNamePattern() + `)\.?\s+(\d{1,3})(?::(` + passage.NumberPattern + `))?(?:\s*[-–—]\s*(` + passage.NumberPattern + `)(?::(` + passage.NumberPattern + `))?)?\b`)
 
 // textPassages finds the passages a text names ("Genesis 18:16-33", "Psalm
 // 23", "Mark 6:35–44") as OSIS references, in the order they occur, and lists
@@ -479,7 +460,7 @@ var bookOSIS = func() map[string]string {
 // no book before it is not read.
 func textPassages(s string) (refs, bad []string) {
 	for _, m := range passageRE.FindAllStringSubmatch(s, -1) {
-		book := bookOSIS[strings.ToLower(strings.Join(strings.Fields(m[1]), " "))]
+		book, _ := passage.BookOSIS(m[1])
 		ref, err := passage.RangeOSIS(book, m[2], m[3], m[4], m[5])
 		if err == nil {
 			var r passage.Range

@@ -344,3 +344,18 @@ func TestRenewCountsKeepsTheNotesRight(t *testing.T) {
 		t.Errorf("the unsure line was lost:\n%s", got)
 	}
 }
+
+// A passages.tsv cell with an abbreviated book (a 'No notes' message prints
+// "2 Cor. 10:1-6") is read by the shared book names (mw-qtu3zvz.59.13).
+func TestListPassageReadsAnAbbreviatedBook(t *testing.T) {
+	for cell, want := range map[string]string{
+		"2 Cor. 10:1-6": "2Cor.10.1-2Cor.10.6",
+		"Ex. 20:1-17":   "Exod.20.1-Exod.20.17",
+		"Rev. 4:1":      "Rev.4.1",
+		"Romans 8:14":   "Rom.8.14",
+	} {
+		if got, why := listPassage(cell); got != want || why != "" {
+			t.Errorf("listPassage(%q) = %q, %q; want %q", cell, got, why, want)
+		}
+	}
+}

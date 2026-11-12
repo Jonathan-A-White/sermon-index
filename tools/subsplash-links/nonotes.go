@@ -61,30 +61,7 @@ var (
 
 // tailPassageRE finds the longest ending of a text that is a passage: a book
 // of the table (or Psalm, Song of Songs), a chapter, and a verse or range.
-var tailPassageRE = func() *regexp.Regexp {
-	names := map[string]bool{"Psalm": true, "Song of Songs": true}
-	for _, b := range passage.Books() {
-		names[b.Name] = true
-	}
-	list := make([]string, 0, len(names))
-	for n := range names {
-		list = append(list, n)
-	}
-	sort.Slice(list, func(i, j int) bool { return len(list[i]) > len(list[j]) })
-	for i, n := range list {
-		list[i] = strings.ReplaceAll(regexp.QuoteMeta(n), `\ `, `\s+`)
-	}
-	np := passage.NumberPattern
-	return regexp.MustCompile(`(?i)(?:^|\s)(((?:` + strings.Join(list, "|") + `))\.?\s+(\d{1,3})(?::(` + np + `))?(?:\s*[-–—]\s*(` + np + `)(?::(` + np + `))?)?)\s*$`)
-}()
-
-var bookOSIS = func() map[string]string {
-	m := map[string]string{"psalm": "Ps", "song of songs": "Song"}
-	for _, b := range passage.Books() {
-		m[strings.ToLower(b.Name)] = b.OSIS
-	}
-	return m
-}()
+var tailPassageRE = regexp.MustCompile(`(?i)(?:^|\s)((` + passage.BookNamePattern() + `)\.?\s+(\d{1,3})(?::(` + passage.NumberPattern + `))?(?:\s*[-–—]\s*(` + passage.NumberPattern + `)(?::(` + passage.NumberPattern + `))?)?)\s*$`)
 
 // splitPassage splits text into what comes before its passage (the preacher)
 // and the passage, which is the longest ending of the text that the book table
@@ -102,7 +79,7 @@ func splitPassage(text string) (before, pass, why string) {
 	sub := tailPassageRE.FindStringSubmatch(text)
 	pass = strings.TrimSpace(sub[1])
 	before = strings.TrimSpace(text[:m[2]])
-	osis, ok := bookOSIS[strings.ToLower(strings.Join(strings.Fields(sub[2]), " "))]
+	osis, ok := passage.BookOSIS(sub[2])
 	if !ok {
 		return before, pass, fmt.Sprintf("the passage %q is refused by the book table", pass)
 	}
@@ -151,7 +128,7 @@ func joinWraps(lines []string) []string {
 			if !dateRE.MatchString(prev) {
 				rest := strings.Fields(m[4])
 				if n := len(rest); n > 0 && len(rest[n-1]) <= 3 && isDigits(rest[n-1]) {
-					if _, ok := bookOSIS[strings.ToLower(rest[n-1]+" "+prev)]; ok {
+					if _, ok := passage.BookOSIS(rest[n-1] + " " + prev); ok {
 						out = out[:len(out)-1]
 						l += " " + prev
 					}
@@ -364,7 +341,7 @@ func readBody(rest string, s []string, last bool) (speaker, pass string, consume
 		acc = strings.TrimSpace(acc + " " + s[k])
 	}
 	// No passage.
-	isBook := func(l string) bool { _, ok := bookOSIS[strings.ToLower(l)]; return ok }
+	isBook := func(l string) bool { _, ok := passage.BookOSIS(l); return ok }
 	if last {
 		if len(s) > 2 {
 			return "", "", -1, fmt.Sprintf("%d lines after the date and no passage in them", len(s))

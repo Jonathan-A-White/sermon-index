@@ -641,3 +641,19 @@ func TestParseNoNotesIgnoresATrailingPeriodOrBulletAfterAnyField(t *testing.T) {
 		}
 	}
 }
+
+// A passage printed with an abbreviated book ("2 Cor. 10:1-6", "Ex. 20:1-17")
+// is read by the same book names as the notes reader (passage.BookOSIS)
+// (mw-qtu3zvz.59.13).
+func TestParseNoNotesReadsAnAbbreviatedBook(t *testing.T) {
+	for passage, text := range map[string]string{
+		"2 Cor. 10:1-6": "The Weapons of Our Warfare\n\nSep 7, 2025 Phil Morgan 2 Cor. 10:1-6\n\nNo notes",
+		"Ex. 20:1-17":   "Ten Words\n\nSep 7, 2025 Phil Morgan Ex. 20:1-17\n\nNo notes",
+		"Phil. 2:5-11":  "Humility\n\nSep 7, 2025 Phil Morgan Phil. 2:5-11\n\nNo notes",
+	} {
+		got, bad, cand := ParseNoNotes("t", text)
+		if !cand || len(bad) != 0 || len(got) != 1 || got[0].Passage != passage || got[0].Speaker != "Phil Morgan" {
+			t.Errorf("%q: sermons %+v unread %v", passage, got, bad)
+		}
+	}
+}
