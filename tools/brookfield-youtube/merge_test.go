@@ -444,6 +444,33 @@ func TestMessagePassagesTakesTheBookBeforeAndABareBook(t *testing.T) {
 	}
 }
 
+// A refusal names the piece that is wrong, not only the cell (mw-qtu3zvz.59.27):
+// a bare book after the first place is a whole book, which is allowed only first.
+func TestMessagePassagesRefusalNamesThePiece(t *testing.T) {
+	_, why := messagePassages("Luke 24, Job")
+	if !strings.Contains(why, `"Job"`) || !strings.Contains(why, "whole book") || !strings.Contains(why, "first") || strings.Contains(why, "spans") {
+		t.Errorf("Luke 24, Job: %q", why)
+	}
+	_, why = messagePassages("Luke 24; Job; John 5")
+	if !strings.Contains(why, `"Job"`) || strings.Contains(why, "spans") {
+		t.Errorf("Luke 24; Job; John 5: %q", why)
+	}
+	// a wide passage after the first is still refused by its width
+	if _, why = messagePassages("Luke 24, Genesis 37-49"); !strings.Contains(why, "Gen.37-Gen.49") || !strings.Contains(why, "spans") {
+		t.Errorf("Luke 24, Genesis 37-49: %q", why)
+	}
+	// a place the book table refuses is named by itself
+	if _, why = messagePassages("Luke 24, Romans 99:1"); !strings.Contains(why, `"Romans 99:1"`) {
+		t.Errorf("Luke 24, Romans 99:1: %q", why)
+	}
+	if _, why = messagePassages("Luke 24; 99:1"); !strings.Contains(why, `"99:1"`) {
+		t.Errorf("Luke 24; 99:1: %q", why)
+	}
+	if _, why = listPassage("Luke 24, Romans 99:1"); !strings.Contains(why, `"Romans 99:1"`) {
+		t.Errorf("listPassage Luke 24, Romans 99:1: %q", why)
+	}
+}
+
 // A message whose cell is a bare book is a series with its first chapter as
 // ref ("Job" -> Job.1), like Genesis 37-49.
 func TestMessageEntryWithABareBookIsASeries(t *testing.T) {

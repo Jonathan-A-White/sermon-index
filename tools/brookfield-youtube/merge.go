@@ -272,7 +272,7 @@ func listPassage(cell string) (string, string) {
 	refs, bad := textPassages(cell)
 	switch {
 	case len(bad) > 0:
-		return "", fmt.Sprintf("the passage %q is refused by the book table", cell)
+		return "", fmt.Sprintf("the passage %q is refused by the book table (%q)", cell, bad[0])
 	case len(refs) != 1:
 		return "", fmt.Sprintf("the passage %q is not exactly one passage", cell)
 	}
@@ -315,8 +315,11 @@ func messagePassages(cell string) ([]string, string) {
 		}
 		refs = append(refs, ref)
 	}
-	refused := fmt.Sprintf("the passage %q is refused by the book table", cell)
-	book := "" // the book of the last place read
+	refused := func(piece string) string {
+		return fmt.Sprintf("the passage %q is refused by the book table (%q)", cell, strings.TrimSpace(piece))
+	}
+	bare := map[string]bool{} // refs that were a bare book, a whole book
+	book := ""                // the book of the last place read
 	// The gap before, between and after the passages the book table reads.
 	gap := func(g string) string {
 		for _, seg := range separatorRE.Split(g, -1) {
@@ -330,11 +333,12 @@ func messagePassages(cell string) ([]string, string) {
 				}
 				ref, err := placeRef(book, m[1], m[2], m[3], m[4])
 				if err != nil {
-					return refused
+					return refused(seg)
 				}
 				add(ref)
 			} else if o, ok := passage.BookOSIS(seg); ok {
 				book = o
+				bare[o] = true
 				add(o)
 			} else {
 				return fmt.Sprintf("the passage %q holds more than the passages (%q is left over)", cell, seg)
@@ -357,7 +361,7 @@ func messagePassages(cell string) ([]string, string) {
 		o, _ := passage.BookOSIS(sub(1))
 		ref, err := placeRef(o, sub(2), sub(3), sub(4), sub(5))
 		if err != nil {
-			return nil, refused
+			return nil, refused(cell[m[0]:m[1]])
 		}
 		book = o
 		add(ref)
@@ -372,6 +376,9 @@ func messagePassages(cell string) ([]string, string) {
 		r, err := passage.Parse(ref)
 		if err != nil {
 			return nil, fmt.Sprintf("the passage %q is refused: %v", cell, err)
+		}
+		if i > 0 && bare[ref] {
+			return nil, fmt.Sprintf("the passage %q has %q after the first place, which is a whole book; a whole book is allowed only as the first place", cell, ref)
 		}
 		if i > 0 && r.Chapters() > 3 {
 			return nil, fmt.Sprintf("the passage %q has %s after the first, which spans %d chapters, a series and not a text", cell, r.OSIS, r.Chapters())
