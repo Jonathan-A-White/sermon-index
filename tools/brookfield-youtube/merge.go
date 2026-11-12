@@ -319,7 +319,7 @@ func messagePassages(cell string) ([]string, string) {
 		return fmt.Sprintf("the passage %q is refused by the book table (%q)", cell, strings.TrimSpace(piece))
 	}
 	bare := map[string]string{} // refs that were a bare book (a whole book), as written
-	book := ""                // the book of the last place read
+	book := ""                  // the book of the last place read
 	// The gap before, between and after the passages the book table reads.
 	gap := func(g string) string {
 		for _, seg := range separatorRE.Split(g, -1) {
