@@ -62,7 +62,6 @@ func TestReadAlertsDropsABadReference(t *testing.T) {
 
 func TestReadAlertsRefusesMissingAndBadFields(t *testing.T) {
 	cases := map[string]string{
-		"no reference": `{"id":"x1","kind":"sermon-notes","title":"T","when":"2031-03-02T00:00:00-05:00"}`,
 		"past chapter": `{"id":"x2","kind":"sermon-notes","title":"T","reference":"Romans 99:1","when":"2031-03-02T00:00:00-05:00"}`,
 		"no title":     `{"id":"x3","kind":"sermon-notes","reference":"Romans 5:1","when":"2031-03-02T00:00:00-05:00"}`,
 		"no date":      `{"id":"x4","kind":"sermon-notes","title":"T","reference":"Romans 5:1"}`,

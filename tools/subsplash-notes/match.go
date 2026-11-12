@@ -52,7 +52,7 @@ func Match(n Note, rows []sources.Row) (Record, error) {
 		return Record{}, err
 	}
 	st, _ := time.Parse(dateLayout, sunday)
-	var hits []string
+	var hits, sameTitle []string
 	for _, r := range rows {
 		if r.Date == nil {
 			continue
@@ -63,7 +63,15 @@ func Match(n Note, rows []sources.Row) (Record, error) {
 		}
 		if d := rt.Sub(st); d >= -24*time.Hour && d <= 24*time.Hour {
 			hits = append(hits, r.ID)
+			if foldTitle(r.Title) == foldTitle(n.Title) {
+				sameTitle = append(sameTitle, r.ID)
+			}
 		}
+	}
+	// A mail with no passage has only its date and its title to go by: of
+	// several rows within the day, the one with its title is taken.
+	if n.Ref == "" && len(hits) > 1 && len(sameTitle) == 1 {
+		hits = sameTitle
 	}
 	switch len(hits) {
 	case 0:
@@ -145,6 +153,9 @@ func MatchNote(n Note, rows []sources.Row) (rec Record, how string, err error) {
 // sharesPlace is whether the row's passage, or one it cites, is any of the
 // places the note's passage names.
 func sharesPlace(n Note, r sources.Row) bool {
+	if n.Ref == "" {
+		return false
+	}
 	places := []string{n.Ref}
 	if n.Also != "" {
 		places = append(places, strings.Split(n.Also, AlsoSep)...)

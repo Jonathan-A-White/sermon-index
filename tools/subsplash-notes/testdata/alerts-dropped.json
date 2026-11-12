@@ -1,0 +1,74 @@
+{
+ "alerts": [
+  {
+   "id": "b682bb042296794b",
+   "seq": 59,
+   "kind": "sermon-notes",
+   "when": "2026-06-21T00:00:00-04:00",
+   "title": "Pictures of Our Father",
+   "reference": "Matthew 6:9/Romans 8:14-16",
+   "notes_sha256": "0ef282220a474950cfd44d8868b29f5d1aa0f41bf084f68c1310e70582ba1b36",
+   "notes_size": 98932
+  },
+  {
+   "id": "17201668b55b45b8",
+   "seq": 82,
+   "kind": "sermon-notes",
+   "when": "2023-11-04T00:00:00-04:00",
+   "title": "Our Privilege of Partnership",
+   "reference": "2 Corinthians 2:15; 10:13-16",
+   "notes_sha256": "a68f1108fca6fb677f8f6e2de6cea6517109e5516fe739cb383ba31661445b13",
+   "notes_size": 100863
+  },
+  {
+   "id": "a2cba2963b118613",
+   "seq": 90,
+   "kind": "sermon-notes",
+   "when": "2025-09-28T00:00:00-04:00",
+   "title": "Boasting in Bruises",
+   "reference": "2 Cor. 11:16-33",
+   "notes_sha256": "65900859d1f49983718b08902df672842cc52eb31e08aca28759cf83444c2c9e",
+   "notes_size": 177478
+  },
+  {
+   "id": "a987b6f0faa31866",
+   "seq": 92,
+   "kind": "sermon-notes",
+   "when": "2025-09-14T00:00:00-04:00",
+   "title": "The Measure That Matters",
+   "reference": "2 Cor. 10:7-18",
+   "notes_sha256": "cdd827e6dcadb3b9ece2cac731f452ef61368d867ef1bf42796e8c3402f5b36e",
+   "notes_size": 175894
+  },
+  {
+   "id": "4252d198eb54a85c",
+   "seq": 93,
+   "kind": "sermon-notes",
+   "when": "2025-09-07T00:00:00-04:00",
+   "title": "The Weapons of Our Warfare",
+   "reference": "2 Cor. 10:1-6",
+   "notes_sha256": "cf4bc944cebc9b978afd89d2d3d023337f18ef7bc53a4187187b60778b67df24",
+   "notes_size": 176896
+  },
+  {
+   "id": "f8252164bc6808e8",
+   "seq": 94,
+   "kind": "sermon-notes",
+   "when": "2025-08-31T00:00:00-04:00",
+   "title": "The Cheerful Giver",
+   "reference": "2 Cor. 9:1-15",
+   "notes_sha256": "5caee366e0acf5da905d7f9e548c76238abf8b971dea7b10b40982166ae54694",
+   "notes_size": 179151
+  },
+  {
+   "id": "a7f24e79fdb1ac2b",
+   "seq": 96,
+   "kind": "sermon-notes",
+   "when": "2025-08-17T00:00:00-04:00",
+   "title": "From Good Intentions to Godly Impact",
+   "notes_sha256": "60bd21375db420e9b533df5b10806acfbc1894fffaf78590b6c9cd8006c7cbc5",
+   "notes_size": 179101
+  }
+ ],
+ "next": 130
+}

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"regexp"
-	"sort"
 	"strings"
 	"time"
 
@@ -152,9 +151,16 @@ func (a Alert) note() (Note, error) {
 	if title == "" {
 		return Note{}, errors.New("no title")
 	}
-	places, err := ReferencesToOSIS(a.Reference)
-	if err != nil {
-		return Note{}, err
+	// A mail may name no passage at all; its row is then found by its date
+	// (and its title), see Match.
+	var places []string
+	if strings.TrimSpace(a.Reference) == "" {
+		places = []string{""}
+	} else {
+		var err error
+		if places, err = ReferencesToOSIS(a.Reference); err != nil {
+			return Note{}, err
+		}
 	}
 	if a.When == "" {
 		return Note{}, errors.New("no date")
@@ -180,29 +186,9 @@ func (a Alert) note() (Note, error) {
 
 var sha256RE = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
-var refRE = func() *regexp.Regexp {
-	names := map[string]bool{"psalm": true, "song of songs": true}
-	for _, b := range passage.Books() {
-		names[strings.ToLower(b.Name)] = true
-	}
-	list := make([]string, 0, len(names))
-	for n := range names {
-		list = append(list, n)
-	}
-	sort.Slice(list, func(i, j int) bool { return len(list[i]) > len(list[j]) })
-	for i, n := range list {
-		list[i] = strings.ReplaceAll(regexp.QuoteMeta(n), `\ `, `\s+`)
-	}
-	return regexp.MustCompile(`(?i)^(` + strings.Join(list, "|") + `)\.?\s+(\d{1,3})(?::(` + passage.NumberPattern + `))?(?:\s*[-–—]\s*(` + passage.NumberPattern + `)(?::(` + passage.NumberPattern + `))?)?$`)
-}()
-
-var bookOSIS = func() map[string]string {
-	m := map[string]string{"psalm": "Ps", "song of songs": "Song"}
-	for _, b := range passage.Books() {
-		m[strings.ToLower(b.Name)] = b.OSIS
-	}
-	return m
-}()
+// refRE reads one place: a book (full name, "Psalm", "Song of Songs" or a
+// usual abbreviation, passage.BookOSIS), a chapter and verses.
+var refRE = regexp.MustCompile(`(?i)^(` + passage.BookNamePattern() + `)\.?\s+(\d{1,3})(?::(` + passage.NumberPattern + `))?(?:\s*[-–—]\s*(` + passage.NumberPattern + `)(?::(` + passage.NumberPattern + `))?)?$`)
 
 // AlsoSep joins the OSIS references of a note's other places in Note.Also and
 // Record.Also (a string, so a Note and a Record still compare by ==).
@@ -232,7 +218,7 @@ func ReferencesToOSIS(s string) ([]string, error) {
 		var osis string
 		var err error
 		if m := refRE.FindStringSubmatch(piece); m != nil {
-			book = bookOSIS[strings.ToLower(strings.Join(strings.Fields(m[1]), " "))]
+			book, _ = passage.BookOSIS(m[1])
 			chapter, hadVerse = m[2], m[3] != ""
 			osis, err = passage.RangeOSIS(book, m[2], m[3], m[4], m[5])
 		} else if m := contRE.FindStringSubmatch(piece); m != nil && book != "" {
@@ -277,7 +263,7 @@ func ReferenceToOSIS(s string) (string, error) {
 	if m == nil {
 		return "", fmt.Errorf("reference '%s' is not one passage of a book, chapter and verses", s)
 	}
-	book := bookOSIS[strings.ToLower(strings.Join(strings.Fields(m[1]), " "))]
+	book, _ := passage.BookOSIS(m[1])
 	// A verse may carry a letter part ("10a", "4b"), which passage.RangeOSIS
 	// reads as its verse; a chapter may not ("Isaiah 40a", "Isaiah 40-41a"),
 	// which it refuses.
