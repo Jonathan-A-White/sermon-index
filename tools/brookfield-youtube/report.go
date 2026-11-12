@@ -175,7 +175,11 @@ func listCommentText(m *Merge) string {
 }
 
 func listNoteText(m *Merge) string {
-	return fmt.Sprintf("The title, preacher and passage of %d rows come instead from the church's own list of its sermons, sources/brookfield-first/passages.tsv, matched to the videos by date: %d typed by hand from screenshots of the church's app that the Governor took, and %d from messages the Governor sent, each read by him in the church's app (these are sermons that have no notes). No tool read the app, so Subsplash's terms on automated reading are not engaged. The Governor shows the list to the pastor and removes it on an objection. It holds no YouTube data, so the 30 days do not bind it.", m.Merged, m.Merged-m.FromMessages, m.FromMessages)
+	notes := ""
+	if m.FromNotes > 0 {
+		notes = fmt.Sprintf(" The title and passage of %d of them are those of the sermon notes the church's app mailed the Governor (tools/subsplash-notes), written to the list by tools/subsplash-links --read-notes.", m.FromNotes)
+	}
+	return fmt.Sprintf("The title, preacher and passage of %d rows come instead from the church's own list of its sermons, sources/brookfield-first/passages.tsv, matched to the videos by date: %d typed by hand from screenshots of the church's app that the Governor took, and %d from messages the Governor sent, each read by him in the church's app (these are sermons that have no notes)."+notes+" No tool read the app, so Subsplash's terms on automated reading are not engaged. The Governor shows the list to the pastor and removes it on an objection. It holds no YouTube data, so the 30 days do not bind it.", m.Merged, m.Merged-m.FromMessages-m.FromNotes, m.FromMessages)
 }
 
 // countsMarkdown is the counts of REPORT.md's section on the list, up to the
@@ -186,6 +190,9 @@ func (m *Merge) countsMarkdown() string {
 	w("- Entries in the list: %d\n", m.Entries)
 	w("- Merged into a row: %d\n", m.Merged)
 	w("- Of them from the Governor's messages: %d\n", m.FromMessages)
+	if m.FromNotes > 0 {
+		w("- Of them from the notes mails: %d\n", m.FromNotes)
+	}
 	w("- Not merged: %d", len(m.Problems))
 	if len(m.Problems) == 0 {
 		w(".\n")

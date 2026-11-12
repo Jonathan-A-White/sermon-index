@@ -25,9 +25,17 @@
 #      $GOVERNOR_KEY_FILE, default ~/.config/sermon-index/governor.pub), and adds
 #      each to sources/brookfield-first/passages.tsv and no-notes.tsv; then
 #      brookfield-youtube --merge-only (no API, no key) puts the title, preacher
-#      and passage on the sermon's row. A message it cannot read whole is named
-#      by txid and changes nothing. Before the link step, so that a link whose
-#      address names such a sermon finds its row by the new title;
+#      and passage on the sermon's row (2d). A message it cannot read whole is
+#      named by txid and changes nothing;
+#   2c. the notes mails' own title and passage: subsplash-links --read-notes
+#      adds a passages.tsv line (row = the record's row id, last column 'notes')
+#      for each record whose row has no passage and only a generic title, since
+#      data/subsplash-notes.jsonl is git-ignored and a row keeps what is in the
+#      tracked list; a row his message already has a line for is not replaced
+#      (a difference is named);
+#   2d. brookfield-youtube --merge-only (no API, no key) puts passages.tsv on the
+#      rows. Before the link step, so that a link whose address names such a
+#      sermon finds its row by the new title;
 #   3. the link list: every https://brookfieldfirst.subspla.sh/<code> in the
 #      Postern inbox's messages ($POSTERN_INBOX, default ~/.local/state/mw/
 #      postern/inbox), in a temporary file outside the checkout, and every
@@ -115,7 +123,7 @@ if ! "$GO" run ./tools/subsplash-notes fetch; then
 	status=1
 fi
 
-# 2b. The sermons with no notes, from the Governor's messages, onto their rows.
+# 2b. The sermons with no notes, from the Governor's messages, onto passages.tsv.
 if [ -r "$KEYFILE" ] && [ -n "$(tr -d ' \t\r\n' < "$KEYFILE")" ]; then
 	GKEY=$(tr -d ' \t\r\n' < "$KEYFILE")
 	if "$GO" run ./tools/subsplash-links --read-messages "$INBOX" --key "$GKEY" --rows "$ROWS" > "$TMP/nonotes.out"; then :; else
@@ -123,12 +131,23 @@ if [ -r "$KEYFILE" ] && [ -n "$(tr -d ' \t\r\n' < "$KEYFILE")" ]; then
 		status=1
 	fi
 	cat "$TMP/nonotes.out"
-	if ! "$GO" run ./tools/brookfield-youtube --merge-only --out "$SRC"; then
-		echo "subsplash-hourly: brookfield-youtube --merge-only failed (see above)" >&2
-		status=1
-	fi
 else
 	echo "subsplash-hourly: cannot read the Governor's public key at $KEYFILE; his 'No notes' messages were not read" >&2
+	status=1
+fi
+
+# 2c. The title and passage of each notes mail, onto passages.tsv: the records
+# file is git-ignored, so only a line of the tracked list keeps them on the row.
+if "$GO" run ./tools/subsplash-links --read-notes --rows "$ROWS" --passages "$SRC/passages.tsv" > "$TMP/notes.out"; then :; else
+	echo "subsplash-hourly: subsplash-links --read-notes failed (see above)" >&2
+	status=1
+fi
+cat "$TMP/notes.out"
+
+# 2d. passages.tsv onto the rows (no API, no key). Before the link step, so that
+# a link whose address names such a sermon finds its row by the new title.
+if ! "$GO" run ./tools/brookfield-youtube --merge-only --out "$SRC"; then
+	echo "subsplash-hourly: brookfield-youtube --merge-only failed (see above)" >&2
 	status=1
 fi
 

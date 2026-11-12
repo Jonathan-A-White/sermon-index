@@ -148,7 +148,7 @@ func runMergeOnly(out, listPath, reportPath string, stdout io.Writer) error {
 	if err := patch(reportPath, renewReport); err != nil {
 		return err
 	}
-	fmt.Fprintf(stdout, "merge: %d entries in the list, %d merged (%d from the Governor's messages), %d row(s) changed\n", m.Entries, m.Merged, m.FromMessages, changed)
+	fmt.Fprintf(stdout, "merge: %d entries in the list, %d merged (%d from the Governor's messages, %d from the notes mails), %d row(s) changed\n", m.Entries, m.Merged, m.FromMessages, m.FromNotes, changed)
 	return nil
 }
 

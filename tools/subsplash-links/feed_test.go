@@ -42,7 +42,7 @@ func feedRecords() []Record {
 
 func feedServed() map[string]servedRow {
 	return map[string]servedRow{
-		"v2": {ID: "v2", AltURL: sp(feedAlt + "bbb2222-the-narrow-door")},
+		"v2": {ID: "v2", AltURL: sp(feedAlt + "bbb2222-the-narrow-door"), Ref: "Luke.13.22-Luke.13.30", Role: "text"},
 		"v5": {ID: "v5"}, // served without its link: not loaded yet
 		"v6": {ID: "v6"},
 		"v3": {ID: "v3"},
@@ -254,5 +254,49 @@ func TestFeedFlagReadsTheNoNotesFile(t *testing.T) {
 	got, _ := os.ReadFile(out)
 	if !strings.Contains(string(got), "The Running Man (no notes)") || !strings.Contains(string(got), `"mail": true`) {
 		t.Errorf("feed: %s", got)
+	}
+}
+
+// Acceptance 3 of mw-qtu3zvz.59.25: 'Lightning in Clay Pots' showed live (all
+// three green) while the service did not serve it with its passage at all.
+// Live now means the service serves the row with the passage the row holds,
+// and a row that has a link but no passage while the notes name one is not live.
+func TestBuildFeedIsNotLiveWhileTheServiceLacksThePassage(t *testing.T) {
+	alt := feedAlt + "ddd4444-lightning-in-clay-pots"
+	rows := []sources.Row{
+		{ID: "L", Title: "Brookfield First - Online Service | October 19, 2025", URL: "yL", Date: sp("2025-10-19"), AltURL: &alt},
+		{ID: "M", Title: "Plain", Ref: sp("Mark.1.1"), URL: "yM", Date: sp("2025-10-12"), AltURL: sp(feedAlt + "eee5555-plain")},
+		{ID: "N", Title: "Other", Ref: sp("Mark.2.1"), URL: "yN", Date: sp("2025-10-05"), AltURL: sp(feedAlt + "fff6666-other")},
+	}
+	recs := []Record{{ID: "L", Date: "2025-10-19", Title: "Lightning in Clay Pots", Ref: "2Cor.13"}}
+	// The service holds every row it can serve as rows.jsonl has it, and the
+	// only row without a passage is L: the old rule called L live.
+	served := map[string]servedRow{
+		"M": {ID: "M", Title: "Plain", URL: "yM", Date: sp("2025-10-12"), AltURL: rows[1].AltURL, Ref: "Mark.1.1", Role: "text"},
+		// N is served, with another passage than the row's own.
+		"N": {ID: "N", Title: "Other", URL: "yN", Date: sp("2025-10-05"), AltURL: rows[2].AltURL, Ref: "Mark.9.9", Role: "text"},
+	}
+	f := BuildFeed(rows, recs, nil, served, time.Now())
+	live := map[string]bool{}
+	for _, it := range f.Items {
+		live[it.Date] = it.Done["live"]
+	}
+	if live["2025-10-19"] {
+		t.Error("'Lightning in Clay Pots' is live though the service does not serve it with a passage")
+	}
+	if !live["2025-10-12"] {
+		t.Error("a row the service serves with its passage and link is not live")
+	}
+	if live["2025-10-05"] {
+		t.Error("a row the service serves with another passage than the row's is live")
+	}
+	// Once the row holds the passage and the service serves it, it is live.
+	rows[0].Ref = sp("2Cor.13")
+	served["L"] = servedRow{ID: "L", Title: rows[0].Title, URL: "yL", Date: sp("2025-10-19"), AltURL: &alt, Ref: "2Cor.13", Role: "text"}
+	f = BuildFeed(rows, recs, nil, served, time.Now())
+	for _, it := range f.Items {
+		if it.Date == "2025-10-19" && !it.Done["live"] {
+			t.Error("served with its passage and link, still not live")
+		}
 	}
 }

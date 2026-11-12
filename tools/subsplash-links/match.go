@@ -19,6 +19,8 @@ type Record struct {
 	Date  string `json:"date"`
 	Title string `json:"title"`
 	Ref   string `json:"ref"`
+	// Also is a second passage the notes name (a Governor-read "cited" text).
+	Also string `json:"also,omitempty"`
 }
 
 // ReadRecords reads the records file; a file that does not exist holds none.

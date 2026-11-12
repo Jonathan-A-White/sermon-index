@@ -923,3 +923,52 @@ func mustAtoi(t *testing.T, s string) int {
 	}
 	return n
 }
+
+// mw-qtu3zvz.59.25: the title and passage a notes mail gave a sermon reach its
+// row through the tracked list (passages.tsv) in the hourly run, are committed,
+// loaded into the service, and the Jobs feed ticks "live" for it only then.
+func TestHourlyPutsANotesRecordsTitleAndPassageOnItsRow(t *testing.T) {
+	h := newHourlyRig(t)
+	clay := `{"id":"clay","title":"Brookfield First - Online Service | October 19, 2031","url":"https://www.youtube.com/watch?v=clay","kind":"link","date":"2031-10-19"}` + "\n"
+	rows := h.file("sources/brookfield-first/rows.jsonl") + clay
+	if err := os.WriteFile(filepath.Join(h.clone, "sources/brookfield-first/rows.jsonl"), []byte(rows), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	git(t, h.clone, "commit", "-q", "-am", "a row with a generic title")
+	git(t, h.clone, "push", "-q", "origin", "main")
+	if err := os.WriteFile(h.service, []byte(rows), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// The service lacks nothing it serves; the row has no passage, so it is not asked about.
+	records := hourlyRecord + "\n" + `{"id":"clay","date":"2031-10-19","title":"Lightning in Clay Pots","ref":"2Cor.13"}`
+	before := h.commits()
+	out, code := h.run("scripts/subsplash-hourly.sh", "FAKE_NOTES_RECORDS="+records)
+	if code != 0 {
+		t.Fatalf("exit %d:\n%s", code, out)
+	}
+	got := h.file("sources/brookfield-first/rows.jsonl")
+	if !strings.Contains(got, `"id":"clay","title":"Lightning in Clay Pots","ref":"2Cor.13"`) {
+		t.Errorf("the row did not get the notes' title and passage:\n%s", got)
+	}
+	if !strings.Contains(h.file("sources/brookfield-first/passages.tsv"), "\t2031-10-19\tLightning in Clay Pots\t\t2 Corinthians 13\tclay\tnotes\n") {
+		t.Errorf("passages.tsv:\n%s", h.file("sources/brookfield-first/passages.tsv"))
+	}
+	log := h.calls()
+	notes := strings.Index(log, "--read-notes")
+	merge := strings.Index(log, "merge-only:")
+	if notes < 0 || merge < notes {
+		t.Errorf("want read-notes before merge-only (%d, %d):\n%s", notes, merge, log)
+	}
+	if h.commits() != strconv.Itoa(mustAtoi(t, before)+1) || git(t, h.clone, "status", "--porcelain") != "" || !h.pushed() {
+		t.Errorf("not committed once, pushed and clean (commits %s -> %s)", before, h.commits())
+	}
+	// The service was loaded with it, so it serves the row now.
+	if b, _ := os.ReadFile(h.service); !strings.Contains(string(b), `"ref":"2Cor.13"`) {
+		t.Errorf("the service was not loaded with the passage:\n%s", b)
+	}
+	// And a second run changes nothing.
+	commits := h.commits()
+	if out, code = h.run("scripts/subsplash-hourly.sh", "FAKE_NOTES_RECORDS="+records); code != 0 || h.commits() != commits {
+		t.Errorf("second run exit %d, commits %s -> %s:\n%s", code, commits, h.commits(), out)
+	}
+}
