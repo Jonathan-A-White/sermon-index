@@ -524,3 +524,70 @@ func TestMergeANotesLineGivesTitleAndPassageAndKeepsThePreacher(t *testing.T) {
 		t.Errorf("%v %+v", err, l)
 	}
 }
+
+// His report (2026-11-12): 'When Angels Go to Church' (Gc3PYgXzzjQ) is Phil
+// Morgan's and the row showed no preacher. A notes line with a speaker puts
+// that speaker on the row and its note says where the speaker came from: the
+// notes PDF's header ('notes') or the Governor's word ('notes+<txid of his message>').
+func TestMergeANotesLineWithASpeakerPutsItOnTheRowAndSaysWhere(t *testing.T) {
+	rows := rowsForMerge()
+	l, err := ReadList(writeTSV(t, "series\tdate\ttitle\tspeaker\tpassage\trow\tfrom\n"+
+		"\t2026-11-01\tLightning in Clay Pots\tPhil Morgan\t2 Corinthians 13\tvidA\tnotes\n"+
+		"\t2020-08-23\tPictures of Our Father\tSam Morgan\tMatthew 6:9\tvidB\tnotes+direct:abc123\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := MergeList(rows, l)
+	if m.Merged != 2 || len(m.Problems) != 0 || m.FromNotes != 2 || m.FromMessages != 0 {
+		t.Fatalf("%+v", m)
+	}
+	a := rowByID(rows, "vidA")
+	if str(a.Preacher) != "Phil Morgan" || str(a.Ref) != "2Cor.13" {
+		t.Errorf("row A %+v", a)
+	}
+	if n := str(a.Notes); !strings.Contains(n, "Preacher") || !strings.Contains(n, "notes PDF") || strings.Contains(n, "Governor's message") {
+		t.Errorf("row A notes %q", n)
+	}
+	b := rowByID(rows, "vidB")
+	if str(b.Preacher) != "Sam Morgan" || str(b.Ref) != "Matt.6.9" {
+		t.Errorf("row B %+v", b)
+	}
+	if n := str(b.Notes); !strings.Contains(n, "Preacher") || !strings.Contains(n, "Governor's message direct:abc123") {
+		t.Errorf("row B notes %q", n)
+	}
+	// A notes line with no speaker says nothing of a preacher.
+	l, _ = ReadList(writeTSV(t, "series\tdate\ttitle\tspeaker\tpassage\trow\tfrom\n\t2020-07-12\tX\t\tLuke 24\tvidC\tnotes\n"))
+	MergeList(rows, l)
+	if n := str(rowByID(rows, "vidC").Notes); strings.Contains(n, "reacher") {
+		t.Errorf("row C notes %q", n)
+	}
+}
+
+// The checked-in rows carry every speaker the checked-in list names, and the
+// three rows whose preacher a source names: his word for Gc3PYgXzzjQ, and the
+// header of the notes PDFs of L4mXkwT7tW4 and P-CduhO5oPo ('Pastor Phil Morgan').
+func TestBrookfieldFirstRowsCarryTheListsSpeakers(t *testing.T) {
+	dir := filepath.Join("..", "..", "sources", "brookfield-first")
+	l, err := ReadList(filepath.Join(dir, "passages.tsv"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows := readRowsFile(t, filepath.Join(dir, "rows.jsonl"))
+	by := map[string]sources.Row{}
+	for _, r := range rows {
+		by[r.ID] = r
+	}
+	for _, e := range l.Entries {
+		if e.Speaker != "" && e.Row != "" && str(by[e.Row].Preacher) != e.Speaker {
+			t.Errorf("passages.tsv:%d names %q for row %s, the row has %q", e.Line, e.Speaker, e.Row, str(by[e.Row].Preacher))
+		}
+	}
+	for id, want := range map[string]string{"Gc3PYgXzzjQ": "Phil Morgan", "L4mXkwT7tW4": "Phil Morgan", "P-CduhO5oPo": "Phil Morgan"} {
+		if got := str(by[id].Preacher); got != want {
+			t.Errorf("row %s preacher %q, want %q", id, got, want)
+		}
+	}
+	if n := str(by["Gc3PYgXzzjQ"].Notes); !strings.Contains(n, "direct:378beeb60224") {
+		t.Errorf("Gc3PYgXzzjQ notes do not cite his message: %q", n)
+	}
+}

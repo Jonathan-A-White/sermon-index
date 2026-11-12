@@ -149,6 +149,23 @@ func pdftohtml(path string) ([]byte, error) {
 	return out, nil
 }
 
+// defaultNotesPDFs is where tools/subsplash-notes keeps the notes PDFs
+// (~/.local/state/sermon-index/notes).
+func defaultNotesPDFs() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "none"
+	}
+	return filepath.Join(home, ".local", "state", "sermon-index", "notes")
+}
+
+func pdfDir(flag string) string {
+	if flag == "none" {
+		return ""
+	}
+	return flag
+}
+
 func main() {
 	os.Exit(cli(os.Args[1:], os.Stdout, os.Stderr, deps{}))
 }
@@ -168,6 +185,7 @@ func cli(args []string, stdout, stderr io.Writer, d deps) int {
 	fs.Var(&pdfs, "pdf", "a search-result PDF (repeatable)")
 	rowsPath := fs.String("rows", defaultRows, "the rows to write alt_url to")
 	notesPath := fs.String("notes", defaultNotes, "the records file of tools/subsplash-notes (may be missing)")
+	notesPDFs := fs.String("notes-pdfs", defaultNotesPDFs(), "with --read-notes, where tools/subsplash-notes keeps the notes PDFs; a line takes the speaker its PDF's header names (\"none\" reads no PDF)")
 	cachePath := fs.String("cache", defaultCache, "the cache of code -> full address")
 	progressPath := fs.String("progress", "", "append one JSON line of progress to this file after a real run")
 	dry := fs.Bool("dry-run", false, "write nothing and make no request")
@@ -189,7 +207,7 @@ func cli(args []string, stdout, stderr io.Writer, d deps) int {
 			fmt.Fprintln(stderr, usage)
 			return 2
 		}
-		res, err := RunNotes(*notesPath, *passages, *rowsPath)
+		res, err := RunNotesWithSpeakers(*notesPath, *passages, *rowsPath, pdfDir(*notesPDFs), pdftotextFirstPage)
 		if err != nil {
 			fmt.Fprintln(stderr, "subsplash-links: read-notes:", strings.Join(strings.Fields(err.Error()), " "))
 			return 1

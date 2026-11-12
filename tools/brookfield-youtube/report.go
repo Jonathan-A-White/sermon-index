@@ -198,6 +198,12 @@ func (m *Merge) countsMarkdown() string {
 	if m.FromNotes > 0 {
 		w("- Of them from the notes mails: %d\n", m.FromNotes)
 	}
+	if m.Counted {
+		w("- Rows with a preacher: %d of %d (109 before the speakers of three rows were read: the Governor's word of 2026-11-12 for \"When Angels Go to Church\", and the header of the notes PDFs of two others). The mails name no speaker and the YouTube titles and descriptions name none beyond those already read, so the other %d have none; nothing is guessed from who usually preaches:\n", m.RowsPreacher, m.RowsPreacher+len(m.NoPreacher), len(m.NoPreacher))
+		for _, x := range m.NoPreacher {
+			w("  - %s\n", x)
+		}
+	}
 	w("- Not merged: %d", len(m.Problems))
 	if len(m.Problems) == 0 {
 		w(".\n")
