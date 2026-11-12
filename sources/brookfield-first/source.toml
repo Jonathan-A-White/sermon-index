@@ -20,7 +20,7 @@
 # word for word:
 
 id = "brookfield-first"
-name = "Brookfield First's sermons (YouTube)"
+name = "Brookfield First's sermons (Subsplash)"
 kind = "sermons"
 
 licence = """
@@ -33,7 +33,7 @@ WATCH THE 30 DAYS: the Developer Policies quoted above allow public API data to 
 The title, preacher and passage of 199 rows come instead from the church's own list of its sermons, sources/brookfield-first/passages.tsv, matched to the videos by date: 27 typed by hand from screenshots of the church's app that the Governor took, and 65 from messages the Governor sent, each read by him in the church's app (these are sermons that have no notes). The title and passage of 107 of them are those of the sermon notes the church's app mailed the Governor (tools/subsplash-notes), written to the list by tools/subsplash-links --read-notes. No tool read the app, so Subsplash's terms on automated reading are not engaged. The Governor shows the list to the pastor and removes it on an objection. It holds no YouTube data, so the 30 days do not bind it."""
 
 credit = "Brookfield First (Brookfield Assembly of God), Brookfield CT"
-homepage = "https://www.youtube.com/@BrookfieldFirst"
+homepage = "https://subsplash.com/u/brookfieldfirst/media"
 terms_url = "https://developers.google.com/youtube/terms/developer-policies"
 added = 2026-11-09
 on_by_default = false
