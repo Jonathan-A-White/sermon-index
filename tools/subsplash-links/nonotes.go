@@ -61,7 +61,12 @@ var (
 
 // tailPassageRE finds the longest ending of a text that is a passage: a book
 // of the table (or Psalm, Song of Songs), a chapter, and a verse or range.
-var tailPassageRE = regexp.MustCompile(`(?i)(?:^|\s)((` + passage.BookNamePattern() + `)\.?\s+(\d{1,3})(?::(` + passage.NumberPattern + `))?(?:\s*[-–—]\s*(` + passage.NumberPattern + `)(?::(` + passage.NumberPattern + `))?)?)\s*$`)
+var tailPassageRE = regexp.MustCompile(`(?i)(?:^|[\s/])((` + passage.BookNamePattern() + `)\.?\s+(\d{1,3})(?::(` + passage.NumberPattern + `))?(?:\s*[-–—]\s*(` + passage.NumberPattern + `)(?::(` + passage.NumberPattern + `))?)?)\s*$`)
+
+// bareTailRE finds a second place that names no book of its own ("10:13-16" in
+// "2 Corinthians 2:15; 10:13-16") after a comma, semicolon or slash: it is a
+// chapter and verses of the book before it.
+var bareTailRE = regexp.MustCompile(`^(.*[,;/])\s*(\d{1,3}:` + passage.NumberPattern + `(?:\s*[-–—]\s*` + passage.NumberPattern + `(?::` + passage.NumberPattern + `)?)?)$`)
 
 // splitPassage splits text into what comes before its passage (the preacher)
 // and the passage, which is the longest ending of the text that the book table
@@ -74,7 +79,7 @@ func splitPassage(text string) (before, pass, why string) {
 	text = strings.TrimRight(text, " .•")
 	m := tailPassageRE.FindStringSubmatchIndex(text)
 	if m == nil {
-		return "", "", ""
+		return splitBare(text)
 	}
 	sub := tailPassageRE.FindStringSubmatch(text)
 	pass = strings.TrimSpace(sub[1])
@@ -93,6 +98,31 @@ func splitPassage(text string) (before, pass, why string) {
 	return before, pass, ""
 }
 
+// splitBare reads a text that ends in a place with no book of its own ("Phil
+// Morgan 2 Corinthians 2:15; 10:13-16"): the place takes the book of the passage
+// before it, so the passage it gives ("2 Corinthians 10:13-16") stands alone and
+// joinParts puts the two together. A text that ends otherwise gives nothing.
+func splitBare(text string) (before, pass, why string) {
+	m := bareTailRE.FindStringSubmatch(text)
+	if m == nil {
+		return "", "", ""
+	}
+	head := strings.TrimRight(m[1], ",;/ ")
+	_, p, w := splitPassage(head)
+	if p == "" || w != "" {
+		return "", "", ""
+	}
+	t := tailPassageRE.FindStringSubmatch(head)
+	if t == nil {
+		return "", "", ""
+	}
+	pass = strings.TrimSpace(t[2]) + " " + strings.TrimSpace(m[2])
+	if _, _, w := splitPassage(pass); w != "" {
+		return strings.TrimSpace(m[1]), pass, w
+	}
+	return strings.TrimSpace(m[1]), pass, ""
+}
+
 // joinParts moves a passage that ends the preacher's words into the passage
 // when a comma or semicolon joins them: "Sam Morgan Luke 24," and "John 5" are
 // the preacher Sam Morgan and the passage "Luke 24, John 5".
@@ -103,14 +133,18 @@ func joinParts(before, pass string) (string, string) {
 			return before, pass
 		}
 		sep := t[len(t)-1]
-		if sep != ',' && sep != ';' {
+		if sep != ',' && sep != ';' && sep != '/' {
 			return before, pass
 		}
-		b2, p2, w := splitPassage(strings.TrimRight(t, ",; "))
+		b2, p2, w := splitPassage(strings.TrimRight(t, ",;/ "))
 		if p2 == "" || w != "" {
 			return before, pass
 		}
-		before, pass = b2, p2+string(sep)+" "+pass
+		glue := string(sep) + " "
+		if sep == '/' {
+			glue = "/"
+		}
+		before, pass = b2, p2+glue+pass
 	}
 }
 

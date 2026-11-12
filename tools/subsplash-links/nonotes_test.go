@@ -684,3 +684,19 @@ func TestCommittedPassagesHoldWhatTheReaderReads(t *testing.T) {
 		}
 	}
 }
+
+// A message that names two places (mw-qtu3zvz.59.21): the preacher's name
+// alone is the speaker and every place is the passage, whether a slash or a
+// semicolon joins them. A place with no book of its own ("10:13-16") takes the
+// book before it, so brookfield-youtube's messagePassages can read the cell.
+func TestParseNoNotesReadsAMessageNamingTwoPlaces(t *testing.T) {
+	for passage, text := range map[string]string{
+		"Matthew 6:9/Romans 8:14-16":                 "Pictures of Prayer\n\nSep 7, 2025 Phil Morgan Matthew 6:9/Romans 8:14-16\n\nNo notes",
+		"2 Corinthians 2:15; 2 Corinthians 10:13-16": "Partnership\n\nSep 7, 2025 Phil Morgan 2 Corinthians 2:15; 10:13-16\n\nNo notes",
+	} {
+		got, bad, cand := ParseNoNotes("t", text)
+		if !cand || len(bad) != 0 || len(got) != 1 || got[0].Passage != passage || got[0].Speaker != "Phil Morgan" {
+			t.Errorf("%q: sermons %+v unread %v", passage, got, bad)
+		}
+	}
+}
