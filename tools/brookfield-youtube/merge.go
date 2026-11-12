@@ -163,7 +163,18 @@ func MergeList(rows []sources.Row, l *List) *Merge {
 			continue
 		}
 		ref := ""
-		if e.Passage != "" || e.Row == "" {
+		var refs []string
+		if e.Row != "" {
+			// A message's cell may name several passages or a whole series.
+			if e.Passage != "" {
+				var why string
+				refs, why = messagePassages(e.Passage)
+				if why != "" {
+					fail(why)
+					continue
+				}
+			}
+		} else {
 			var why string
 			ref, why = listPassage(e.Passage)
 			if why != "" {
@@ -204,11 +215,16 @@ func MergeList(rows []sources.Row, l *List) *Merge {
 			r.Cited = nil
 			r.Series = nil
 			note = "Title, preacher and passage from the church's own list of its sermons (passages.tsv), matched to the video by date."
-		case ref != "":
-			r.Ref = ptr(ref)
+		case len(refs) > 0:
 			r.Cited = nil
 			r.Series = nil
+			var ignored []string
+			setPassage(r, refs, "message", &ignored)
 			note = "Title, preacher and passage from a message the Governor sent, read by him in the church's app (passages.tsv; no notes exist for this sermon), matched to the video by its date."
+			if r.IsSeries() {
+				first, _ := passage.Parse(refs[0])
+				note += fmt.Sprintf(" The passage %s spans %d chapters, so the row is a series; its ref is the first chapter.", first.OSIS, first.Chapters())
+			}
 		default:
 			note = "Title and preacher from a message the Governor sent, read by him in the church's app (passages.tsv; no notes exist for this sermon), matched to the video by its date; the message names no passage."
 		}
@@ -246,6 +262,39 @@ func listPassage(cell string) (string, string) {
 		return "", fmt.Sprintf("the passage %q spans %d chapters, which is a series and not a text", cell, r.Chapters())
 	}
 	return r.OSIS, ""
+}
+
+// messagePassages reads the passage cell of a line from the Governor's
+// message: one or more passages, in order, as OSIS ranges, with nothing else
+// but separators (",", ";", "/", "&", "and") between them ("Luke 24, John 5").
+// A passage may be wider than a text (the caller marks the row a series); a
+// cell with other words in it, or a book the table refuses, is refused with
+// the reason. Every passage after the first must be a text, not a series.
+func messagePassages(cell string) ([]string, string) {
+	refs, bad := textPassages(cell)
+	if len(bad) > 0 {
+		return nil, fmt.Sprintf("the passage %q is refused by the book table", cell)
+	}
+	if len(refs) == 0 {
+		return nil, fmt.Sprintf("the passage %q is not a passage", cell)
+	}
+	rest := passageRE.ReplaceAllString(cell, " ")
+	rest = strings.NewReplacer(",", " ", ";", " ", "/", " ", "&", " ").Replace(rest)
+	for _, w := range strings.Fields(rest) {
+		if !strings.EqualFold(w, "and") {
+			return nil, fmt.Sprintf("the passage %q holds more than the passages (%q is left over)", cell, w)
+		}
+	}
+	for i, ref := range refs {
+		r, err := passage.Parse(ref)
+		if err != nil {
+			return nil, fmt.Sprintf("the passage %q is refused: %v", cell, err)
+		}
+		if i > 0 && r.Chapters() > 3 {
+			return nil, fmt.Sprintf("the passage %q has %s after the first, which spans %d chapters, a series and not a text", cell, r.OSIS, r.Chapters())
+		}
+	}
+	return refs, ""
 }
 
 // recount sets the preacher, passage and series counts from the rows, after

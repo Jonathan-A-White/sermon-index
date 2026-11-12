@@ -359,3 +359,52 @@ func TestListPassageReadsAnAbbreviatedBook(t *testing.T) {
 		}
 	}
 }
+
+// A passage cell of a Governor's message may name two passages ("Luke 24, John
+// 5"; "Exodus 2:1-10, Hebrews 11:23") or a whole series ("Genesis 37-49"); the
+// church's own screenshot list still takes exactly one text (mw-qtu3zvz.59.20).
+func TestMessageEntryTakesATwoPassageCellAndAWidePassage(t *testing.T) {
+	rows := rowsForMerge()
+	l, err := ReadList(writeTSV(t, listHeader6+
+		"\t2026-11-01\tHow to Read the Bible Like Jesus\tSam Morgan\tLuke 24, John 5\tvidA\n"+
+		"\t2020-08-23\tHer Legacy of Faith\tPhil Morgan\tExodus 2:1-10, Hebrews 11:23\tvidB\n"+
+		"The Life of Joseph\t2020-07-12\tI Am My Brother's Keeper\tJim Wiley\tGenesis 37-49\tvidC\n"+
+		"\t2026-09-15\tNot A Passage\tJim Wiley\tLuke 24, the empty tomb\tvidD\n"+
+		"\t2022-03-03\tBad Book\tJim Wiley\tLuke 24, Romans 99:1\tvidE\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := MergeList(rows, l)
+	if m.Merged != 3 || m.FromMessages != 3 || len(m.Problems) != 2 {
+		t.Fatalf("merged %d from messages %d, problems %+v", m.Merged, m.FromMessages, m.Problems)
+	}
+
+	a := rowByID(rows, "vidA")
+	if a.Title != "How to Read the Bible Like Jesus" || str(a.Preacher) != "Sam Morgan" || str(a.Ref) != "Luke.24" || len(a.Cited) != 1 || a.Cited[0] != "John.5" || a.IsSeries() {
+		t.Errorf("Luke 24, John 5: %+v", a)
+	}
+	b := rowByID(rows, "vidB")
+	if b.Title != "Her Legacy of Faith" || str(b.Ref) != "Exod.2.1-Exod.2.10" || len(b.Cited) != 1 || b.Cited[0] != "Heb.11.23" {
+		t.Errorf("Exodus 2:1-10, Hebrews 11:23: %+v", b)
+	}
+	// a wide passage makes the row a series, with its first chapter as the ref
+	c := rowByID(rows, "vidC")
+	if c.Title != "I Am My Brother's Keeper" || str(c.Preacher) != "Jim Wiley" || str(c.Ref) != "Gen.37" || !c.IsSeries() || len(c.Cited) != 0 {
+		t.Errorf("Genesis 37-49: %+v", c)
+	}
+	if !strings.Contains(str(c.Notes), "series") || !strings.Contains(str(c.Notes), "Gen.37-Gen.49") {
+		t.Errorf("notes %q", str(c.Notes))
+	}
+	// a cell with words that are no passage, or a book the table refuses, is still refused
+	for _, id := range []string{"vidD", "vidE"} {
+		if r := rowByID(rows, id); strings.HasPrefix(r.Title, "Not A") || r.Title == "Bad Book" || r.Ref != nil {
+			t.Errorf("row %s was merged: %+v", id, r)
+		}
+	}
+	// a second run of a row that was a series earlier clears the mark
+	l2, _ := ReadList(writeTSV(t, listHeader6+"\t2020-07-12\tI Am My Brother's Keeper\tJim Wiley\tGenesis 37:1-11\tvidC\n"))
+	MergeList(rows, l2)
+	if c := rowByID(rows, "vidC"); c.IsSeries() || str(c.Ref) != "Gen.37.1-Gen.37.11" {
+		t.Errorf("series mark kept: %+v", c)
+	}
+}
