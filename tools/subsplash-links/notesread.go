@@ -4,6 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
+	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/Jonathan-A-White/sermon-index/internal/passage"
@@ -168,9 +171,49 @@ func recordPassage(rec Record) (string, error) {
 	return cell, nil
 }
 
+// speakerRE reads the line of a notes PDF's header that names its speaker:
+// "Pastor Phil Morgan". pdftotext breaks a word in the middle at some kerned
+// letters ("Pas tor"), so one space inside the title word is allowed.
+var speakerRE = regexp.MustCompile(`^Pas ?tor\s+([A-Z][A-Za-z.'’-]+(?:\s+[A-Z][A-Za-z.'’-]+){1,3})\s*$`)
+
+// notesSpeaker is the speaker a notes PDF's header names, from the text of its
+// first page (pdftotext): a line "Pastor <Name>" above the line that begins
+// "Part of" (the series) and nowhere else, since the body of the notes is
+// the Governor's and the pastor's own words and says nothing of who preached.
+// Empty when the header names none; a speaker is never guessed.
+func notesSpeaker(text string) string {
+	for _, line := range strings.Split(text, "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "Part of ") {
+			return ""
+		}
+		if m := speakerRE.FindStringSubmatch(line); m != nil {
+			return strings.Join(strings.Fields(m[1]), " ")
+		}
+	}
+	return ""
+}
+
+// pdftotextFirstPage is the text of a PDF's first page, from poppler's pdftotext.
+func pdftotextFirstPage(path string) (string, error) {
+	out, err := exec.Command("pdftotext", "-l", "1", path, "-").Output()
+	if err != nil {
+		return "", fmt.Errorf("pdftotext %s: %w", path, err)
+	}
+	return string(out), nil
+}
+
 // RunNotes writes the records of notesPath that need it to the list at
-// passagesPath, for the rows of rowsPath.
+// passagesPath, for the rows of rowsPath. It names no speaker.
 func RunNotes(notesPath, passagesPath, rowsPath string) (*NotesResult, error) {
+	return RunNotesWithSpeakers(notesPath, passagesPath, rowsPath, "", nil)
+}
+
+// RunNotesWithSpeakers is RunNotes, and a line it writes takes the speaker the
+// header of the row's notes PDF (<pdfDir>/<row id>.pdf, read with text) names.
+// With no pdfDir, or no file, or a header that names none, the speaker is left
+// empty.
+func RunNotesWithSpeakers(notesPath, passagesPath, rowsPath, pdfDir string, text func(path string) (string, error)) (*NotesResult, error) {
 	recs, err := ReadRecords(notesPath)
 	if err != nil {
 		return nil, err
@@ -257,7 +300,13 @@ func RunNotes(notesPath, passagesPath, rowsPath string) (*NotesResult, error) {
 			continue
 		}
 		taken[row.ID] = true
-		fmt.Fprintf(&add, "\t%s\t%s\t\t%s\t%s\tnotes\n", rec.Date, title, tsvField(cell), row.ID)
+		var speaker string
+		if pdfDir != "" && text != nil {
+			if t, err := text(filepath.Join(pdfDir, row.ID+".pdf")); err == nil {
+				speaker = tsvField(notesSpeaker(t))
+			}
+		}
+		fmt.Fprintf(&add, "\t%s\t%s\t%s\t%s\t%s\tnotes\n", rec.Date, title, speaker, tsvField(cell), row.ID)
 		res.Added++
 	}
 	if add.Len() > 0 {

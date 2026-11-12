@@ -27,8 +27,10 @@ import (
 // published, which need not be the Sunday; tools/subsplash-links writes those
 // lines, with a line in no-notes.tsv for each. The seventh column, from, is
 // optional too: "notes" marks a line tools/subsplash-links --read-notes wrote
-// from a notes mail (its title and passage, no speaker), whose row's notes say
-// so. A line with a row is matched to
+// from a notes mail (its title and passage, and its speaker when the notes PDF
+// prints one under the title), whose row's notes say so; "notes+<txid>" marks
+// such a line whose speaker is the Governor's word in the message with that
+// txid, which the row's notes cite. A line with a row is matched to
 // that row by id and not by date, and an empty passage sets the title and the
 // preacher and leaves the row's passage as it was. A line that starts with "#" is a comment, except
 // "# unsure:", whose text REPORT.md prints as a sermon the list could not pin
@@ -42,7 +44,7 @@ import (
 type Entry struct {
 	Series, Date, Title, Speaker, Passage string
 	Row                                   string // the id of the row a message entry belongs to; empty = match by date
-	From                                  string // "notes" for a line written from a notes mail; empty otherwise
+	From                                  string // "notes" for a line written from a notes mail ("notes+<txid>" when its speaker is the Governor's message's); empty otherwise
 	Line                                  int
 }
 
@@ -137,8 +139,11 @@ type Merge struct {
 	Counted                               bool
 	RowsPreacher, RowsPassage, RowsSeries int
 	RowsBoth, RowsNeither                 int
-	Unsure                                []string
-	Entries                               int // entries in the list
+	// NoPreacher is a line for each row left with no preacher, set by
+	// MergeRowsFile with the counts: "`id` date, title".
+	NoPreacher []string
+	Unsure     []string
+	Entries    int // entries in the list
 }
 
 // MergeList applies the list to rows, in place.
@@ -227,12 +232,19 @@ func MergeList(rows []sources.Row, l *List) *Merge {
 			r.Cited = nil
 			r.Series = nil
 			note = "Title, preacher and passage from the church's own list of its sermons (passages.tsv), matched to the video by date."
-		case len(refs) > 0 && e.From == "notes":
+		case len(refs) > 0 && fromNotes(e.From):
 			r.Cited = nil
 			r.Series = nil
 			var ignored []string
 			setPassage(r, refs, "notes", &ignored)
 			note = "Title and passage from the sermon notes the church's app mailed the Governor (Subsplash; passages.tsv), matched to the video by its id."
+			if e.Speaker != "" {
+				if tx := notesTx(e.From); tx != "" {
+					note += fmt.Sprintf(" Preacher from the Governor's message %s (passages.tsv); the notes do not name one.", tx)
+				} else {
+					note += " Preacher as the notes PDF prints it under the title (passages.tsv)."
+				}
+			}
 			if r.IsSeries() {
 				first, _ := passage.Parse(refs[0])
 				note += fmt.Sprintf(" The passage %s spans %d chapters, so the row is a series; its ref is the first chapter.", first.OSIS, first.Chapters())
@@ -256,13 +268,30 @@ func MergeList(rows []sources.Row, l *List) *Merge {
 		r.Notes = ptr(note)
 		m.Merged++
 		switch {
-		case e.From == "notes":
+		case fromNotes(e.From):
 			m.FromNotes++
 		case e.Row != "":
 			m.FromMessages++
 		}
 	}
 	return m
+}
+
+// fromNotes reports whether a line's from column marks a line written from a
+// notes mail: "notes", or "notes+<txid>" when its speaker is the Governor's
+// word in the message with that txid and not the notes PDF's.
+func fromNotes(from string) bool {
+	return from == "notes" || strings.HasPrefix(from, "notes+")
+}
+
+// notesTx is the txid of the Governor's message a "notes+<txid>" names, empty
+// for a plain "notes".
+func notesTx(from string) string {
+	tx, _ := strings.CutPrefix(from, "notes+")
+	if tx == from {
+		return ""
+	}
+	return tx
 }
 
 // listPassage reads a passage cell ("1 Peter 1:22-2:3") as an OSIS range. A
@@ -508,6 +537,13 @@ func MergeRowsFile(rowsPath, listPath string) (*Merge, int, error) {
 		}
 		if r.Ref == nil && r.Preacher == nil {
 			m.RowsNeither++
+		}
+		if r.Preacher == nil {
+			date := ""
+			if r.Date != nil {
+				date = *r.Date
+			}
+			m.NoPreacher = append(m.NoPreacher, fmt.Sprintf("`%s` %s, %s", r.ID, date, r.Title))
 		}
 	}
 	changed := 0

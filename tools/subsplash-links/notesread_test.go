@@ -255,3 +255,52 @@ func TestReadNotesOfAMailWithNoPassageFindsTheLineAlreadyHoldingItsTitle(t *test
 		t.Errorf("a record with no passage and no line is not reported: %v", res.Problems)
 	}
 }
+
+// The text pdftotext gives of the first page of two real notes PDFs
+// (L4mXkwT7tW4 and P-CduhO5oPo): a notes PDF prints its speaker under the
+// title, and pdftotext breaks words in the middle ("Pas tor").
+const headerWithPastor = "\"From Good\nIntentions to\nGodly Impact\"\n2 Corinthians 8:10-15\nPas tor Phil Morgan\n\nPart of 2 Corinthians Onward We Stumble\nAugus t 17, 2025\n\n\n2 Corinthians 8:10-15\n\n1. Our Accountability ____ (v. 10-11)\n"
+
+func TestNotesSpeakerReadsThePastorOfAHeaderAndNothingElse(t *testing.T) {
+	for text, want := range map[string]string{
+		headerWithPastor: "Phil Morgan",
+		"\"The Teachable\nHeart\" — Luke 8:1-\n15\nPastor Sam Morgan\nPart of Standalone Sermons\nDecember 28, 2025\n": "Sam Morgan",
+		// No speaker in the header: nothing, and the body is never read.
+		"\"Gospel Simplicity\"\n— 2 Corinthians\n11:1-15\nPart of 2 Corinthians Onward We Stumble\nSeptember 21, 2025\n\n2 Corinthians 11:1-15\n": "",
+		"\"Title\"\nPart of X\nJuly 21, 2024\n\nAsk Pastor Phil Morgan about it\n\nPastor Phil Morgan\n":                                          "",
+		"": "",
+	} {
+		if got := notesSpeaker(text); got != want {
+			t.Errorf("notesSpeaker(%q) = %q, want %q", text, got, want)
+		}
+	}
+}
+
+// A line --read-notes writes takes its speaker from the row's notes PDF.
+func TestReadNotesWritesTheSpeakerTheNotesPDFNames(t *testing.T) {
+	rows, recs, list := notesRig(t, passagesHeader)
+	pdfs := t.TempDir()
+	text := func(path string) (string, error) {
+		switch filepath.Base(path) {
+		case "FhOTBXf3S90.pdf":
+			return headerWithPastor, nil
+		case "also1.pdf":
+			return "\"x\"\nPart of Y\n", nil
+		}
+		return "", os.ErrNotExist
+	}
+	res, err := RunNotesWithSpeakers(recs, list, rows, pdfs, text)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Added == 0 {
+		t.Fatalf("%+v", res)
+	}
+	got := readFile(t, list)
+	if !strings.Contains(got, "\t2025-10-19\tLightning in Clay Pots\tPhil Morgan\t2 Corinthians 13\tFhOTBXf3S90\tnotes\n") {
+		t.Errorf("no speaker on FhOTBXf3S90's line:\n%s", got)
+	}
+	if !strings.Contains(got, "\t2026-06-21\tPictures of Our Father\t\tMatthew 6:9; Romans 8:14-16\talso1\tnotes\n") {
+		t.Errorf("also1 has a speaker or no line:\n%s", got)
+	}
+}
