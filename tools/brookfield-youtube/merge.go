@@ -318,7 +318,7 @@ func messagePassages(cell string) ([]string, string) {
 	refused := func(piece string) string {
 		return fmt.Sprintf("the passage %q is refused by the book table (%q)", cell, strings.TrimSpace(piece))
 	}
-	bare := map[string]bool{} // refs that were a bare book, a whole book
+	bare := map[string]string{} // refs that were a bare book (a whole book), as written
 	book := ""                // the book of the last place read
 	// The gap before, between and after the passages the book table reads.
 	gap := func(g string) string {
@@ -338,7 +338,7 @@ func messagePassages(cell string) ([]string, string) {
 				add(ref)
 			} else if o, ok := passage.BookOSIS(seg); ok {
 				book = o
-				bare[o] = true
+				bare[o] = seg
 				add(o)
 			} else {
 				return fmt.Sprintf("the passage %q holds more than the passages (%q is left over)", cell, seg)
@@ -377,8 +377,8 @@ func messagePassages(cell string) ([]string, string) {
 		if err != nil {
 			return nil, fmt.Sprintf("the passage %q is refused: %v", cell, err)
 		}
-		if i > 0 && bare[ref] {
-			return nil, fmt.Sprintf("the passage %q has %q after the first place, which is a whole book; a whole book is allowed only as the first place", cell, ref)
+		if i > 0 && bare[ref] != "" {
+			return nil, fmt.Sprintf("the passage %q has %q after the first place, which is a whole book; a whole book is allowed only as the first place", cell, bare[ref])
 		}
 		if i > 0 && r.Chapters() > 3 {
 			return nil, fmt.Sprintf("the passage %q has %s after the first, which spans %d chapters, a series and not a text", cell, r.OSIS, r.Chapters())
