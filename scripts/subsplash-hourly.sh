@@ -33,7 +33,10 @@
 #      data/subsplash-notes.jsonl is git-ignored and a row keeps what is in the
 #      tracked list; a row his message already has a line for is not replaced
 #      (a difference is named). The line's speaker is the 'Pastor <Name>' the
-#      first page of the row's notes PDF prints under the title, when it does;
+#      first page of the row's notes PDF prints under the title, when it does.
+#      A record whose mail names no passage takes the one the notes PDF header
+#      prints (pdfPassage: kept dash, or confirmed by a body line); a record
+#      whose PDF holds none is named in the report and not added;
 #   2d. brookfield-youtube --merge-only (no API, no key) puts passages.tsv on the
 #      rows. Before the link step, so that a link whose address names such a
 #      sermon finds its row by the new title;

@@ -114,3 +114,30 @@ func TestRecipeAndTemplateNameTheSteps(t *testing.T) {
 		t.Error(err)
 	}
 }
+
+// A notes mail with no passage is read from its notes PDF (pdfPassage); the
+// recipe and the hourly script's header say so and not that it is left as it is.
+func TestRecipeSaysARecordWithNoPassageIsReadFromItsNotesPDF(t *testing.T) {
+	read := func(p string) string {
+		b, err := os.ReadFile(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(b)
+	}
+	recipe := read("../../docs/adding-a-source.md")
+	for _, want := range []string{"pdfPassage", "--notes-pdfs", "kept dash", "named in the report"} {
+		if !strings.Contains(recipe, want) {
+			t.Errorf("docs/adding-a-source.md lacks %q on the notes mails' passage", want)
+		}
+	}
+	if strings.Contains(recipe, "a record with no passage and a record no single row holds are left as they are") {
+		t.Errorf("docs/adding-a-source.md still says a record with no passage is left as it is")
+	}
+	hourly := read("../../scripts/subsplash-hourly.sh")
+	for _, want := range []string{"pdfPassage", "notes PDF header"} {
+		if !strings.Contains(hourly, want) {
+			t.Errorf("scripts/subsplash-hourly.sh step 2c lacks %q", want)
+		}
+	}
+}
