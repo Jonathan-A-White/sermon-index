@@ -460,3 +460,40 @@ func TestMessageEntryWithABareBookIsASeries(t *testing.T) {
 		t.Errorf("Job: %+v", c)
 	}
 }
+
+// mw-qtu3zvz.59.25: a line of the list written from a notes mail (the 'from'
+// column says "notes") puts the mail's title and passage on its row, says so in
+// the row's notes, and leaves the preacher as the video gave it.
+func TestMergeANotesLineGivesTitleAndPassageAndKeepsThePreacher(t *testing.T) {
+	rows := rowsForMerge()
+	rows[0].Preacher = ptr("Phil Morgan")
+	l, err := ReadList(writeTSV(t, "series\tdate\ttitle\tspeaker\tpassage\trow\tfrom\n"+
+		"\t2026-11-01\tLightning in Clay Pots\t\t2 Corinthians 13\tvidA\tnotes\n"+
+		"\t2020-08-23\tPictures of Our Father\t\tMatthew 6:9; Romans 8:14-16\tvidB\tnotes\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if l.Entries[0].From != "notes" {
+		t.Fatalf("from = %q", l.Entries[0].From)
+	}
+	m := MergeList(rows, l)
+	if m.Merged != 2 || len(m.Problems) != 0 {
+		t.Fatalf("%+v", m)
+	}
+	a := rowByID(rows, "vidA")
+	if a.Title != "Lightning in Clay Pots" || str(a.Ref) != "2Cor.13" || str(a.Preacher) != "Phil Morgan" {
+		t.Errorf("row A %+v", a)
+	}
+	if n := str(a.Notes); !strings.Contains(n, "notes") || strings.Contains(n, "no notes exist") || strings.Contains(n, "Governor sent") {
+		t.Errorf("notes %q", n)
+	}
+	b := rowByID(rows, "vidB")
+	if str(b.Ref) != "Matt.6.9" || len(b.Cited) != 1 || b.Cited[0] != "Rom.8.14-Rom.8.16" {
+		t.Errorf("row B %+v", b)
+	}
+	// A header of six columns still reads, and its lines have no 'from'.
+	l, err = ReadList(writeTSV(t, listHeader6+"\t2026-11-01\tX\tY\tLuke 24\tvidA\n"))
+	if err != nil || l.Entries[0].From != "" {
+		t.Errorf("%v %+v", err, l)
+	}
+}

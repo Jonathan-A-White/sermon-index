@@ -19,13 +19,16 @@ import (
 // from the Governor's screenshots of the church's app (no tool reads the app),
 // kept in sources/brookfield-first/passages.tsv. Columns, with a header line:
 //
-//	series  date  title  speaker  passage  [row]
+//	series  date  title  speaker  passage  [row  [from]]
 //
 // The date is the Sunday. The sixth column, row, is optional (the header may
 // stop at passage): a line from one of the Governor's messages names the id of
 // the row it belongs to, because that row is dated the day the video was
 // published, which need not be the Sunday; tools/subsplash-links writes those
-// lines, with a line in no-notes.tsv for each. A line with a row is matched to
+// lines, with a line in no-notes.tsv for each. The seventh column, from, is
+// optional too: "notes" marks a line tools/subsplash-links --read-notes wrote
+// from a notes mail (its title and passage, no speaker), whose row's notes say
+// so. A line with a row is matched to
 // that row by id and not by date, and an empty passage sets the title and the
 // preacher and leaves the row's passage as it was. A line that starts with "#" is a comment, except
 // "# unsure:", whose text REPORT.md prints as a sermon the list could not pin
@@ -39,6 +42,7 @@ import (
 type Entry struct {
 	Series, Date, Title, Speaker, Passage string
 	Row                                   string // the id of the row a message entry belongs to; empty = match by date
+	From                                  string // "notes" for a line written from a notes mail; empty otherwise
 	Line                                  int
 }
 
@@ -69,7 +73,7 @@ func ReadList(path string) (*List, error) {
 		}
 		f := strings.Split(line, "\t")
 		if !header {
-			want := []string{"series", "date", "title", "speaker", "passage", "row"}
+			want := []string{"series", "date", "title", "speaker", "passage", "row", "from"}
 			if len(f) < 5 {
 				return nil, fmt.Errorf("%s:%d: the header names %d columns, want series, date, title, speaker, passage", path, i+1, len(f))
 			}
@@ -93,6 +97,9 @@ func ReadList(path string) (*List, error) {
 		}
 		if len(f) > 5 {
 			e.Row = strings.TrimSpace(f[5])
+		}
+		if len(f) > 6 {
+			e.From = strings.TrimSpace(f[6])
 		}
 		if _, err := time.Parse("2006-01-02", e.Date); err != nil {
 			return nil, fmt.Errorf("%s:%d: date %q is not YYYY-MM-DD", path, i+1, e.Date)
@@ -120,7 +127,11 @@ type Merge struct {
 	// FromMessages is how many of Merged are lines with a row: sermons the
 	// Governor sent in a message, read by him in the church's app.
 	FromMessages int
-	Problems     []Problem
+	// FromNotes is how many of Merged are lines from a notes mail (from =
+	// "notes"), written by tools/subsplash-links --read-notes; they are not
+	// counted in FromMessages.
+	FromNotes int
+	Problems  []Problem
 	// Counted is set by MergeRowsFile, which counts the rows after the merge:
 	// the rows with a preacher, with a passage, and series rows.
 	Counted                               bool
@@ -216,6 +227,16 @@ func MergeList(rows []sources.Row, l *List) *Merge {
 			r.Cited = nil
 			r.Series = nil
 			note = "Title, preacher and passage from the church's own list of its sermons (passages.tsv), matched to the video by date."
+		case len(refs) > 0 && e.From == "notes":
+			r.Cited = nil
+			r.Series = nil
+			var ignored []string
+			setPassage(r, refs, "notes", &ignored)
+			note = "Title and passage from the sermon notes the church's app mailed the Governor (Subsplash; passages.tsv), matched to the video by its id."
+			if r.IsSeries() {
+				first, _ := passage.Parse(refs[0])
+				note += fmt.Sprintf(" The passage %s spans %d chapters, so the row is a series; its ref is the first chapter.", first.OSIS, first.Chapters())
+			}
 		case len(refs) > 0:
 			r.Cited = nil
 			r.Series = nil
@@ -234,7 +255,10 @@ func MergeList(rows []sources.Row, l *List) *Merge {
 		}
 		r.Notes = ptr(note)
 		m.Merged++
-		if e.Row != "" {
+		switch {
+		case e.From == "notes":
+			m.FromNotes++
+		case e.Row != "":
 			m.FromMessages++
 		}
 	}

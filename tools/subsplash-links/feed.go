@@ -22,7 +22,9 @@ import (
 //	      " (no notes)"
 //	link  the row holds a Subsplash address, which only a code he shared (or a
 //	      search PDF he gave) can have put there
-//	live  the sermons service serves that same address for the row
+//	live  the sermons service serves that same address for the row, and with
+//	      the passage the row holds (a row whose notes name a passage it lacks
+//	      is not live)
 //
 // "here" is the oldest row with both mail and link: he works newest to oldest,
 // so that is where his hands have got to. The feed holds titles, dates and the
@@ -86,10 +88,14 @@ func isGenericTitle(t string) bool { return strings.HasPrefix(t, "Brookfield Fir
 // row it can serve as rows.jsonl has it.
 func BuildFeed(rows []sources.Row, recs []Record, noNotes map[string]bool, served map[string]servedRow, now time.Time) Feed {
 	mail := map[int]string{} // row index -> the title of its record
+	noted := map[int]bool{}  // row index -> a record names a passage for it
 	for _, rec := range recs {
 		if i := recordRow(rows, rec); i >= 0 {
 			if _, ok := mail[i]; !ok {
 				mail[i] = rec.Title
+			}
+			if strings.TrimSpace(rec.Ref) != "" {
+				noted[i] = true
 			}
 		}
 	}
@@ -130,9 +136,16 @@ func BuildFeed(rows []sources.Row, recs []Record, noNotes map[string]bool, serve
 		live := false
 		if link != "" {
 			if s, ok := served[r.ID]; ok {
+				// Served with its link, and with the passage the row holds.
 				live = orEmpty(s.AltURL) == link
+				if ref := orEmpty(r.Ref); ref != "" {
+					live = live && s.Role == "text" && s.Ref == ref
+				}
 			} else {
-				live = allHeld && !hasPassage(r)
+				// A row with no passage cannot be served; but if the notes mail
+				// names one the row lacks, the service is missing what it
+				// should serve (mw-qtu3zvz.59.25), so it is not live.
+				live = allHeld && !hasPassage(r) && !(noted[i] && !hasOwnPassage(r))
 			}
 		}
 		entries = append(entries, entry{date, r.ID, FeedItem{
@@ -165,6 +178,12 @@ func hasPassage(r sources.Row) bool {
 	if r.Series != nil && *r.Series {
 		return false
 	}
+	return (r.Ref != nil && *r.Ref != "") || len(r.Cited) > 0
+}
+
+// hasOwnPassage reports whether the row holds a passage at all, a series' first
+// chapter included.
+func hasOwnPassage(r sources.Row) bool {
 	return (r.Ref != nil && *r.Ref != "") || len(r.Cited) > 0
 }
 
