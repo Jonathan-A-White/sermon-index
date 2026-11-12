@@ -35,9 +35,10 @@ A row's date is the day its title prints ("August 23, 2020"), which is the Sunda
 `passages.tsv` is the church's own list of its sermons (series, Sunday, title, speaker, passage), typed by hand from screenshots of the church's app that the Governor took, or (the lines with a `row`) copied from a message in which he gave a sermon's title, date, preacher and passage as he read them in the app, for a sermon that has no notes; no tool reads the app. Each entry is matched to the one YouTube row of its date (a line with a `row` to that row, which tools/subsplash-links found within a day of the date), and that row takes the sermon's title, its preacher and its passage and keeps its watch link. An entry that cannot be matched to exactly one row, or whose passage the book table refuses, is named here and changes nothing; nothing is guessed.
 
 - Entries in the list: 92
-- Merged into a row: 92
-- Of them from the Governor's messages: 65
-- Not merged: 0.
+- Merged into a row: 91
+- Of them from the Governor's messages: 64
+- Not merged: 1:
+  - 2021-11-07 "It Ain't Over 'Til It's Over" (Phil Morgan, Job): the passage "Job" is not a passage
 - Unsure, left out of the list and never merged: 2:
   - 2026-10-04 "When the Man Comes Around" (Sam Morgan, 2 Peter 2:4-10): its range overlaps the other unsure sermon's at 2 Peter 2:10, so neither is certain; not merged.
   - 2026-10-11 "Balaam's Madness" (Phil Morgan, 2 Peter 2:10-17): its range overlaps the other unsure sermon's at 2 Peter 2:10, so neither is certain; not merged.

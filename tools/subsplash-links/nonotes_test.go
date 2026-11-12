@@ -657,3 +657,30 @@ func TestParseNoNotesReadsAnAbbreviatedBook(t *testing.T) {
 		}
 	}
 }
+
+// mw-qtu3zvz.59.19: three lines of the church's list were written by the first
+// reader of his messages and, since --read-messages never replaces a line,
+// stayed wrong, so every hourly run printed "not read: ... already has a line
+// ... with other words". Each now holds the words the reader reads from the
+// message (the speaker alone, the passage in its own column).
+func TestCommittedPassagesHoldWhatTheReaderReads(t *testing.T) {
+	got, err := readPassages(filepath.Join("..", "..", "sources", "brookfield-first", "passages.tsv"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []struct{ date, title, speaker, passage, row string }{
+		{"2022-01-23", "How to Read the Bible Like Jesus", "Sam Morgan", "Luke 24, John 5", "xJJTltshFFc"},
+		{"2021-11-07", "It Ain't Over 'Til It's Over", "Phil Morgan", "Job", "2ofYQXu_aLA"},
+		{"2021-05-09", "Her Legacy of Faith", "Phil Morgan", "Exodus 2:1-10, Hebrews 11:23", "HzlT_R8TrVY"},
+	} {
+		l, ok := got[want.date]
+		if !ok {
+			t.Errorf("%s: no line in passages.tsv", want.date)
+			continue
+		}
+		if l.Title != want.title || l.Speaker != want.speaker || l.Passage != want.passage || l.Row != want.row {
+			t.Errorf("%s: passages.tsv holds title %q, speaker %q, passage %q, row %q; the reader reads %q, %q, %q, %q",
+				want.date, l.Title, l.Speaker, l.Passage, l.Row, want.title, want.speaker, want.passage, want.row)
+		}
+	}
+}
