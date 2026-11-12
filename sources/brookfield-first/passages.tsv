@@ -1,4 +1,4 @@
-series	date	title	speaker	passage	row
+series	date	title	speaker	passage	row	from
 # unsure: 2026-10-04 "When the Man Comes Around" (Sam Morgan, 2 Peter 2:4-10): its range overlaps the other unsure sermon's at 2 Peter 2:10, so neither is certain; not merged.
 # unsure: 2026-10-11 "Balaam's Madness" (Phil Morgan, 2 Peter 2:10-17): its range overlaps the other unsure sermon's at 2 Peter 2:10, so neither is certain; not merged.
 2 Peter: Truth Against the Tide	2026-08-30	Like Precious Faith	Phil Morgan	2 Peter 1:1-4
@@ -93,3 +93,109 @@ The Life of Joseph	2021-07-25	I Am My Brother's Keeper	Jim Wiley	Genesis 37-49	l
 Easter 2021	2021-04-04	Surprised by Joy	Phil Morgan	John 20:1-29	I3XhhpYd8xk
 	2024-09-08	Sails and Rudder	Phil Morgan	1 Corinthians 14	elWGlvab3pg
 	2024-08-11	The Gift-Giving God	Phil Morgan	1 Corinthians 12:1-6	HwhLZXm6fjU
+	2023-09-10	Dear 21st Century Church		1 Corinthians 1:1-3	RosBFCA-dUA	notes
+	2023-09-17	All the Called		1 Corinthians 1:1-9	ZJN1he-Hhbs	notes
+	2023-09-24	Is Christ Divided?		1 Corinthians 1:10-17	R1m8CtFiHBc	notes
+	2023-10-01	The Subversive Power of the Cross		1 Corinthians 1:18-25	AO7g1n2CCRY	notes
+	2023-10-08	God's Strange Plan		1 Corinthians 1:26-31	BIUjJJlPbtA	notes
+	2023-10-15	The Cure for Nerf Gun Ministry		1 Corinthians 2:1-5	xzhbkgC8GMg	notes
+	2023-10-22	Wisdom by the Spirit		1 Corinthians 2:6-16	LDtHvuvsH8I	notes
+	2023-11-05	Our Privilege of Partnership		2 Corinthians 2:15; 2 Corinthians 10:13-16	DqzKNZy8t7M	notes
+	2023-11-12	The Carnal Christian		1 Corinthians 3:1-4	oSCKhNSiSY8	notes
+	2023-11-19	Built to Last		1 Corinthians 3:5-23	xSLYZDhSLew	notes
+	2023-11-26	Found Faithful		1 Corinthians 4:1-7	vjyLGESSrQI	notes
+	2023-12-31	Following Jesus into 2024		Luke 6:40	lUM4I5QGV4M	notes
+	2024-01-07	If You Walk With God		Genesis 6:9	-6kwEEFZJk4	notes
+	2024-02-04	The Now and the Not Yet		1 Corinthians 4:8-13	52ea_kadhDU	notes
+	2024-02-11	Daddy D̶a̶y̶ Discipleship Care		1 Corinthians 4:14-21	Kb_hfL752jg	notes
+	2024-02-18	The Surprising Grace of Church Discipline		1 Corinthians 5	HsqiEtRGkXI	notes
+	2024-02-25	The Wrong Way to Be Right		1 Corinthians 6:1-8	3AOcy3sUbVY	notes
+	2024-03-03	Such Were Some of You		1 Corinthians 6:9-11	SLUcMxK4hRo	notes
+	2024-03-10	Bumper Sticker Christianity		1 Corinthians 6:12-17	Y9LdjpS5kx0	notes
+	2024-03-17	You Are Not Your Own		1 Corinthians 6:18-20	EFmdijdm2q4	notes
+	2024-03-24	What To Do When I Don't Want God		Psalms 27:4	4WgJX2PLMjA	notes
+	2024-04-07	A New Life Without Fear		John 20:19-20	DKtzIeedA9A	notes
+	2024-04-14	The Gifts of Marriage and Singleness		1 Corinthians 7:1-9	kQe3k_vW2e4	notes
+	2024-04-21	Marriage Matters		1 Corinthians 7:10-16	itjXWulLKsg	notes
+	2024-04-28	Bloom Where You're Planted		1 Corinthians 7:17-24	h4h_wJwJLjI	notes
+	2024-05-05	Satisfied in Every Season		1 Corinthians 7:25-40	qawSL17O0O0	notes
+	2024-05-12	She Believed and Received		1 Kings 17:8-24	EjOUUeZV26U	notes
+	2024-05-19	Why Are We Pentecostal?		Acts 1:4-8	EcUkCrdmV2o	notes
+	2024-05-26	Love Will Keep Us Together		1 Corinthians 8	mJ1uzv32PIQ	notes
+	2024-06-02	The End of Entitlement		1 Corinthians 9:1-18	Z70MxD1eRLc	notes
+	2024-06-09	Gospel-formed Freedom		1 Corinthians 9:19-27	XOS76QklSXw	notes
+	2024-06-23	Presuming on Privilege		1 Corinthians 10:1-13	RKO7lrvQlmU	notes
+	2024-06-30	Flee From Idolatry		1 Corinthians 10:14-22	Yt3X0lBhYkk	notes
+	2024-07-07	Love, Liberty and the Pursuit of God's Glory		1 Corinthians 10:23-11:1	m7U7AiOm0Zk	notes
+	2024-07-21	When Angels Go to Church		1 Corinthians 11:2-16	Gc3PYgXzzjQ	notes
+	2024-07-28	What the Lord's Supper Isn't		1 Corinthians 11:17-22	RHv9aES72Ek	notes
+	2024-08-04	What the Lord's Supper IS		1 Corinthians 11:23-34	YlW2X-9UM5Q	notes
+	2024-08-25	Unleashing the Power of Everybody		1 Corinthians 12:12-31	GggUbYjr-3k	notes
+	2024-09-01	The More Excellent Way		1 Corinthians 13:1-13	bHmXpIDSBDg	notes
+	2024-09-15	The Gospel-Centered Life		1 Corinthians 15:1-11	iFn-zYQYjD8	notes
+	2024-09-29	Resurrection Bodies		1 Corinthians 15:35-58	DudjtC56Ufc	notes
+	2024-10-06	Managing the Mission		1 Corinthians 16:1-12	YDEiWpWanIM	notes
+	2024-10-13	Maturity Matters		1 Corinthians 16:13-24	Jv82OGpyMDs	notes
+	2024-10-20	The King's Kindness		2 Samuel 9:1-13	blhOjMlCKVg	notes
+	2024-10-27	The Invitation of Jesus		Matthew 11:25-30	HwwLdYKdyVY	notes
+	2024-12-01	Mary's Song of Praise		Luke 1:46-56	NaHOmgIE_p0	notes
+	2024-12-08	Zechariah's Song of Faith		Luke 1:67-80	hUXd8n69YfA	notes
+	2024-12-15	The Angels' Song of Joy		Luke 2:8-14	CSxQVA7fvBk	notes
+	2024-12-22	Simeon's Song of Hope		Luke 2:21-35	iYpBxede3E8	notes
+	2025-01-19	The Adventure of Faith		Hebrews 11:8-12	Zz8HNUGBhSg	notes
+	2025-02-02	Covenant Faith		Genesis 15	KaeYFIQx5wI	notes
+	2025-02-09	Stumbling Faith		Genesis 16:1-6	adlZ6o6zeKg	notes
+	2025-02-16	Praying Faith		Genesis 18:16-33	K1RBmN8HQ5I	notes
+	2025-02-23	Refined Faith		Genesis 22:1-14	HIEXSCD4LfQ	notes
+	2025-03-02	Finishing Faith		Genesis 25:1-11	SBwZflGUJKs	notes
+	2025-03-16	Dying to Live		2 Corinthians 1:8-11	hpn3UHK4PPI	notes
+	2025-03-23	Our Plans, God's Promises		2 Corinthians 1:12-24	qdKaxB5XMuw	notes
+	2025-03-30	A Careful Love		2 Corinthians 2:1-11	tGI8NsyoN1Y	notes
+	2025-04-06	Kingdom Contrasts		2 Corinthians 2:12-17	NzvpNtbyXpo	notes
+	2025-04-13	The Long and Winding Road		Isaiah 50:4-9	0693wJtSExg	notes
+	2025-04-27	Living Letters		2 Corinthians 3:1-6	Tlpzx5DwBn4	notes
+	2025-05-04	From Glory to Glory		2 Corinthians 3:7-18	vntqTUI77KA	notes
+	2025-05-11	The Multiplied Mom		2 Timothy 1:3-7	cqEOs0o_WRg	notes
+	2025-05-18	Reasons to Never Lose Heart		2 Corinthians 4:1-6	0_7ersV9awk	notes
+	2025-05-25	The Clay Pot Paradox		2 Corinthians 4:7-12	1X68sihElJ8	notes
+	2025-06-01	Gospel Hope for Weary Pilgrims		2 Corinthians 4:13-18	Cc2rZ218lOk	notes
+	2025-06-08	The Life-Giving Spirit		Genesis 1:1-5	zgnC7lvWsjQ	notes
+	2025-06-15	Homecoming		2 Corinthians 5:1-8	3zJIBJvR_IU	notes
+	2025-06-22	We Must All Appear		2 Corinthians 5:9-11	MT0urZj5qyw	notes
+	2025-06-29	Walk the Walk		Colossians 2:1-7	EG7J3jRygGw	notes
+	2025-07-06	Motivated for Life		2 Corinthians 5:11-15	Q7dc4xZJ6A0	notes
+	2025-07-13	What's So New About New Creation?		2 Corinthians 5:16-21	27M6bVS9VjY	notes
+	2025-07-20	Protocols of Heaven's Embassy		2 Corinthians 6:1-10	XSNAvaCKyVw	notes
+	2025-07-27	Heart Surgeries		2 Corinthians 6:11-7:1	RzUTnvfZ2Y4	notes
+	2025-08-03	The Grace of Godly Grief		2 Corinthians 7:2-16	zlOYAN3rRAc	notes
+	2025-08-24	The Storehouse		2 Corinthians 8:16-24	cc8vmwWQUGw	notes
+	2025-08-31	The Cheerful Giver		2 Corinthians 9:1-15	gSTnbQ8Fe14	notes
+	2025-09-07	The Weapons of Our Warfare		2 Corinthians 10:1-6	nJQv2yqXILI	notes
+	2025-09-14	The Measure That Matters		2 Corinthians 10:7-18	JWR9_aEJub8	notes
+	2025-09-21	Gospel Simplicity		2 Corinthians 11:1-15	1Ry2KCLNEOc	notes
+	2025-09-28	Boasting in Bruises		2 Corinthians 11:16-33	oSKPg6wTCAo	notes
+	2025-10-05	The House That God Builds		2 Corinthians 12:1-10	fTfNJSaiaN4	notes
+	2025-10-12	The Care of Souls		2 Corinthians 12:11-21	i4gPozBFFGw	notes
+	2025-10-19	Lightning in Clay Pots		2 Corinthians 13	FhOTBXf3S90	notes
+	2025-10-26	If God Is For Us?		Romans 8:31-39	AEChlXKiLeQ	notes
+	2025-11-02	Pierce My Ear		Exodus 21:1-6	HqSiDkBcnvU	notes
+	2025-11-23	Thanks in the Face of Thorns		Luke 22:14-23	rWotu8TC7-c	notes
+	2025-11-30	The Promise Foretold		Luke 24:44-45	aGXSMjnqDtI	notes
+	2025-12-07	The People Who Waited		Luke 2:22-38	812ksCvm-es	notes
+	2025-12-14	The King Who Came		John 1:1-13	LoWuVVLCMr8	notes
+	2025-12-21	The Hope Who Returns		Isaiah 40:5	Nz9wIUBPmFM	notes
+	2025-12-28	The Teachable Heart		Luke 8:1-15	P-CduhO5oPo	notes
+	2026-01-04	The Lion Fear		Isaiah 8:11-15	u22VPCdGIe0	notes
+	2026-01-11	The God Who is to Be Feared		Hebrews 10:31	2hnWkvgswf4	notes
+	2026-01-18	The Grace of Fear		Proverbs 14:27	OVprCuyYDDg	notes
+	2026-01-25	Walking in the Fear of the Lord		Proverbs 2:1-5	ZTuy1G9FiuE	notes
+	2026-02-01	Behind a Frowning Providence		Habakkuk 1:1-11	0_FQ9fss7fw	notes
+	2026-02-15	The Falls of Babylon		Habakkuk 2	CHDXYiutIMc	notes
+	2026-02-22	When Fields Fail		Habakkuk 3:1-19	xvtgyhu1tFE	notes
+	2026-03-01	How to Hear a Sermon		Luke 8:18	1vY8oe6vNvU	notes
+	2026-05-10	A Faith That Outlasts Pain		1 Samuel 1-2	QcMBjiGzDv0	notes
+	2026-06-14	Heart Recalibration		Ecclesiastes 3:1-11	omdA4p7TBhA	notes
+	2026-06-21	Pictures of Our Father		Matthew 6:9; Romans 8:14-16	0jAthJ_RBsE	notes
+	2026-10-04	When the Man Comes Around		2 Peter 2:4-10	wAsyvhEJVbA	notes
+	2026-10-11	Balaam's Madness		2 Peter 2:10-17	bMemJB2uH9I	notes
+	2026-11-08	Unfinished Business		Acts 1:8	KeNFhuTVUj0	notes
