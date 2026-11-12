@@ -103,6 +103,303 @@ func TestParseNoNotesNamesWhatItCannotRead(t *testing.T) {
 	}
 }
 
+// His message of 2026-11-12 (39 date lines, 2020-2022; the Mayor counted 36), as he sent it.
+const hisNoNotesList = `No notes: 
+As The Heavens Are Higher
+
+Sep 4, 2022 Phil Morgan Isaiah 55:6-9
+
+Portable Faith
+
+Aug 28, 2022 Phil Morgan Genesis 26:24-25
+
+The Difference Maker
+
+Aug 21, 2022 Phil Morgan James 4:1-3
+
+God's Gym
+
+Aug 14, 2022 Phil Morgan 1 Timothy 4:1-11
+
+Secret Sin
+
+Aug 7, 2022 Phil Morgan Joshua 7
+
+Little Stories Jesus Told About Life
+
+May 22, 2022 Phil Morgan Luke 13
+
+How to Read the Bible Like Jesus
+
+Jan 23, 2022 Sam Morgan Luke 24, John 5
+
+God Be With You
+
+Jan 9, 2022 Jim Wiley Acts 20:17-24
+
+The Secret to Contentment
+
+Dec 26, 2021
+
+Phil Morgan •
+
+Philippians 4:10-13
+
+It Ain't Over 'Til It's Over
+
+Nov 7, 2021 Phil Morgan
+
+Job
+
+Five Words for Standing Firm
+
+Thessalonians
+
+Aug 22, 2021 Phil Morgan 1
+
+5:16-28
+
+Are We There Yet?
+
+Aug 8, 2021 Sam Morgan Philippians 4:10-13
+
+I Am My Brother's Keeper
+
+The Life of Joseph
+
+Jul 25, 2021 Jim Wiley Genesis 37-49
+
+One Out of One
+
+Jul 4, 2021 Sam Morgan Luke 15
+
+Abba
+
+Jun 20, 2021 Phil Morgan Matthew 6:9-13
+
+Hide and Seek
+
+Jun 13, 2021 Phil Morgan Isaiah 45:15
+
+The Place Was Shaken
+
+May 23, 2021 Phil Morgan Acts 4:25-31
+
+Her Legacy of Faith
+
+Exodus 2:1-10,
+
+May 9, 2021 Phil Morgan
+
+Hebrews 11:23
+
+How To Keep It Together
+
+May 2, 2021 Jim Wiley 1 Samuel 13:7-12
+
+Reboot
+
+Apr 11, 2021 Phil Morgan Ephesians 2:11-22
+
+Surprised by Joy
+
+Easter 2021
+
+Apr 4, 2021 Phil Morgan John 20:1-29
+
+Behold the Man
+
+Good Friday 2021
+
+Apr 2, 2021 Phil Morgan John 19:1-5
+
+Kingdom Paradox
+
+Palm Sunday 2021
+
+Mar 28, 2021
+
+• Sam Morgan John 12:12-26
+
+Where In The World Is Jesus?
+
+Jan 31, 2021 Sam Morgan John 11:1-44
+
+Reach (Part 2)
+
+Jan 10, 2021 Phil Morgan Hebrews 12:26-29
+
+Reach (Part 1)
+
+par
+
+Jan 3, 2021 Phil Morgan 1 Timothy 3:14-15
+
+The Blessed Life
+
+Dec 27, 2020 Phil Morgan Psalms 67
+
+Life in the Kingdom
+
+Nov 29, 2020 Sam Morgan Matthew 13:44-46
+
+Compelled to Send Them
+
+Missions Convention 2020
+
+Nov 1, 2020 Phil Morgan 3 John 1:1-8
+
+Missions Sunday 2020
+
+Oct 25, 2020 Neil Vanaria
+
+Everybody's Got a Hungry Heart
+
+Oct 18, 2020 Sam Morgan Proverbs 4:20-27
+
+Be Mission Ready
+
+Sep 13, 2020 Tim Anderson Matthew 25:1-13
+
+Will God Spare Sodom for the Righteous?
+
+Aug 23, 2020 Phil Morgan
+
+Genesis 18:16-33
+
+Do You Want To Be Well?
+
+Jul 12, 2020 Jim Wiley John 5:1-9
+
+The Best Robe
+
+Father's Day 2020
+
+Jun 21, 2020 Phil Morgan Luke 15:11-32
+
+The Spirals of Human History
+
+May 31, 2020 Phil Morgan Acts 2:14-21
+
+First Lady
+
+Mother's Day 2020
+
+May 10, 2020
+
+Phil Morgan
+
+Genesis 3:20
+
+Easter is for Comebacks
+
+Easter 2020
+
+Apr 12, 2020 Phil Morgan Mark 16:7
+
+Still the Creator
+
+Mar 15, 2020 Phil Morgan Genesis 1:1-3
+
+End of stand alone sermons`
+
+func sermonOn(t *testing.T, ss []Sermon, date string) Sermon {
+	t.Helper()
+	for _, s := range ss {
+		if s.Date == date {
+			return s
+		}
+	}
+	t.Fatalf("no sermon read for %s", date)
+	return Sermon{}
+}
+
+// What he saw lost: a passage wrapped around the date line, a whole-series
+// passage, the entries after them, and the shapes of the same message that were
+// read wrongly (a passage in the preacher's place).
+func TestParseNoNotesReadsAllOfHisList(t *testing.T) {
+	got, bad, cand := ParseNoNotes("direct:made-up-tx", hisNoNotesList)
+	if !cand {
+		t.Fatal("not a candidate")
+	}
+	for _, u := range bad {
+		t.Errorf("unread: %+v", u)
+	}
+	if len(got) != 39 {
+		t.Errorf("read %d sermons, want 39", len(got))
+	}
+	want := []Sermon{
+		{"", "2021-08-22", "Five Words for Standing Firm", "Phil Morgan", "1 Thessalonians 5:16-28", "direct:made-up-tx"},
+		{"The Life of Joseph", "2021-07-25", "I Am My Brother's Keeper", "Jim Wiley", "Genesis 37-49", "direct:made-up-tx"},
+		{"", "2021-06-20", "Abba", "Phil Morgan", "Matthew 6:9-13", "direct:made-up-tx"},
+		{"Easter 2021", "2021-04-04", "Surprised by Joy", "Phil Morgan", "John 20:1-29", "direct:made-up-tx"},
+		// A passage of two parts is the passage, not the preacher's name.
+		{"", "2022-01-23", "How to Read the Bible Like Jesus", "Sam Morgan", "Luke 24, John 5", "direct:made-up-tx"},
+		// Its first part sits above the date line, with a comma.
+		{"", "2021-05-09", "Her Legacy of Faith", "Phil Morgan", "Exodus 2:1-10, Hebrews 11:23", "direct:made-up-tx"},
+		// A bullet before the preacher, after the date.
+		{"Palm Sunday 2021", "2021-03-28", "Kingdom Paradox", "Sam Morgan", "John 12:12-26", "direct:made-up-tx"},
+		// The whole book, on a line of its own.
+		{"", "2021-11-07", "It Ain't Over 'Til It's Over", "Phil Morgan", "Job", "direct:made-up-tx"},
+		// A line (\"par\") between the title and the date is taken as the series.
+		{"par", "2021-01-03", "Reach (Part 1)", "Phil Morgan", "1 Timothy 3:14-15", "direct:made-up-tx"},
+		// No passage, a preacher on his own line.
+		{"", "2020-10-25", "Missions Sunday 2020", "Neil Vanaria", "", "direct:made-up-tx"},
+	}
+	for _, w := range want {
+		if g := sermonOn(t, got, w.Date); !reflect.DeepEqual(g, w) {
+			t.Errorf("%s:\n got %+v\nwant %+v", w.Date, g, w)
+		}
+	}
+}
+
+// One entry that cannot be read never hides the entry after it: where it ends
+// is known from the date line of the next, not from how many lines it had.
+func TestParseNoNotesOneUnreadableEntryNeverHidesTheNext(t *testing.T) {
+	cases := map[string]string{
+		"a passage the book table refuses": "First\n\nApr 5, 2026 Phil Morgan Luke 24:33-46\n\nGarbled\n\nApr 12, 2026 Phil Morgan Luke 99:1\n\nThird\n\nSeries Three\n\nApr 19, 2026 Sam Morgan John 3:1-8\n\nNo notes",
+		"a date that is not one":           "First\n\nApr 5, 2026 Phil Morgan Luke 24:33-46\n\nGarbled\n\nFeb 30, 2026 Phil Morgan Luke 1:1-4\n\nThird\n\nSeries Three\n\nApr 19, 2026 Sam Morgan John 3:1-8\n\nNo notes",
+	}
+	for name, text := range cases {
+		got, bad, _ := ParseNoNotes("direct:t", text)
+		if len(bad) != 1 || bad[0].Title != "Garbled" {
+			t.Errorf("%s: unread %+v, want only Garbled", name, bad)
+		}
+		if len(got) != 2 {
+			t.Errorf("%s: read %+v, want First and Third", name, got)
+			continue
+		}
+		want := Sermon{"Series Three", "2026-04-19", "Third", "Sam Morgan", "John 3:1-8", "direct:t"}
+		if !reflect.DeepEqual(got[1], want) {
+			t.Errorf("%s: got %+v, want %+v", name, got[1], want)
+		}
+	}
+}
+
+// Two rows within a day: the one with no passage and a generic title is his.
+func TestRunNoNotesChoosesTheGenericRowOverOneThatAlreadyHoldsATitle(t *testing.T) {
+	r := newNNRig(t)
+	rows := r.read(r.rows) +
+		`{"id":"yt5","title":"Behold the Man","ref":"John.19.1-John.19.5","url":"https://www.youtube.com/watch?v=yt5","kind":"link","preacher":"Phil Morgan","date":"2031-05-03"}
+{"id":"yt6","title":"Brookfield First - Easter Online 2031","url":"https://www.youtube.com/watch?v=yt6","kind":"link","date":"2031-05-04"}
+{"id":"yt7","title":"Brookfield First - Online Service | June 1, 2031","url":"https://www.youtube.com/watch?v=yt7","kind":"link","date":"2031-06-01"}
+{"id":"yt8","title":"Online Service","url":"https://www.youtube.com/watch?v=yt8","kind":"link","date":"2031-06-03"}
+`
+	must(t, os.WriteFile(r.rows, []byte(rows), 0o644))
+	r.message("a", "direct:chosen", govKey, true, "2031-05-07T10:00:00Z", "Surprised by Joy\n\nEaster 2031\n\nMay 4, 2031 Phil Morgan John 20:1-29\n\nNo notes")
+	r.message("b", "direct:both-generic", govKey, true, "2031-05-07T10:01:00Z", "Neither\n\nJun 2, 2031 Phil Morgan John 3:1-8\n\nNo notes")
+	res, err := r.run()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Added != 1 || len(res.Problems) != 1 || !strings.Contains(res.Problems[0], "direct:both-generic") {
+		t.Fatalf("%+v", res)
+	}
+	if got := r.read(r.nn); got != "date\trow\ttxid\n2031-05-04\tyt6\tdirect:chosen\n" {
+		t.Errorf("no-notes.tsv:\n%s", got)
+	}
+}
+
 // --- the run over an inbox ---
 
 const nnHeader = "series\tdate\ttitle\tspeaker\tpassage\trow\n"
