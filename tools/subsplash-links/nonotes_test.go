@@ -596,3 +596,48 @@ func TestReadNoNotesGivesTheRowIDs(t *testing.T) {
 		t.Errorf("a missing file holds none: %v %v", got, err)
 	}
 }
+
+// His later posts of the same thread: a period after the year with the
+// chapter and verse wrapped onto a line of its own, a bullet glued to the date
+// and to the preacher with the book's number alone on a line, and the series
+// heading and closing lines that are not sermons and hide no entry.
+func TestParseNoNotesReadsHisCorinthiansPostsAndSeriesFraming(t *testing.T) {
+	cases := []struct {
+		name, text string
+		want       []Sermon
+	}{
+		{"period after the year, chapter and verse wrapped", "The One Thing Christianity Would Not Survive\nSep 22, 2024. Phil Morgan 1 Corinthians\n15:12-34\n\nNo notes",
+			[]Sermon{{"", "2024-09-22", "The One Thing Christianity Would Not Survive", "Phil Morgan", "1 Corinthians 15:12-34", "direct:t"}}},
+		{"bullets glued to date and preacher, number alone", "Sails and Rudder\nSep 8, 2024•\nPhil Morgan•\n1\nCorinthians 14\n\nNo notes",
+			[]Sermon{{"", "2024-09-08", "Sails and Rudder", "Phil Morgan", "1 Corinthians 14", "direct:t"}}},
+		{"a series opening and closing line", "Start 2 Corinthians:\nNo notes:\nGod of All Comfort\nOct 6, 2024 Phil Morgan 2 Corinthians 1:3-11\nNo notes:\nEnd 2 Corinthians (everything possible in this series emailed too)",
+			[]Sermon{{"", "2024-10-06", "God of All Comfort", "Phil Morgan", "2 Corinthians 1:3-11", "direct:t"}}},
+		{"a series heading and a closing line after the entry", "Abraham\nNo notes:\nFighting Faith\nJan 26, 2025 Phil Morgan Genesis 14\nEverything else in this series emailed (end of series)",
+			[]Sermon{{"", "2025-01-26", "Fighting Faith", "Phil Morgan", "Genesis 14", "direct:t"}}},
+	}
+	for _, c := range cases {
+		got, bad, _ := ParseNoNotes("direct:t", c.text)
+		if len(bad) != 0 {
+			t.Errorf("%s: unread %+v", c.name, bad)
+		}
+		if !reflect.DeepEqual(got, c.want) {
+			t.Errorf("%s:\n got %+v\nwant %+v", c.name, got, c.want)
+		}
+	}
+}
+
+// A trailing '.' or '•' after any field of the date line is not part of it.
+func TestParseNoNotesIgnoresATrailingPeriodOrBulletAfterAnyField(t *testing.T) {
+	want := []Sermon{{"", "2024-09-08", "Sails and Rudder", "Phil Morgan", "1 Corinthians 14:1-5", "direct:t"}}
+	for name, text := range map[string]string{
+		"period after the speaker":  "Sails and Rudder\nSep 8, 2024. Phil Morgan. 1 Corinthians 14:1-5\nNo notes",
+		"period after the passage":  "Sails and Rudder\nSep 8, 2024 Phil Morgan 1 Corinthians 14:1-5.\nNo notes",
+		"bullet after the passage":  "Sails and Rudder\nSep 8, 2024• Phil Morgan• 1 Corinthians 14:1-5•\nNo notes",
+		"bullets on separate lines": "Sails and Rudder\nSep 8, 2024•\nPhil Morgan•\n1 Corinthians 14:1-5•\nNo notes",
+	} {
+		got, bad, _ := ParseNoNotes("direct:t", text)
+		if len(bad) != 0 || !reflect.DeepEqual(got, want) {
+			t.Errorf("%s:\n got %+v (unread %+v)\nwant %+v", name, got, bad, want)
+		}
+	}
+}

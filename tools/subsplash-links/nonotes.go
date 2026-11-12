@@ -54,7 +54,7 @@ type Sermon struct {
 type Unread struct{ Tx, Title, Why string }
 
 var (
-	dateRE    = regexp.MustCompile(`(?i)^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(\d{1,2}),?\s+(\d{4})\.?(?:\s+(.*))?$`)
+	dateRE    = regexp.MustCompile(`(?i)^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(\d{1,2}),?\s+(\d{4})[.•]?(?:\s+(.*))?$`)
 	noNotesRE = regexp.MustCompile(`(?i)^\(?\s*no notes`)
 	monthNum  = map[string]time.Month{"jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6, "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12}
 )
@@ -93,6 +93,8 @@ var bookOSIS = func() map[string]string {
 // A passage of any width is read: the Governor wrote it, and a whole series
 // ("Genesis 37-49") is what he read in the app.
 func splitPassage(text string) (before, pass, why string) {
+	// A period or a bullet the app's copy leaves after the passage is not part of it.
+	text = strings.TrimRight(text, " .•")
 	m := tailPassageRE.FindStringSubmatchIndex(text)
 	if m == nil {
 		return "", "", ""
@@ -182,7 +184,7 @@ func cleanLine(s string) string {
 
 // cleanSpeaker drops the bullet a message may print after a name.
 func cleanSpeaker(s string) string {
-	return strings.Join(strings.Fields(strings.ReplaceAll(s, "•", " ")), " ")
+	return strings.TrimRight(strings.Join(strings.Fields(strings.ReplaceAll(s, "•", " ")), " "), ".")
 }
 
 // ParseNoNotes reads the sermons of one message. candidate is false when the
@@ -214,7 +216,22 @@ func ParseNoNotes(tx, text string) (sermons []Sermon, unread []Unread, candidate
 	if len(cur) > 0 {
 		blocks = append(blocks, block{cur, false})
 	}
-	for _, b := range blocks {
+	// A series is framed by a line or two of the Governor's own ("Abraham", then
+	// "No notes:" and the sermons): a closed block of one line with no date, ahead
+	// of a block that holds dates, is that heading and not a sermon lost.
+	dated := make([]bool, len(blocks)+1)
+	for i := len(blocks) - 1; i >= 0; i-- {
+		dated[i] = dated[i+1]
+		for _, l := range blocks[i].lines {
+			if dateRE.MatchString(l) {
+				dated[i] = true
+			}
+		}
+	}
+	for i, b := range blocks {
+		if b.closed && len(b.lines) == 1 && dated[i+1] && !dateRE.MatchString(b.lines[0]) {
+			continue
+		}
 		s, u := parseBlock(tx, b.lines, b.closed)
 		sermons = append(sermons, s...)
 		unread = append(unread, u...)
