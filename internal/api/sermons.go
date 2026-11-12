@@ -171,7 +171,7 @@ func (s *server) sermons(w http.ResponseWriter, r *http.Request) {
 	}
 	if wantTheme {
 		total, rows, err := store.ThemeSermons(r.Context(), s.db, store.ThemeQuery{
-			Span: span, Sources: sq.Sources, Themes: themeIDs, DirectOnly: directOnly, Limit: sq.Limit, Offset: sq.Offset})
+			Span: span, Sources: sq.Sources, Themes: themeIDs, DirectOnly: directOnly, PassageTier: wantPassage, Limit: sq.Limit, Offset: sq.Offset})
 		if err != nil {
 			s.dbFailed(w, r, err)
 			return

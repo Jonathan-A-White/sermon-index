@@ -10,6 +10,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/Jonathan-A-White/sermon-index/internal/sources"
 )
@@ -356,5 +357,76 @@ func TestSermonsDirectLinks(t *testing.T) {
 	}
 	if a, b := body(t, ts.do("GET", "/v1/sermons?ref=rom.5.8&tier=passage&direct=only")), body(t, ts.do("GET", "/v1/sermons?ref=rom.5.8")); a != b {
 		t.Errorf("tier=passage&direct=only is not the flat answer:\n%s\n%s", a, b)
+	}
+}
+
+// pagesOf reads every page of the tier named (passage or theme) of target,
+// limit rows at a time from offset, and returns the "source:id" of each row.
+func pagesOf(t *testing.T, ts *testServer, target, tier string, limit int) []string {
+	t.Helper()
+	var ids []string
+	for offset := 0; ; {
+		ts.clock.add(time.Minute) // the rate limit is not under test
+		got := getTiers(t, ts, fmt.Sprintf("%s&limit=%d&offset=%d", target, limit, offset))
+		page := got.Theme
+		if tier == "passage" {
+			page = got.Passage
+		}
+		if page == nil {
+			return ids
+		}
+		for _, r := range page.Rows {
+			ids = append(ids, r.Source+":"+r.ID)
+		}
+		offset += len(page.Rows)
+		if len(page.Rows) == 0 || offset >= page.Total {
+			return ids
+		}
+	}
+}
+
+// Wherever both tiers are listed, no sermon is in both: over the whole Bible
+// with a named theme too (the theme-only ask keeps the passage rows, as the
+// count of a theme's sermons; the tier=theme ask does not).
+func TestTiersAreDifferentSermons(t *testing.T) {
+	ts := newTestServer(t, loadedDB(t))
+	refs := []string{"eph.2.8", "Rom.5", "Gen.1.1-Rev.22.21"}
+	themes := []string{"", "&theme=themes-demo:grace", "&theme=themes-demo:atonement"}
+	for _, ref := range refs {
+		for _, theme := range themes {
+			for _, tier := range []string{"theme", "passage,theme", "theme-only"} {
+				for _, direct := range []string{"", "&direct=only"} {
+					for _, limit := range []int{200, 2, 1} {
+						target := "/v1/sermons?ref=" + ref + "&tier=" + tier + theme + direct
+						name := fmt.Sprintf("%s limit=%d", target, limit)
+						themeIDs := pagesOf(t, ts, target, "theme", limit)
+						seen := map[string]bool{}
+						for _, id := range themeIDs {
+							if seen[id] {
+								t.Errorf("%s: %s is listed twice in the theme tier", name, id)
+							}
+							seen[id] = true
+						}
+						if tier == "theme-only" {
+							continue
+						}
+						for _, id := range pagesOf(t, ts, target, "passage", limit) {
+							if seen[id] {
+								t.Errorf("%s: %s is in both tiers", name, id)
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	// theme-only over the whole Bible with a named theme still answers the
+	// topic's sermons; beside the passage tier the theme tier is empty.
+	whole := "/v1/sermons?ref=Gen.1.1-Rev.22.21&theme=themes-demo:grace"
+	if got := pagesOf(t, ts, whole+"&tier=theme-only", "theme", 200); len(got) == 0 {
+		t.Error("theme-only over the whole Bible with a named theme answers nothing")
+	}
+	if got := pagesOf(t, ts, whole+"&tier=theme", "theme", 200); len(got) != 0 {
+		t.Errorf("tier=theme over the whole Bible lists the passage rows again: %v", got)
 	}
 }

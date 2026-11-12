@@ -217,11 +217,15 @@ const ThemeMaxVerses = 300
 // preaching text shares a topic with Span. Sources limits the sermon sources
 // when not empty and Themes the topics, each "<theme source>:<topic>", when
 // not empty; DirectOnly leaves out the sermons reached through their text.
+// PassageTier is whether the passage tier is answered beside it (tier=theme):
+// then a named topic over the whole Bible does not keep the passage rows
+// either, so the two tiers are different sermons.
 type ThemeQuery struct {
 	Span          passage.Range
 	Sources       []string
 	Themes        []string
 	DirectOnly    bool
+	PassageTier   bool
 	Limit, Offset int
 }
 
@@ -279,8 +283,9 @@ func (r ThemeSermonRow) MarshalJSON() ([]byte, error) {
 // topic, $5 the topics ("source:topic"), $6 the cap, $7 whether to answer
 // direct rows only and $8 whether to keep the sermons with a passage on the
 // span. A sermon with a passage overlapping the span is a passage row and is
-// never in it, unless $8 (a named topic asked over the whole Bible, where
-// every sermon is a passage row and nothing else would be left).
+// never in it, unless $8 (a named topic asked over the whole Bible with the
+// theme tier alone, where every sermon is a passage row and nothing else
+// would be left).
 //
 // The cap $6 applies to a topic the span's own themes offer; a topic named
 // ($4) is used however wide it is: a person chose it.
@@ -357,7 +362,7 @@ func ThemeSermons(ctx context.Context, db *pgxpool.Pool, q ThemeQuery) (int, []T
 	if themes == nil {
 		themes = []string{}
 	}
-	args := []any{q.Span.PG(), len(q.Sources) > 0, srcs, len(q.Themes) > 0, themes, ThemeMaxVerses, q.DirectOnly, len(q.Themes) > 0 && wholeBible(q.Span)}
+	args := []any{q.Span.PG(), len(q.Sources) > 0, srcs, len(q.Themes) > 0, themes, ThemeMaxVerses, q.DirectOnly, len(q.Themes) > 0 && !q.PassageTier && wholeBible(q.Span)}
 	var total int
 	if err := db.QueryRow(ctx, `SELECT count(*) FROM (`+themeTier+`) b`, args...).Scan(&total); err != nil {
 		return 0, nil, err

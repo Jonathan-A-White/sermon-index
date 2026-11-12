@@ -494,6 +494,50 @@ func TestThemeSermonsNamedWholeBible(t *testing.T) {
 	}
 }
 
+// With the passage tier listed beside it (tier=theme), a theme named over the
+// whole Bible leaves the passage rows out of the theme tier, as over any
+// other ref: the two tiers are different sermons. Only the theme tier alone
+// (PassageTier false) keeps them, as the count of a theme's sermons.
+func TestThemeSermonsWholeBibleBesidePassageTier(t *testing.T) {
+	a, tx := tierSources(t)
+	db := loaded(t, a, tx)
+	ctx := context.Background()
+	whole := ref(t, "Gen.1.1-Rev.22.21")
+	for _, theme := range []string{"tx:wide", "tx:mid", "tx:narrow"} {
+		for _, direct := range []bool{false, true} {
+			ptotal, prows, err := store.Sermons(ctx, db, store.SermonQuery{Span: whole, Limit: 500})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if ptotal != len(prows) {
+				t.Fatalf("passage rows: %d of %d", len(prows), ptotal)
+			}
+			inPassage := map[string]bool{}
+			for _, r := range prows {
+				inPassage[r.Source+"/"+r.ID] = true
+			}
+			q := store.ThemeQuery{Span: whole, Themes: []string{theme}, DirectOnly: direct, PassageTier: true, Limit: 500}
+			total, rows, err := store.ThemeSermons(ctx, db, q)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if total != len(rows) {
+				t.Fatalf("%s direct=%v: %d rows of %d", theme, direct, len(rows), total)
+			}
+			for _, r := range rows {
+				if inPassage[r.Source+"/"+r.ID] {
+					t.Errorf("%s direct=%v: %s/%s is in both tiers", theme, direct, r.Source, r.ID)
+				}
+			}
+		}
+	}
+	// The theme tier alone still answers every sermon on the topic.
+	total, rows, err := store.ThemeSermons(ctx, db, store.ThemeQuery{Span: whole, Themes: []string{"tx:wide"}, Limit: 50})
+	if err != nil || total != 3 || len(rows) != 3 {
+		t.Errorf("theme-only tx:wide over the whole Bible: %d %d %v", total, len(rows), err)
+	}
+}
+
 // /v1/themes's rows carry the sermons on each topic by preaching text and
 // the topic's verses (all of it, past the cap too).
 func TestThemesCarrySermonsAndVerses(t *testing.T) {
