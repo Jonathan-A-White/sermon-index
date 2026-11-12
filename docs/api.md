@@ -68,7 +68,7 @@ Example: `GET /v1/health`
 
 ## GET /v1/sources
 
-Every source, sermon sources first, then by id: `{rows: [...]}`, each row `{id, name, kind, licence, credit, homepage, on_by_default, rows}`. `kind` is `sermons` or `themes`; `licence` is the source's terms quoted verbatim; `rows` counts a sermon source's sermons or a theme source's topics. `on_by_default` is whether a reader who has never chosen sees the source. Lampas's credits and its Settings switches per source read this.
+Every source, sermon sources first, then by id: `{rows: [...]}`, each row `{id, name, kind, licence, credit, homepage, on_by_default, by?, rows}`. `kind` is `sermons` or `themes`; `licence` is the source's terms quoted verbatim; `rows` counts a sermon source's sermons or a theme source's topics. `on_by_default` is whether a reader who has never chosen sees the source. `by`, when present, is who the source's sermons are by for a row that names no preacher (a church's name); it is never a row's preacher. Lampas's credits and its Settings switches per source read this.
 
 Example: `GET /v1/sources`
 

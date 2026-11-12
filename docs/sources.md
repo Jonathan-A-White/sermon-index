@@ -52,6 +52,7 @@ TOML. Every key is required except `licence_note` and `host_rules`; an unknown k
 | `terms_url` | The page `licence` was quoted from, https. |
 | `added` | The day the source was added, a TOML date (`2026-11-05`, unquoted). |
 | `on_by_default` | `true` or `false`: whether a reader who has never chosen sees the source. Required, so the choice is always made on purpose. |
+| `by` | Optional. Who the source's sermons are by, for a row that names no preacher: the name of the church (or of the preacher) whose sermons they all are. Set it only for a source whose every row was preached at that church or by that preacher; a source that mixes venues or speakers leaves it out. Served in `/v1/sources` as `by` (left out of the answer when the source sets none) and stored in `sources.by` by `sermons load`; it is never written into a row's `preacher`, so search and the tutor never take it for a preacher. An empty one is a fault. |
 | `language` | Optional. The language the source's titles are in, a two-letter ISO 639-1 code in lower case from `en`, `pt`, `la`, `de`, `nl`, `fr`, `el`, `he` (a code outside the list is a fault; add one to `sources.Languages` when a source needs it). Left out, the source is English (`en`). Stored in `sources.language` by `sermons load`; the site does not yet filter or show it. |
 | `host_rules` | Optional table: what `sermons check --urls` does for a host ([Host rules](#host-rules)). |
 

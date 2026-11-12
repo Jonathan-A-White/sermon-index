@@ -163,6 +163,11 @@ homepage = "https://subsplash.com/u/brookfieldfirst/media"
 terms_url = "https://developers.google.com/youtube/terms/developer-policies"
 added = 2026-11-09
 on_by_default = false
+
+# These are the sermons of one church, preached at Brookfield First, so a row
+# that names no preacher is shown as the church's. Never written into a row's
+# preacher.
+by = "Brookfield First Assembly of God"
 `, len(r.Rows), r.Handle, r.Seen, r.WithPreacher, r.WithPassage, r.SeriesRows, len(r.Rephil), r.First, r.Last, listComment, listNote)
 }
 

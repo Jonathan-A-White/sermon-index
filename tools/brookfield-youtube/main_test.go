@@ -418,7 +418,7 @@ func TestRunWritesTheSameBytesTwice(t *testing.T) {
 		t.Errorf("check: faults %v warnings %v", faults, warnings)
 	}
 	toml := string(first[filepath.Join(out, "source.toml")])
-	for _, w := range []string{`id = "brookfield-first"`, "on_by_default = false", `credit = "Brookfield First (Brookfield Assembly of God), Brookfield CT"`, "licence_note"} {
+	for _, w := range []string{`id = "brookfield-first"`, "on_by_default = false", `by = "Brookfield First Assembly of God"`, `credit = "Brookfield First (Brookfield Assembly of God), Brookfield CT"`, "licence_note"} {
 		if !strings.Contains(toml, w) {
 			t.Errorf("source.toml lacks %q", w)
 		}

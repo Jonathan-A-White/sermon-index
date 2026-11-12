@@ -133,6 +133,91 @@ func TestSourcesListsBothKindsWithTheirRows(t *testing.T) {
 	}
 }
 
+// A source's `by` is served with the source, and a source without one
+// serves nothing (the key is left out of the JSON); no row's preacher is
+// touched by it.
+func TestSourcesServeTheByOfASourceThatNamesOne(t *testing.T) {
+	ctx := context.Background()
+	plain := sermonSource(t, "plain", `{"id": "1", "title": "One", "url": "https://example.org/1"}`)
+	church := sermonSource(t, "church",
+		`{"id": "1", "title": "No preacher", "url": "https://example.org/c1"}`,
+		`{"id": "2", "title": "Preacher", "preacher": "Pat Pastor", "url": "https://example.org/c2"}`)
+	toml := filepath.Join(church, "source.toml")
+	b, err := os.ReadFile(toml)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(toml, append(b, []byte("by = \"First Church of X\"\n")...), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	db := loaded(t, plain, church)
+	got, err := store.Sources(ctx, db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	by := map[string]string{}
+	for _, s := range got {
+		by[s.ID] = s.By
+	}
+	if !reflect.DeepEqual(by, map[string]string{"church": "First Church of X", "plain": ""}) {
+		t.Errorf("by = %v", by)
+	}
+	js, err := json.Marshal(got)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var back []map[string]any
+	if err := json.Unmarshal(js, &back); err != nil {
+		t.Fatal(err)
+	}
+	for _, m := range back {
+		v, has := m["by"]
+		switch m["id"] {
+		case "church":
+			if !has || v != "First Church of X" {
+				t.Errorf("church JSON: %v", m)
+			}
+		case "plain":
+			if has {
+				t.Errorf("a source with no by serves %v", v)
+			}
+		}
+	}
+	// by is never written into a row's preacher.
+	var preachers []*string
+	rows, err := db.Query(ctx, `SELECT preacher FROM sermons WHERE source_id = 'church' ORDER BY id`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var p *string
+		if err := rows.Scan(&p); err != nil {
+			t.Fatal(err)
+		}
+		preachers = append(preachers, p)
+	}
+	if len(preachers) != 2 || preachers[0] != nil || preachers[1] == nil || *preachers[1] != "Pat Pastor" {
+		t.Errorf("preachers = %v", preachers)
+	}
+	// Taking the key out of source.toml and loading again drops it.
+	if err := os.WriteFile(toml, b, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := sources.Load(ctx, db, church); err != nil {
+		t.Fatal(err)
+	}
+	got, err = store.Sources(ctx, db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range got {
+		if s.By != "" {
+			t.Errorf("%s still has by %q", s.ID, s.By)
+		}
+	}
+}
+
 // The order: preaching text before cited; narrower before wider; then the
 // source, then the id (a number as a number); one row a sermon.
 func TestSermonsOrder(t *testing.T) {

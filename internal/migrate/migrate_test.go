@@ -34,7 +34,7 @@ func TestUpAppliesOnceAndASecondRunIsANoOp(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(pending, []string{"0001_init", "0002_search", "0003_theme_verses", "0004_source_language", "0005_sermon_topics"}) {
+	if !reflect.DeepEqual(pending, []string{"0001_init", "0002_search", "0003_theme_verses", "0004_source_language", "0005_sermon_topics", "0006_source_by"}) {
 		t.Errorf("pending before = %v", pending)
 	}
 
@@ -42,7 +42,7 @@ func TestUpAppliesOnceAndASecondRunIsANoOp(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(applied, []string{"0001_init", "0002_search", "0003_theme_verses", "0004_source_language", "0005_sermon_topics"}) {
+	if !reflect.DeepEqual(applied, []string{"0001_init", "0002_search", "0003_theme_verses", "0004_source_language", "0005_sermon_topics", "0006_source_by"}) {
 		t.Errorf("first Up applied %v", applied)
 	}
 	again, err := Up(ctx, db)
@@ -56,8 +56,8 @@ func TestUpAppliesOnceAndASecondRunIsANoOp(t *testing.T) {
 	if err := db.QueryRow(ctx, "select count(*) from schema_migrations").Scan(&n); err != nil {
 		t.Fatal(err)
 	}
-	if n != 5 {
-		t.Errorf("schema_migrations has %d rows, want 5", n)
+	if n != 6 {
+		t.Errorf("schema_migrations has %d rows, want 6", n)
 	}
 	pending, err = Pending(ctx, db)
 	if err != nil {
@@ -237,12 +237,49 @@ func TestSermonTopicsMigrationKeepsLoadedRows(t *testing.T) {
 		t.Fatal(err)
 	}
 	applied, err := Up(ctx, db)
-	if err != nil || !reflect.DeepEqual(applied, []string{"0005_sermon_topics"}) {
+	if err != nil || !reflect.DeepEqual(applied, []string{"0005_sermon_topics", "0006_source_by"}) {
 		t.Fatalf("Up over 0004: %v %v", applied, err)
 	}
 	var n int
 	if err := db.QueryRow(ctx, `select count(*) from sermons`).Scan(&n); err != nil || n != 1 {
 		t.Errorf("sermons after 0005: %d (%v)", n, err)
+	}
+	if again, err := Up(ctx, db); err != nil || len(again) != 0 {
+		t.Errorf("second Up: %v %v", again, err)
+	}
+}
+
+// 0006 applies over a database loaded at 0005, keeping its sources; they
+// have no by.
+func TestSourceByMigrationKeepsLoadedSources(t *testing.T) {
+	ctx := context.Background()
+	db := store.TestDB(t)
+	ms, err := All()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(ctx, createTable); err != nil {
+		t.Fatal(err)
+	}
+	for _, m := range ms[:5] {
+		if _, err := db.Exec(ctx, m.SQL); err != nil {
+			t.Fatalf("%s: %v", m.Name, err)
+		}
+		if _, err := db.Exec(ctx, `insert into schema_migrations (version, name) values ($1, $2)`, m.Version, m.Name); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := db.Exec(ctx, `insert into sources (id, name, kind, licence, credit, homepage, terms_url, added, on_by_default)
+			values ('s', 'S', 'sermons', 'Public domain', 'C', 'https://example.org', 'https://example.org/terms', '2026-11-05', false)`); err != nil {
+		t.Fatal(err)
+	}
+	applied, err := Up(ctx, db)
+	if err != nil || !reflect.DeepEqual(applied, []string{"0006_source_by"}) {
+		t.Fatalf("Up over 0005: %v %v", applied, err)
+	}
+	var by *string
+	if err := db.QueryRow(ctx, `select by from sources where id = 's'`).Scan(&by); err != nil || by != nil {
+		t.Errorf("by after 0006: %v (%v)", by, err)
 	}
 	if again, err := Up(ctx, db); err != nil || len(again) != 0 {
 		t.Errorf("second Up: %v %v", again, err)

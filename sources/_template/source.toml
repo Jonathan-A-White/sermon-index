@@ -53,6 +53,16 @@ on_by_default = false
 # and checked only; nothing in the site shows or filters by it yet.
 # language = "pt"
 
+# Optional: who the source's sermons are by, shown for a row that names no
+# preacher. Set it only when every sermon of the source was preached at one
+# church or by one preacher (a church's name, "Brookfield First Assembly of
+# God"; a preacher's, "C. H. Spurgeon"). It is served with the source
+# (/v1/sources) and never written into a row's `preacher`, so search and the
+# tutor never take it for a preacher. Left out, a row with no preacher shows
+# none. A row that was preached elsewhere (a guest at another church's
+# service) is not covered: a source with such rows leaves `by` out.
+# by = "First Church of Example"
+
 # Optional: what `sermons check --urls N` does for a host, by host name (lower
 # case, no scheme, path or port). Leave the table out when the host answers
 # 404 to an address it does not have and asks for no delay: a HEAD that says

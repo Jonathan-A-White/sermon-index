@@ -128,6 +128,22 @@ func TestFaultsInSourceToml(t *testing.T) {
 	}
 }
 
+func TestByKey(t *testing.T) {
+	with := func(by string) map[string]string {
+		return map[string]string{"source.toml": goodToml + by, "rows.jsonl": goodRow}
+	}
+	d, fs := Read(writeSource(t, with("by = \"First Church of X\"\n")))
+	if len(fs) != 0 || d.Source.By != "First Church of X" {
+		t.Errorf("read: %q %+v", faultStrings(fs), d.Source)
+	}
+	d, _ = Read(writeSource(t, map[string]string{"source.toml": goodToml, "rows.jsonl": goodRow}))
+	if d.Source.By != "" {
+		t.Errorf("no by: %+v", d.Source)
+	}
+	expectFault(t, with("by = \"\"\n"), "source.toml: by is empty: leave it out instead")
+	expectFault(t, with("by = \"  \"\n"), "source.toml: by is empty: leave it out instead")
+}
+
 func TestLanguageKey(t *testing.T) {
 	with := func(lang string) map[string]string {
 		return map[string]string{"source.toml": goodToml + lang, "rows.jsonl": goodRow}

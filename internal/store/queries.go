@@ -40,13 +40,16 @@ type Source struct {
 	Credit      string `json:"credit"`
 	Homepage    string `json:"homepage"`
 	OnByDefault bool   `json:"on_by_default"`
-	Rows        int    `json:"rows"`
+	// By is who the source's sermons are by, for a row with no preacher
+	// (source.toml `by`); left out when the source sets none.
+	By   string `json:"by,omitempty"`
+	Rows int    `json:"rows"`
 }
 
 // Sources lists every source, sermon sources first, then by id.
 func Sources(ctx context.Context, db *pgxpool.Pool) ([]Source, error) {
 	rows, err := db.Query(ctx, `
-		SELECT s.id, s.name, s.kind, s.licence, s.credit, s.homepage, s.on_by_default,
+		SELECT s.id, s.name, s.kind, s.licence, s.credit, s.homepage, s.on_by_default, COALESCE(s.by, ''),
 		       CASE s.kind WHEN 'sermons' THEN (SELECT count(*) FROM sermons m WHERE m.source_id = s.id)
 		                   ELSE (SELECT count(*) FROM themes t WHERE t.source_id = s.id) END
 		FROM sources s
@@ -56,7 +59,7 @@ func Sources(ctx context.Context, db *pgxpool.Pool) ([]Source, error) {
 	}
 	out, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (Source, error) {
 		var s Source
-		err := r.Scan(&s.ID, &s.Name, &s.Kind, &s.Licence, &s.Credit, &s.Homepage, &s.OnByDefault, &s.Rows)
+		err := r.Scan(&s.ID, &s.Name, &s.Kind, &s.Licence, &s.Credit, &s.Homepage, &s.OnByDefault, &s.By, &s.Rows)
 		return s, err
 	})
 	if out == nil {

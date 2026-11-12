@@ -126,15 +126,15 @@ func nullable(s string) *string {
 
 func upsertSource(ctx context.Context, tx pgx.Tx, s Source) error {
 	_, err := tx.Exec(ctx, `INSERT INTO sources
-			(id, name, kind, licence, licence_note, credit, homepage, terms_url, added, on_by_default, language)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+			(id, name, kind, licence, licence_note, credit, homepage, terms_url, added, on_by_default, language, by)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 		ON CONFLICT (id) DO UPDATE SET
 			name = EXCLUDED.name, kind = EXCLUDED.kind, licence = EXCLUDED.licence,
 			licence_note = EXCLUDED.licence_note, credit = EXCLUDED.credit, homepage = EXCLUDED.homepage,
 			terms_url = EXCLUDED.terms_url, added = EXCLUDED.added, on_by_default = EXCLUDED.on_by_default,
-			language = EXCLUDED.language, loaded_at = now()`,
+			language = EXCLUDED.language, by = EXCLUDED.by, loaded_at = now()`,
 		s.ID, s.Name, s.Kind, s.Licence, nullable(s.LicenceNote), s.Credit, s.Homepage, s.TermsURL,
-		s.Added, s.OnByDefault, s.LanguageOrDefault())
+		s.Added, s.OnByDefault, s.LanguageOrDefault(), nullable(s.By))
 	if err != nil {
 		return fmt.Errorf("writing the source: %w", err)
 	}

@@ -58,6 +58,10 @@ type Source struct {
 	// Language is the language the source's titles are in, a two-letter ISO
 	// 639-1 code from Languages (optional; English when it is left out).
 	Language string `toml:"language"`
+	// By is the name the source's sermons are by, shown for a row that names
+	// no preacher (optional): only a source of one church's or one preacher's
+	// sermons sets it. It is never written into a row's preacher.
+	By string `toml:"by"`
 
 	// HostRules are what `sermons check --urls` does for a host, by host
 	// name (optional): see HostRule and DefaultHostRules.
@@ -225,6 +229,9 @@ func Read(dir string) (*Dir, []Fault) {
 		}
 		if md.IsDefined("language") && strings.TrimSpace(s.Language) == "" {
 			add(SourceFile, 0, "language is empty: leave it out for English")
+		}
+		if md.IsDefined("by") && strings.TrimSpace(s.By) == "" {
+			add(SourceFile, 0, "by is empty: leave it out instead")
 		}
 		if md.IsDefined("licence_note") && strings.TrimSpace(s.LicenceNote) == "" {
 			add(SourceFile, 0, "licence_note is empty: leave it out instead")
