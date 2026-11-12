@@ -304,3 +304,104 @@ func TestReadNotesWritesTheSpeakerTheNotesPDFNames(t *testing.T) {
 		t.Errorf("also1 has a speaker or no line:\n%s", got)
 	}
 }
+
+// Acceptance 1 (mw-qtu3zvz.59.29): a mail that names no passage (noref1, as
+// L4mXkwT7tW4 was) has the passage its notes PDF's text holds written to the
+// list with the mail's title, and 'notes' as its source.
+func TestReadNotesOfAMailWithNoPassageReadsItFromTheNotesPDF(t *testing.T) {
+	rows, recs, list := notesRig(t, passagesHeader)
+	pdfs := t.TempDir()
+	text := func(path string) (string, error) {
+		if filepath.Base(path) == "noref1.pdf" {
+			return headerWithPastor, nil
+		}
+		return "", os.ErrNotExist
+	}
+	res, err := RunNotesWithSpeakers(recs, list, rows, pdfs, text)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := readFile(t, list)
+	want := "\t2026-01-04\tNo Ref Here\tPhil Morgan\t2 Corinthians 8:10-15\tnoref1\tnotes\n"
+	if !strings.Contains(got, want) {
+		t.Errorf("passages.tsv lacks %q:\n%s", want, got)
+	}
+	if strings.Contains(strings.Join(res.Problems, "\n"), "noref1") {
+		t.Errorf("noref1 is reported though its passage was read: %v", res.Problems)
+	}
+	// A second run finds the line and adds nothing.
+	first := got
+	res, err = RunNotesWithSpeakers(recs, list, rows, pdfs, text)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if readFile(t, list) != first || strings.Contains(strings.Join(res.Problems, "\n"), "noref1") {
+		t.Errorf("second run changed the list or reported: %v\n%s", res.Problems, readFile(t, list))
+	}
+}
+
+// Acceptance 2: neither the mail nor the PDF text holds a passage; the row is
+// named in the report, with which of the two was missing.
+func TestReadNotesOfAMailWithNoPassageNamesTheRowWhenThePDFHoldsNone(t *testing.T) {
+	for name, text := range map[string]func(string) (string, error){
+		"text with no passage": func(string) (string, error) {
+			return "\"No Ref Here\"\nPart of Standalone Sermons\nJanuary 4, 2026\n\n1. Our ____ (v. 10-11)\n", nil
+		},
+		"no PDF": func(string) (string, error) { return "", os.ErrNotExist },
+	} {
+		rows, recs, list := notesRig(t, passagesHeader)
+		res, err := RunNotesWithSpeakers(recs, list, rows, t.TempDir(), text)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var line string
+		for _, p := range res.Problems {
+			if strings.Contains(p, "noref1") {
+				line = p
+			}
+		}
+		if line == "" || !strings.Contains(line, "no passage") || !strings.Contains(line, "notes PDF") {
+			t.Errorf("%s: the row is not named with why: %v", name, res.Problems)
+		}
+		if strings.Contains(readFile(t, list), "No Ref Here") {
+			t.Errorf("%s: a line was written:\n%s", name, readFile(t, list))
+		}
+	}
+}
+
+// The CLI prints that report line.
+func TestReadNotesFlagReportsARecordWithNoPassageAnywhere(t *testing.T) {
+	rows, recs, list := notesRig(t, passagesHeader)
+	var out, errb strings.Builder
+	code := cli([]string{"--read-notes", "--notes", recs, "--passages", list, "--rows", rows, "--notes-pdfs", "none"}, &out, &errb, deps{})
+	if code != 0 || !strings.Contains(out.String(), "notes: not added: noref1") {
+		t.Errorf("exit %d\nout %s\nerr %s", code, out.String(), errb.String())
+	}
+}
+
+func TestPDFPassageReadsTheHeadersPassageAndNotABodyLine(t *testing.T) {
+	for text, want := range map[string]string{
+		headerWithPastor: "2Cor.8.10-2Cor.8.15",
+		// The header wraps the passage and drops its dash; the body's heading is whole.
+		"\"The Teachable\nHeart\" — Luke 8:115\nPas tor Phil Morgan\nPart of Standalone Sermons\nDecember 28, 2025\n\nLuke 8:1-15\n1. A ____ Heart\n":              "Luke.8.1-Luke.8.15",
+		"\"Dear 21st\nCentury Church\" —\n1 Corinthians 1:13\nPart of 1 Corinthians Following\nSeptember 9, 2023\n\n1 Corinthians 1:1-3\n1. The ____ of Corinth\n": "1Cor.1.1-1Cor.1.3",
+		// The header keeps its dash: taken as it is, with an abbreviated book.
+		"\"The Cheerful\nGiver\" — 2 Cor.\n9:1-15\nPart of 2 Corinthians\nAugus t 31, 2025\n\n2 Corinthians 9\n1. God Loves ____\n": "2Cor.9.1-2Cor.9.15",
+		// The header's passage lost a dash and no body line confirms it: none,
+		// and the body's sub-passage and quoted verse are not taken for it.
+		"\"Following Jesus\ninto 2024\" — Luke\n6:40\nPart of Standalone Sermons\nDecember 31, 2023\n\n\u201cA disciple is not above his teacher.\u201d (Luke 6:40)\nLuke 6:41\n": "",
+		"\"Title\"\nPart of Y\nJanuary 4, 2026\n\nLuke 8:1-15\n": "",
+		"": "",
+	} {
+		got, ok := pdfPassage(text)
+		if want == "" {
+			if ok {
+				t.Errorf("pdfPassage(%q) = %q, want none", text, got)
+			}
+			continue
+		}
+		if !ok || got != want {
+			t.Errorf("pdfPassage(%q) = %q, %v; want %q", text, got, ok, want)
+		}
+	}
+}
