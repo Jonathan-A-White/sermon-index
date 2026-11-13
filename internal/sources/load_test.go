@@ -617,6 +617,12 @@ func TestLoadLogosArchives(t *testing.T) {
 		{"sermon-starters-volume-3-logos", 199, 199, 0, 0},
 		{"sermon-starters-volume-4-logos", 198, 198, 0, 0},
 		{"sermon-starters-volume-5-logos", 199, 199, 0, 0},
+		// Sermons found inside books Logos does not type as sermon books (mw-qtu3zvz.117).
+		{"edwards-works-1-logos", 5, 5, 0, 0},
+		{"edwards-works-2-logos", 63, 63, 0, 0},
+		{"luther-annotated-4-logos", 3, 3, 0, 0},
+		{"fuller-works-1-logos", 84, 84, 0, 0},
+		{"fuller-works-3-logos", 89, 88, 1, 0},
 	}
 	ctx := context.Background()
 	db := migrated(t)

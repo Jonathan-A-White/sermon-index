@@ -2354,3 +2354,86 @@ func TestInferTextReportAndRowsPassTheChecker(t *testing.T) {
 		t.Fatalf("faults %v, warnings %v", sources.Faults(faults), sources.Faults(warnings))
 	}
 }
+
+// The sermons found inside the Governor's Logos books that are not typed as
+// sermon books (mw-qtu3zvz.117): docs/logos-hidden-sermons-survey.md lists the
+// resources, and data/logos-index/<slug>-sermons.jsonl with <slug>-report.md is
+// the index file of each one found, in the shape of the 88 archives.
+func TestHiddenSermonsSurveyNamesTheBooksHeAskedAbout(t *testing.T) {
+	data, err := os.ReadFile("../../docs/logos-hidden-sermons-survey.md")
+	if err != nil {
+		t.Fatalf("the survey is missing: %v", err)
+	}
+	text := string(data)
+	for _, id := range []string{
+		"LLS:WRKJONEDWRDS1", "LLS:WRKJONEDWRDS2", "LLS:ANNOTLUTV1", "LLS:ANNOTLUTV2",
+		"LLS:NNTTDLTHR03", "LLS:NNTTDLTHR04", "LLS:NNTTDLTHR05", "LLS:NNTTDLTHR06", "LLS:BONHOEFFERREADER",
+	} {
+		if !strings.Contains(text, id) {
+			t.Errorf("the survey does not name %s, which the Governor named", id)
+		}
+	}
+}
+
+func TestHiddenSermonIndexFilesImportAndPassTheChecker(t *testing.T) {
+	paths, err := filepath.Glob("../../data/logos-index/*-sermons.jsonl")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(paths) == 0 {
+		t.Fatal("no index file under data/logos-index")
+	}
+	for _, p := range paths {
+		slug := strings.TrimSuffix(filepath.Base(p), "-sermons.jsonl")
+		t.Run(slug, func(t *testing.T) {
+			if _, err := os.Stat(filepath.Join(filepath.Dir(p), slug+"-report.md")); err != nil {
+				t.Errorf("no report beside the index file: %v", err)
+			}
+			inputs := readFile(t, p)
+			if len(inputs) == 0 {
+				t.Fatal("empty index file: a book with no sermon that has its preaching text is left out of the folder")
+			}
+			for _, in := range inputs {
+				if in.Ref == nil || *in.Ref == "" {
+					t.Errorf("%s %q carries no preaching text: it is left out and the report says why", in.ID, in.Title)
+				}
+				if in.Date != nil || in.Series != nil {
+					t.Errorf("%s: a book's section has no date or series of its own", in.ID)
+				}
+			}
+			rows, rep := BuildSource([]File{{Name: slug, Inputs: inputs}}, false)
+			if len(rows) == 0 {
+				t.Fatal("no row")
+			}
+			if len(rep.Dropped) != 0 {
+				t.Errorf("lines dropped: %v", rep.Dropped)
+			}
+			for _, r := range rows {
+				if r.Ref == nil {
+					t.Errorf("row %s %q has no ref after the import: the book table refused the passage", r.ID, r.Title)
+				}
+			}
+			out := t.TempDir()
+			if err := writeRows(filepath.Join(out, "rows.jsonl"), rows); err != nil {
+				t.Fatal(err)
+			}
+			toml := `id = "` + filepath.Base(out) + `"
+name = "t"
+kind = "sermons"
+licence = "x"
+credit = "x"
+homepage = "https://example.org"
+terms_url = "https://example.org"
+added = 2026-11-13
+on_by_default = true
+`
+			if err := os.WriteFile(filepath.Join(out, "source.toml"), []byte(toml), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			faults, warnings := sources.CheckReport(out)
+			if len(faults) != 0 || len(warnings) != 0 {
+				t.Fatalf("faults %v, warnings %v", sources.Faults(faults), sources.Faults(warnings))
+			}
+		})
+	}
+}
