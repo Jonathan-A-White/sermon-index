@@ -2375,6 +2375,39 @@ func TestHiddenSermonsSurveyNamesTheBooksHeAskedAbout(t *testing.T) {
 	}
 }
 
+// topicalSermonIndexFiles are the index files of Luther's topical sermons
+// (mw-qtu3zvz.130): a sermon preached on no single text, so the book prints
+// none. Each is indexed with no preaching text (the story asked for them, the
+// survey had held them back); every other index file under data/logos-index must carry a
+// text on every line.
+var topicalSermonIndexFiles = map[string]int{
+	"the-annotated-luther-volume-1-the-roots-of-reform":         3,
+	"the-annotated-luther-volume-2-word-and-faith":              1,
+	"the-annotated-luther-volume-5-christian-life-in-the-world": 1,
+}
+
+func TestLutherTopicalSermonsAreIndexedWithNoText(t *testing.T) {
+	for slug, want := range topicalSermonIndexFiles {
+		p := filepath.Join("../../data/logos-index", slug+"-sermons.jsonl")
+		if _, err := os.Stat(p); err != nil {
+			t.Errorf("%s: the topical sermons are left out of the index: %v", slug, err)
+			continue
+		}
+		inputs := readFile(t, p)
+		if len(inputs) != want {
+			t.Errorf("%s: %d lines, want %d", slug, len(inputs), want)
+		}
+		for _, in := range inputs {
+			if in.Ref != nil && *in.Ref != "" {
+				t.Errorf("%s %q carries a text: it is not a topical sermon, so it belongs in the plain index", in.ID, in.Title)
+			}
+			if !strings.Contains(strings.ToLower(in.Title), "sermon") {
+				t.Errorf("%s %q is not a sermon by its title", in.ID, in.Title)
+			}
+		}
+	}
+}
+
 func TestHiddenSermonIndexFilesImportAndPassTheChecker(t *testing.T) {
 	paths, err := filepath.Glob("../../data/logos-index/*-sermons.jsonl")
 	if err != nil {
@@ -2393,8 +2426,9 @@ func TestHiddenSermonIndexFilesImportAndPassTheChecker(t *testing.T) {
 			if len(inputs) == 0 {
 				t.Fatal("empty index file: a book with no sermon that has its preaching text is left out of the folder")
 			}
+			_, topical := topicalSermonIndexFiles[slug]
 			for _, in := range inputs {
-				if in.Ref == nil || *in.Ref == "" {
+				if !topical && (in.Ref == nil || *in.Ref == "") {
 					t.Errorf("%s %q carries no preaching text: it is left out and the report says why", in.ID, in.Title)
 				}
 				if in.Date != nil || in.Series != nil {
@@ -2409,7 +2443,7 @@ func TestHiddenSermonIndexFilesImportAndPassTheChecker(t *testing.T) {
 				t.Errorf("lines dropped: %v", rep.Dropped)
 			}
 			for _, r := range rows {
-				if r.Ref == nil {
+				if r.Ref == nil && !topical {
 					t.Errorf("row %s %q has no ref after the import: the book table refused the passage", r.ID, r.Title)
 				}
 			}
