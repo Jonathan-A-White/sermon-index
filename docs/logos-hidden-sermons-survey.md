@@ -4,6 +4,15 @@ His question (Postern general, 2026-11-13): are there books in his Logos library
 
 **Yes.** Of the 4,707 resources in his library (`plans/lampas-logos-library-2026-10-08.csv`) that are not among the 88 typed as sermon books, this survey found sermons inside collected works (Edwards, Luther, Fuller, Fletcher, Strong), a book of classic sermons and a few single-address books. The five with the most sermons that print their text were indexed and imported (`data/logos-index/`, `sources/*-logos`: 244 rows). The rest are listed below, in his well-known-first order, as follow-up stories.
 
+<!-- toc -->
+
+- [How it was done, and what it did not cover](#how-it-was-done-and-what-it-did-not-cover)
+- [Sermons found, in his order](#sermons-found-in-his-order)
+- [The books he named](#the-books-he-named)
+- [Follow-up stories, in his order](#follow-up-stories-in-his-order)
+
+<!-- /toc -->
+
 ## How it was done, and what it did not cover
 
 - Read through his saved Logos web session (the same one `bin/logos-sermons-index.mjs` uses), GET only, one request a second. Nothing was written to his Logos account, and no sermon text is kept anywhere: only a title, the passage, the cited passages and the `ref.ly` address.

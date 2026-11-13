@@ -17,6 +17,7 @@ Adding a preacher or a collection is a **data add**: a new directory under `sour
 - [A worked example: Truth For Life](#a-worked-example-truth-for-life)
 - [A Logos archive: data only](#a-logos-archive-data-only)
   - [The book-archive form (a book of sermons, not an archive with an index section)](#the-book-archive-form-a-book-of-sermons-not-an-archive-with-an-index-section)
+  - [Sermons inside a book that is not typed as a sermon book (mw-qtu3zvz.117)](#sermons-inside-a-book-that-is-not-typed-as-a-sermon-book-mw-qtu3zvz117)
 - [The shapes already here](#the-shapes-already-here)
 
 <!-- /toc -->
