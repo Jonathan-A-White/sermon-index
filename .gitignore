@@ -6,3 +6,4 @@ bin/
 # Private files tools/subsplash-links and tools/subsplash-notes write; never commit them.
 data/subsplash-links-cache.jsonl
 data/subsplash-notes.jsonl
+data/subsplash-browser-links.txt

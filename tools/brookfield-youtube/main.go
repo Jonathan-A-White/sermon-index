@@ -204,6 +204,11 @@ func run(ctx context.Context, c *Client, handle, out, rephilPath, reportPath, li
 			return err
 		}
 	}
+	kept, err := ReadRephil(rephilPath)
+	if err != nil {
+		return err
+	}
+	res.Rephil = KeepRephil(res.Rephil, kept)
 	var rp bytes.Buffer
 	for _, r := range res.Rephil {
 		if err := writeLine(&rp, r); err != nil {
@@ -241,11 +246,67 @@ func writeLine(buf *bytes.Buffer, v any) error {
 }
 
 // RephilRow is a line of data/morning-rephil.jsonl.
+//
+// Share and NotesFile are written by tools/subsplash-notes browse (the
+// episode's Subsplash share link, and the file in the notes directory that
+// holds the text its page carries); a regeneration keeps them, and keeps the
+// episodes only Subsplash has (no url), see KeepRephil.
 type RephilRow struct {
-	Number int    `json:"number"`
-	Title  string `json:"title"`
-	Date   string `json:"date"`
-	URL    string `json:"url"`
+	Number    int    `json:"number"`
+	Title     string `json:"title"`
+	Date      string `json:"date"`
+	URL       string `json:"url,omitempty"`
+	Share     string `json:"share,omitempty"`
+	NotesFile string `json:"notes_file,omitempty"`
+}
+
+// ReadRephil reads the episodes file as it is; a file that is not there has
+// none.
+func ReadRephil(path string) ([]RephilRow, error) {
+	b, err := os.ReadFile(path)
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var rows []RephilRow
+	for n, l := range strings.Split(string(b), "\n") {
+		if strings.TrimSpace(l) == "" {
+			continue
+		}
+		var r RephilRow
+		if err := json.Unmarshal([]byte(l), &r); err != nil {
+			return nil, fmt.Errorf("%s line %d: %w", path, n+1, err)
+		}
+		rows = append(rows, r)
+	}
+	return rows, nil
+}
+
+// KeepRephil gives each episode the channel's list made the share link and
+// notes file the file already holds for its video (matched on url), and adds
+// the episodes the file holds that have no url, which only Subsplash has, in
+// date order (an episode keeps its place among those of its own day).
+func KeepRephil(rows, kept []RephilRow) []RephilRow {
+	by := map[string]RephilRow{}
+	for _, k := range kept {
+		if k.URL != "" {
+			by[k.URL] = k
+		}
+	}
+	for i, r := range rows {
+		if k, ok := by[r.URL]; ok {
+			rows[i].Share, rows[i].NotesFile = k.Share, k.NotesFile
+		}
+	}
+	for _, k := range kept {
+		if k.URL == "" {
+			rows = append(rows, k)
+		}
+	}
+	sort.SliceStable(rows, func(i, j int) bool { return rows[i].Date < rows[j].Date })
+	return rows
 }
 
 // Skip is an entry of the playlist that is not a video that can be listed.
@@ -326,7 +387,7 @@ func Build(items []Item) *Result {
 				res.Unnumbered = append(res.Unnumbered, it.VideoID)
 			}
 			numbers[n]++
-			res.Rephil = append(res.Rephil, RephilRow{n, it.Title, pubDate, watchURL + it.VideoID})
+			res.Rephil = append(res.Rephil, RephilRow{Number: n, Title: it.Title, Date: pubDate, URL: watchURL + it.VideoID})
 			dates = append(dates, pubDate)
 			continue
 		}

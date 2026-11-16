@@ -8,6 +8,7 @@
 //	subsplash-notes address [--key <file>] [--postern <url>]
 //	subsplash-notes fetch [--key <file>] [--postern <url>] [--since n] [--rows rows.jsonl] [--out records.jsonl] [--notes <dir>]
 //	subsplash-notes forward-confirm [--key <file>] [--postern <url>]
+//	subsplash-notes browse [--cdp <url>] [--rows rows.jsonl] [--out records.jsonl] [--notes <dir>] [--links-out <file>] [--rephil <file>] [--feed <file>] [--pace 10s] [--limit n] [--verify n] [--series <url>] [--series-only] [--episode-pages]
 //	subsplash-notes [--alerts <file>|-] [--rows rows.jsonl] [--out records.jsonl]
 //
 // keygen makes the family's key once, at ~/.config/sermon-index/postern-alerts.key
@@ -32,6 +33,9 @@
 // https://<host>/mail/vf-<token> on one of Postern's confirm hosts (see
 // confirmHosts; any other link is refused and not printed), makes no request but
 // the read of the alerts, and neither visits the link nor claims the alert.
+//
+// browse is the second way in, through the signed-in browser `mw browser open`
+// starts on the Laptop (browser.go, browse.go, cdp.go): see browse below.
 //
 // With no subcommand the tool reads a saved reply of GET /api/alerts, {"alerts":
 // [...], "next": n} ("-" reads it from standard input), and claims nothing.
@@ -92,8 +96,10 @@ import (
 )
 
 const (
-	defaultRows = "sources/brookfield-first/rows.jsonl"
-	defaultOut  = "data/subsplash-notes.jsonl"
+	defaultRows   = "sources/brookfield-first/rows.jsonl"
+	defaultOut    = "data/subsplash-notes.jsonl"
+	defaultLinks  = "data/subsplash-browser-links.txt"
+	defaultRephil = "data/morning-rephil.jsonl"
 )
 
 func main() {
@@ -113,6 +119,8 @@ func cli(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			return fetchCmd(args[1:], stdout, stderr)
 		case "forward-confirm":
 			return forwardConfirmCmd(args[1:], stdout, stderr)
+		case "browse":
+			return browseCmd(args[1:], stdout, stderr)
 		}
 	}
 	return readCmd(args, stdin, stdout, stderr)
@@ -276,6 +284,71 @@ func fetchCmd(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stdout, "%d notes downloaded to %s\n", store.Asked, store.Dir)
 	}
 	return code
+}
+
+// browseCmd is subsplash-notes browse. THE TERMS: Subsplash's terms bar
+// automated means; the Governor allowed this one use, on his own signed-in
+// account in his own browser, at a polite pace, accepting the account's risk
+// (his B on card direct:09581219, 2026-11-16). So it drives that one tab and
+// no other, at least 10 s between page loads, one load at a time, reads only
+// the sermon list, each sermon's page and its notes, and stops at the first
+// login prompt, captcha, HTTP 429 or 403, or page it did not expect.
+//
+// It walks the list newest to oldest. A sermon already sent by hand (a record
+// by its title, and its address on a row or in the links file) is not read;
+// any other is: its page, its notes, and then the record the mail would have
+// made in --out, the notes' text as <row id>.txt in --notes beside the PDFs
+// (never committed), and the sermon's full address in --links-out, which
+// `subsplash-links --links <file>` takes and files with no request (it holds
+// the address already). A Morning RePhil episode is written to --rephil
+// (oldest first, number, title, date, share link). --feed is the Jobs page's
+// file. --verify n reads the newest n sermons that already have a mail-made
+// record, says how each compares, and writes nothing.
+func browseCmd(args []string, stdout, stderr io.Writer) int {
+	fs := flags("browse", stderr)
+	endpoint := fs.String("cdp", DefaultCDP, "the browser's DevTools address (mw browser status): this machine only")
+	rowsPath := fs.String("rows", defaultRows, "the YouTube rows to match against")
+	out := fs.String("out", defaultOut, "the records file to write; read first and merged with")
+	notesDir := fs.String("notes", DefaultNotesDir(), "where the notes are kept: outside the checkout, never committed")
+	linksOut := fs.String("links-out", defaultLinks, "the file of sermon addresses for subsplash-links --links")
+	rephil := fs.String("rephil", defaultRephil, "the Morning RePhil episodes file")
+	feed := fs.String("feed", DefaultFeed(), "the Jobs page's feed file ('' for none)")
+	pace := fs.Duration("pace", MinPace, "the time between two page loads (never under 10s)")
+	limit := fs.Int("limit", 0, "the most sermon and episode pages to read (0: all)")
+	verify := fs.Int("verify", 0, "compare the newest n sermons already recorded by mail, writing nothing")
+	series := fs.String("series", seriesURL, "the Morning RePhil series page to read for every episode ('' for none)")
+	seriesOnly := fs.Bool("series-only", false, "read the series page and not the sermon list")
+	episodePages := fs.Bool("episode-pages", false, "also load each new episode's own page, to keep any text it carries")
+	if !parse(fs, args, stderr, "subsplash-notes browse [--cdp <url>] [--rows rows.jsonl] [--out records.jsonl] [--notes <dir>] [--links-out <file>] [--rephil <file>] [--feed <file>] [--pace 10s] [--limit n] [--verify n] [--series <url>] [--series-only] [--episode-pages]") {
+		return 2
+	}
+	rows, err := readRows(*rowsPath)
+	if err != nil {
+		return fail(stderr, err)
+	}
+	b, err := NewCDP(*endpoint)
+	if err != nil {
+		return fail(stderr, err)
+	}
+	defer b.Close()
+	notes := *notesDir
+	cfg := Config{Rows: rows, Out: *out, NotesDir: notes, LinksOut: *linksOut, Rephil: *rephil, Feed: *feed,
+		Interval: *pace, Limit: *limit, Verify: *verify, Series: *series, SeriesOnly: *seriesOnly, EpisodePages: *episodePages, PDFText: func(id string) (string, error) { return pdfText(filepath.Join(notes, id+".pdf")) }}
+	res, err := Browse(context.Background(), b, cfg, stdout)
+	fmt.Fprintf(stdout, "%d page loads, %d sermon and episode pages read; %d recorded, %d sermon links, %d episodes", res.Loads, res.Visited, res.Recorded, res.Linked, res.Episodes)
+	if *verify > 0 {
+		fmt.Fprintf(stdout, "; %d compared, %d differ", res.Verified, res.Differ)
+	}
+	fmt.Fprintln(stdout)
+	var st Stop
+	if errors.As(err, &st) {
+		fmt.Fprintln(stderr, "subsplash-notes browse:", st.Error(), "(nothing more was written; sign in again if asked, then run it again: it resumes here)")
+		return 1
+	}
+	if err != nil {
+		return fail(stderr, err)
+	}
+	return 0
 }
 
 func readCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
