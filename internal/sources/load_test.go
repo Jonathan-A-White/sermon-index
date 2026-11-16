@@ -623,10 +623,12 @@ func TestLoadLogosArchives(t *testing.T) {
 		{"luther-annotated-4-logos", 3, 3, 0, 0},
 		{"fuller-works-1-logos", 84, 84, 0, 0},
 		{"fuller-works-3-logos", 89, 88, 1, 0},
-		// Luther's topical sermons, no single text printed (mw-qtu3zvz.130).
+		// Luther's sermons, no text in the heading (mw-qtu3zvz.130): volume 1's
+		// three name none in their introductions, volume 2's is on Philippians
+		// 2:5-11 and volume 5's on John 2:1-11, each as its introduction says.
 		{"luther-annotated-1-logos", 3, 0, 0, 3},
-		{"luther-annotated-2-logos", 1, 0, 0, 1},
-		{"luther-annotated-5-logos", 1, 0, 0, 1},
+		{"luther-annotated-2-logos", 1, 1, 0, 0},
+		{"luther-annotated-5-logos", 1, 1, 0, 0},
 	}
 	ctx := context.Background()
 	db := migrated(t)

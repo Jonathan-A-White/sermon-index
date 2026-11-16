@@ -2,7 +2,7 @@
 
 <!-- toc: none -->
 
-Written by `go run ./tools/logos-import --in <vault>/plans/sermons-2026-11-05/the-annotated-luther-volume-2-word-and-faith-sermons.jsonl --note "A topical sermon: the book prints no single preaching text for it, so the row has no passage." --id luther-annotated-2-logos --out sources/luther-annotated-2-logos`; do not edit by hand. Only ids, titles, references and addresses are listed.
+Written by `go run ./tools/logos-import --in <vault>/plans/sermons-2026-11-05/the-annotated-luther-volume-2-word-and-faith-sermons.jsonl --note "The book's heading prints no text; its introduction names the one it was preached on (Philippians 2:5–11, the pericope for Palm Sunday), which is the row's passage." --id luther-annotated-2-logos --out sources/luther-annotated-2-logos`; do not edit by hand. Only ids, titles, references and addresses are listed.
 
 ## Counts
 
@@ -10,10 +10,10 @@ Written by `go run ./tools/logos-import --in <vault>/plans/sermons-2026-11-05/th
 lines read:                          1
 rows written:                        1
 lines dropped:                       0
-rows with a ref:                     0
-  of them read from the label:       0
+rows with a ref:                     1
+  of them read from the label:       1
   of them with cited references:     0
-rows with no ref:                    1
+rows with no ref:                    0
 series rows (ref over >3 chapters):  0
 rows with their own date:            0
 rows dated by the year alone:        0
@@ -45,16 +45,8 @@ Both were read and differ; the row carries Logos's reference.
 
 None.
 
-## Rows with no ref (1)
+## Rows with no ref (0)
 
 Neither a Logos reference nor a label that could be read: the row is kept, found by its title and its source, and by no passage. Ids, in the file's order:
 
-ANNOTLUTV2.1-367708
-
-## No row has a Scripture ref
-
-None of the 1 rows has a Scripture ref (the archive's index gives titles, and no passage; any dates and series it has are kept): none can show on a verse, and all are found by title, preacher and source. A row the index dates by no day is listed here.
-
-### Rows with no date of their own (1)
-
-ANNOTLUTV2.1-367708
+None.

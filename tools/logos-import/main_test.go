@@ -2375,31 +2375,51 @@ func TestHiddenSermonsSurveyNamesTheBooksHeAskedAbout(t *testing.T) {
 	}
 }
 
-// topicalSermonIndexFiles are the index files of Luther's topical sermons
-// (mw-qtu3zvz.130): a sermon preached on no single text, so the book prints
-// none. Each is indexed with no preaching text (the story asked for them, the
-// survey had held them back); every other index file under data/logos-index must carry a
-// text on every line.
-var topicalSermonIndexFiles = map[string]int{
-	"the-annotated-luther-volume-1-the-roots-of-reform":         3,
-	"the-annotated-luther-volume-2-word-and-faith":              1,
-	"the-annotated-luther-volume-5-christian-life-in-the-world": 1,
+// lutherIndexFiles are the index files of Luther's sermons in Annotated Luther
+// volumes 1, 2 and 5 (mw-qtu3zvz.130). The book prints no text in a sermon's
+// heading, so mw-qtu3zvz.117 left them out; the introduction the book puts
+// before each sermon is where a text is named, and these are what the
+// introductions say (read by hand in Logos at the introduction's offset; no
+// sentence of one is kept): "Two Kinds of Righteousness ... is based on
+// Philippians 2:5-11, the pericope for Palm Sunday" (ANNOTLUTV2, introduction
+// at 368180) and "Luther preached on the text of John 2:1-11" (NNTTDLTHR05,
+// introduction at 504048). The three of volume 1 (introductions at 409696,
+// 591970 and 613304) name no text they are preached on: the passion
+// introduction mentions John 12 only as a story popular piety added to, and
+// the other two name none. Those stay with no passage.
+var lutherIndexFiles = map[string]struct {
+	Lines int
+	Ref   string // the OSIS ref every line of the file must carry, "" for none
+}{
+	"the-annotated-luther-volume-1-the-roots-of-reform":         {3, ""},
+	"the-annotated-luther-volume-2-word-and-faith":              {1, "Phil.2.5-Phil.2.11"},
+	"the-annotated-luther-volume-5-christian-life-in-the-world": {1, "John.2.1-John.2.11"},
 }
 
-func TestLutherTopicalSermonsAreIndexedWithNoText(t *testing.T) {
-	for slug, want := range topicalSermonIndexFiles {
+func TestLutherSermonsTakeTheirTextFromTheIntroduction(t *testing.T) {
+	for slug, want := range lutherIndexFiles {
 		p := filepath.Join("../../data/logos-index", slug+"-sermons.jsonl")
 		if _, err := os.Stat(p); err != nil {
-			t.Errorf("%s: the topical sermons are left out of the index: %v", slug, err)
+			t.Errorf("%s: the sermons are left out of the index: %v", slug, err)
 			continue
 		}
 		inputs := readFile(t, p)
-		if len(inputs) != want {
-			t.Errorf("%s: %d lines, want %d", slug, len(inputs), want)
+		if len(inputs) != want.Lines {
+			t.Errorf("%s: %d lines, want %d", slug, len(inputs), want.Lines)
+		}
+		if want.Ref != "" {
+			// The source folder's row must carry the passage the
+			// introduction names, read through the importer.
+			rows, _ := BuildSource([]File{{Name: slug, Inputs: inputs}}, false)
+			for _, r := range rows {
+				if r.Ref == nil || *r.Ref != want.Ref {
+					t.Errorf("%s %q: ref %v, want %s (the introduction names it)", slug, r.Title, r.Ref, want.Ref)
+				}
+			}
 		}
 		for _, in := range inputs {
-			if in.Ref != nil && *in.Ref != "" {
-				t.Errorf("%s %q carries a text: it is not a topical sermon, so it belongs in the plain index", in.ID, in.Title)
+			if want.Ref == "" && in.Ref != nil && *in.Ref != "" {
+				t.Errorf("%s %q carries a text %q: its introduction names none, so it stays with no passage", in.ID, in.Title, *in.Ref)
 			}
 			if !strings.Contains(strings.ToLower(in.Title), "sermon") {
 				t.Errorf("%s %q is not a sermon by its title", in.ID, in.Title)
@@ -2426,7 +2446,8 @@ func TestHiddenSermonIndexFilesImportAndPassTheChecker(t *testing.T) {
 			if len(inputs) == 0 {
 				t.Fatal("empty index file: a book with no sermon that has its preaching text is left out of the folder")
 			}
-			_, topical := topicalSermonIndexFiles[slug]
+			l, isLuther := lutherIndexFiles[slug]
+			topical := isLuther && l.Ref == ""
 			for _, in := range inputs {
 				if !topical && (in.Ref == nil || *in.Ref == "") {
 					t.Errorf("%s %q carries no preaching text: it is left out and the report says why", in.ID, in.Title)

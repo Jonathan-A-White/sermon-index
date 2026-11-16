@@ -1,20 +1,20 @@
-# Martin Luther's topical sermons in The Annotated Luther, Volume 5: Christian Life in the World (the one sermon the book prints), 1 row,
+# Martin Luther's sermon in The Annotated Luther, Volume 5: Christian Life in the World (the one sermon the book prints), 1 row,
 # found inside a book the Logos library does not type as a sermon book (mw-qtu3zvz.117; left out
 # there for printing no text, indexed here by mw-qtu3zvz.130), made by
 #
-#   go run ./tools/logos-import --in data/logos-index/the-annotated-luther-volume-5-christian-life-in-the-world-sermons.jsonl --id luther-annotated-5-logos --out sources/luther-annotated-5-logos --note "A topical sermon: the book prints no single preaching text for it, so the row has no passage."
+#   go run ./tools/logos-import --in data/logos-index/the-annotated-luther-volume-5-christian-life-in-the-world-sermons.jsonl --id luther-annotated-5-logos --out sources/luther-annotated-5-logos --note "The book's heading prints no text; its introduction names the one it was preached on (John 2:1–11, the wedding at Cana, the second Sunday after Epiphany 1519), which is the row's passage."
 #
 # from the index file in this repository (data/logos-index), which was made by
 # reading the book's table of contents through the Governor's saved Logos web session.
-# The index names no preaching text for it, so no row has a `ref`: it is found by title and source
-# and by no verse. The index keeps facts only: a title, the passage, the cited passages and
+# The book's heading prints no text, but its introduction names John 2:1–11 as the text the sermon was
+# preached on, so the index line carries that ref (read by hand from the introduction, mw-qtu3zvz.130). The index keeps facts only: a title, the passage, the cited passages and
 # the ref.ly address. No sentence of a sermon, and no Logos text, is written anywhere.
 # The link (https://ref.ly/logosres/LLS:NNTTDLTHR05?off=<offset>) opens the book at the
 # sermon in Logos for an owner of the book and for no one else. It is UNVERIFIED: no
 # one has tapped one yet.
 
 id = "luther-annotated-5-logos"
-name = "Martin Luther's topical sermons in The Annotated Luther, Volume 5 (his Logos library)"
+name = "Martin Luther's sermon in The Annotated Luther, Volume 5 (his Logos library)"
 kind = "sermons"
 
 # No terms page was read or quoted: the Governor's library is his own, and the
