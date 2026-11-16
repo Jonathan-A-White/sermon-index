@@ -629,6 +629,10 @@ func TestLoadLogosArchives(t *testing.T) {
 		{"luther-annotated-1-logos", 3, 0, 0, 3},
 		{"luther-annotated-2-logos", 1, 1, 0, 0},
 		{"luther-annotated-5-logos", 1, 1, 0, 0},
+		// Fletcher's Works volume 4 (mw-qtu3zvz.131): ten sermons whose heading
+		// names the text, the New Birth and the thirty Brief Outlines of
+		// Sermons, which print it under the heading.
+		{"fletcher-works-4-logos", 41, 41, 0, 0},
 	}
 	ctx := context.Background()
 	db := migrated(t)

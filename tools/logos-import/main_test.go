@@ -2428,6 +2428,98 @@ func TestLutherSermonsTakeTheirTextFromTheIntroduction(t *testing.T) {
 	}
 }
 
+// fletcher4Texts are the sermons of The Works of the Reverend John Fletcher,
+// Volume 4 (mw-qtu3zvz.131), each by the id of its section (the offset in
+// Logos) with the OSIS ref the importer must give it. Ten name their text in
+// the heading ("Sermon III.—State of the Natural Man (1 Cor. 2:14)"); the New
+// Birth and the thirty Brief Outlines of Sermons print it as the motto under
+// the heading, so the survey of mw-qtu3zvz.117 (which read headings) left them
+// out. Outline VIII prints "Jeremiah 17:19" and Outline XXIV "Amos 6:12" over
+// the verses they quote, Jeremiah 17:9 and Amos 4:12: the index takes the
+// verses quoted. The Vindication of Mr. Wesley's Calm Address (political
+// letters) and The Bible and the Sword (a fast-day address to the common
+// people) are not sermons on a text and stay out.
+var fletcher4Texts = map[string]string{
+	"1~206867": "Num.16.30-Num.16.34",
+	"1~299858": "John.3.3",
+	"2~370397": "1Cor.2.14",
+	"2~398086": "Eph.5.14",
+	"2~423360": "2Cor.5.17",
+	"2~444994": "John.3.3",
+	"2~471849": "Ezek.2.7",
+	"2~498637": "Deut.32.29",
+	"2~523036": "John.6.66-John.6.68",
+	"2~556964": "John.5.40",
+	"2~588224": "Ezek.33.7-Ezek.33.9",
+	"2~620438": "Gen.1.26",
+	"2~623292": "2Cor.6.2",
+	"2~625332": "Matt.21.38",
+	"2~627366": "Acts.3.14-Acts.3.15",
+	"2~630113": "Acts.1.5",
+	"2~632126": "Isa.52.1",
+	"2~634291": "Acts.11.18",
+	"2~636025": "Jer.17.9",
+	"2~639269": "1Cor.1.30",
+	"2~640820": "Rev.3.21",
+	"2~642388": "Luke.5.10",
+	"2~643474": "Zech.4.6-Zech.4.7",
+	"2~645839": "Luke.23.42-Luke.23.43",
+	"2~648334": "Matt.14.30",
+	"2~649872": "1Kgs.22.8",
+	"2~651612": "Col.1.26-Col.1.28",
+	"2~654238": "Gen.45.4",
+	"2~656566": "1Cor.1.23",
+	"2~659683": "Acts.13.40-Acts.13.41",
+	"2~662254": "John.7.37-John.7.38",
+	"2~664058": "Gen.27.38",
+	"2~667168": "1Tim.4.1-1Tim.4.3",
+	"2~676016": "Luke.2.14",
+	"2~678348": "Amos.4.12",
+	"2~680690": "1Cor.16.22",
+	"2~682959": "John.3.14-John.3.15",
+	"2~685319": "Phil.3.8",
+	"2~686922": "Heb.4.2",
+	"2~688733": "Joel.2.13",
+	"2~691533": "Ezek.18.31",
+}
+
+func TestFletcherVolume4SermonsAreIndexed(t *testing.T) {
+	const slug = "the-works-of-the-reverend-john-fletcher-volume-4"
+	p := filepath.Join("../../data/logos-index", slug+"-sermons.jsonl")
+	if _, err := os.Stat(p); err != nil {
+		t.Fatalf("Fletcher's sermons are left out of the index: %v", err)
+	}
+	inputs := readFile(t, p)
+	if len(inputs) != len(fletcher4Texts) {
+		t.Errorf("%d lines, want %d", len(inputs), len(fletcher4Texts))
+	}
+	rows, rep := BuildSource([]File{{Name: slug, Inputs: inputs}}, false)
+	// A passage a sermon only cites may be refused (Outline XVI cites Rom.
+	// 16:25, past the 24 verses the book table gives the chapter); a text
+	// never is, as its ref is compared below.
+	if len(rep.Dropped) != 0 {
+		t.Errorf("lines dropped: %v", rep.Dropped)
+	}
+	// A row's id is the resource's and the section's offset ("1-206867").
+	byID := map[string]*string{}
+	for _, r := range rows {
+		if r.Ref == nil {
+			t.Errorf("%s %q has no ref", r.ID, r.Title)
+		}
+		byID[r.ID[strings.LastIndex(r.ID, ".")+1:]] = r.Ref
+	}
+	for _, in := range inputs {
+		want, ok := fletcher4Texts[in.ID]
+		if !ok {
+			t.Errorf("%s %q is not one of the sermons read in the book", in.ID, in.Title)
+			continue
+		}
+		if got := byID[strings.ReplaceAll(in.ID, "~", "-")]; got == nil || *got != want {
+			t.Errorf("%s %q: ref %v, want %s", in.ID, in.Title, got, want)
+		}
+	}
+}
+
 func TestHiddenSermonIndexFilesImportAndPassTheChecker(t *testing.T) {
 	paths, err := filepath.Glob("../../data/logos-index/*-sermons.jsonl")
 	if err != nil {
