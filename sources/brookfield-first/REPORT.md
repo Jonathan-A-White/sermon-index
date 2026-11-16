@@ -9,9 +9,9 @@ Written by `go run ./tools/brookfield-youtube` from the YouTube Data API v3 (cha
 - Videos seen: 522 (the entries of the channel's uploads playlist)
 - Skipped: 0
 - Sermons: 354 (every video that is not a Morning RePhil), in `rows.jsonl`
-  - with a preacher: 112
-  - with a passage: 214 (series among them: 2, each a text over more than 3 chapters, kept with its first chapter and matched by no passage)
-  - with neither: 137
+  - with a preacher: 113
+  - with a passage: 215 (series among them: 2, each a text over more than 3 chapters, kept with its first chapter and matched by no passage)
+  - with neither: 136
 - Morning RePhil episodes: 168, in `data/morning-rephil.jsonl`
 - Date range: 2020-03-15 to 2026-11-09
 - Quota used: 12 units (1 channels.list and 11 playlistItems.list, 1 unit each; the daily allowance is 10,000)
@@ -22,7 +22,7 @@ A row's date is the day its title prints ("August 23, 2020"), which is the Sunda
 
 ## What was not sorted
 
-- **Videos kept with no passage and no preacher: 137.** Most are whole services ("Online Service | October 25, 2026") whose title and description name neither. They are listed by title and date, found by search, and matched by no passage.
+- **Videos kept with no passage and no preacher: 136.** Most are whole services ("Online Service | October 25, 2026") whose title and description name neither. They are listed by title and date, found by search, and matched by no passage.
 - **Videos with a passage but no preacher: 105; with a preacher but no passage: 3.**
 - **Descriptions that print a sermon title: 26.** The title of the sermon is not kept (the story keeps only the video's own title, and the licence note keeps description text out); the preacher and the passage beside it are.
 - **Passages the book table refuses: 0**.
@@ -34,11 +34,11 @@ A row's date is the day its title prints ("August 23, 2020"), which is the Sunda
 
 `passages.tsv` is the church's own list of its sermons (series, Sunday, title, speaker, passage), typed by hand from screenshots of the church's app that the Governor took, or (the lines with a `row`) copied from a message in which he gave a sermon's title, date, preacher and passage as he read them in the app, for a sermon that has no notes; no tool reads the app. Each entry is matched to the one YouTube row of its date (a line with a `row` to that row, which tools/subsplash-links found within a day of the date), and that row takes the sermon's title, its preacher and its passage and keeps its watch link. An entry that cannot be matched to exactly one row, or whose passage the book table refuses, is named here and changes nothing; nothing is guessed.
 
-- Entries in the list: 199
-- Merged into a row: 199
+- Entries in the list: 200
+- Merged into a row: 200
 - Of them from the Governor's messages: 65
-- Of them from the notes mails: 107
-- Rows with a preacher: 112 of 354 (109 before the speakers of three rows were read: the Governor's word of 2026-11-12 for "When Angels Go to Church", and the header of the notes PDFs of two others). The mails name no speaker and the YouTube titles and descriptions name none beyond those already read, so the other 242 have none; nothing is guessed from who usually preaches:
+- Of them from the notes mails: 108
+- Rows with a preacher: 113 of 354 (109 before the speakers of three rows were read: the Governor's word of 2026-11-12 for "When Angels Go to Church", and the header of the notes PDFs of two others). The mails name no speaker and the YouTube titles and descriptions name none beyond those already read, so the other 241 have none; nothing is guessed from who usually preaches:
   - `VvUNg8E1aPo` 2020-09-27, Brookfield First - Online Service | September 27, 2020
   - `wl9DPCXJRQU` 2020-10-04, Brookfield First - Online Service | October 4, 2020
   - `xL6Do-BIVIY` 2020-10-11, Brookfield First - Online Service | October 11, 2020
@@ -270,7 +270,6 @@ A row's date is the day its title prints ("August 23, 2020"), which is the Sunda
   - `OVprCuyYDDg` 2026-01-18, The Grace of Fear
   - `ZTuy1G9FiuE` 2026-01-25, Walking in the Fear of the Lord
   - `0_FQ9fss7fw` 2026-02-01, Behind a Frowning Providence
-  - `RFB1enCwfeQ` 2026-02-08, Brookfield First - Online Service | February 8, 2026
   - `CHDXYiutIMc` 2026-02-15, The Falls of Babylon
   - `xvtgyhu1tFE` 2026-02-22, When Fields Fail
   - `1vY8oe6vNvU` 2026-03-01, How to Hear a Sermon
