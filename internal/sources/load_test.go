@@ -620,7 +620,9 @@ func TestLoadLogosArchives(t *testing.T) {
 		// Sermons found inside books Logos does not type as sermon books (mw-qtu3zvz.117).
 		{"edwards-works-1-logos", 5, 5, 0, 0},
 		{"edwards-works-2-logos", 63, 63, 0, 0},
-		{"luther-annotated-4-logos", 3, 3, 0, 0},
+		// Volume 4 (mw-qtu3zvz.199): 15 sermons, 6 with a passage; the eight
+		// Invocavit Sermons and the Rogation Days sermon name none.
+		{"luther-annotated-4-logos", 15, 6, 0, 9},
 		{"fuller-works-1-logos", 92, 92, 0, 0},
 		{"fuller-works-3-logos", 89, 88, 1, 0},
 		// Luther's sermons, no text in the heading (mw-qtu3zvz.130): volume 1's

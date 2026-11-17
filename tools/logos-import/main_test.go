@@ -2428,6 +2428,65 @@ func TestLutherSermonsTakeTheirTextFromTheIntroduction(t *testing.T) {
 	}
 }
 
+// luther4Texts are the fifteen sermons of The Annotated Luther, Volume 4
+// (mw-qtu3zvz.199), each by the id of its section (the offset in Logos) with
+// the OSIS ref the importer must give it, "" for none. Three headings print
+// their text and were indexed by mw-qtu3zvz.117. mw-qtu3zvz.199 read the
+// sections the survey had left out (by hand in Logos, at each section's
+// offset; no sentence of one is kept): the Introduction to the Invocavit
+// Sermons (349210) names no text, only eight sermons over eight days; the
+// Introduction to the Selected Sermons (426034) is about Luther's preaching
+// and names none; the Coburg sermon's body is headed "A Harmony of Matthew 27,
+// Luke 24, and John 19" (Matthew 27 is the ref, the other two are cited); the
+// Twelfth Sunday after Trinity's body is headed "2 Cor. 3:4-6" and the
+// Pleissenburg sermon's "John 14:23-31"; the Rogation Days Introduction (599192)
+// names John 16:23-30 and Luke 11 only as the readings the days usually had
+// and Luther's sermon opens on prayer, with no text of its own, so it has none.
+var luther4Texts = map[string]string{
+	"4~360170": "", // The First Sermon, 9 March 1522, Invocavit Sunday
+	"4~371793": "",
+	"4~380088": "",
+	"4~390575": "",
+	"4~399817": "",
+	"4~408063": "",
+	"4~415203": "",
+	"4~418717": "", // The Eighth Sermon
+	"4~432773": "John.20.19-John.20.20",
+	"4~446025": "Matt.22.37-Matt.22.39",
+	"4~461996": "Matt.27",               // Coburg 1530
+	"4~490188": "2Cor.3.4-2Cor.3.6",     // Twelfth Sunday after Trinity 1531
+	"4~506182": "John.14.23-John.14.31", // Castle Pleissenburg 1539
+	"4~527128": "Luke.2.15-Luke.2.20",
+	"2~599113": "", // Rogation Days 1519
+}
+
+func TestLutherVolume4SermonsAreIndexedWithTheirIntroductionsText(t *testing.T) {
+	const slug = "the-annotated-luther-volume-4-pastoral-writings"
+	inputs := readFile(t, filepath.Join("../../data/logos-index", slug+"-sermons.jsonl"))
+	if len(inputs) != len(luther4Texts) {
+		t.Errorf("%d lines, want %d", len(inputs), len(luther4Texts))
+	}
+	rows, rep := BuildSource([]File{{Name: slug, Inputs: inputs}}, false)
+	if len(rep.Dropped) != 0 {
+		t.Errorf("lines dropped: %v", rep.Dropped)
+	}
+	got := map[string]*string{}
+	for _, r := range rows {
+		got[r.ID[strings.LastIndex(r.ID, ".")+1:]] = r.Ref
+	}
+	for id, want := range luther4Texts {
+		r, ok := got[strings.ReplaceAll(id, "~", "-")]
+		switch {
+		case !ok:
+			t.Errorf("%s is left out of the index", id)
+		case want == "" && r != nil:
+			t.Errorf("%s: ref %s, want none (no text is named for it)", id, *r)
+		case want != "" && (r == nil || *r != want):
+			t.Errorf("%s: ref %v, want %s", id, r, want)
+		}
+	}
+}
+
 // fletcher4Texts are the sermons of The Works of the Reverend John Fletcher,
 // Volume 4 (mw-qtu3zvz.131), each by the id of its section (the offset in
 // Logos) with the OSIS ref the importer must give it. Ten name their text in
@@ -2587,8 +2646,16 @@ func TestHiddenSermonIndexFilesImportAndPassTheChecker(t *testing.T) {
 			}
 			l, isLuther := lutherIndexFiles[slug]
 			topical := isLuther && l.Ref == ""
+			// A section of Luther volume 4 whose introduction names no text
+			// (luther4Texts holds "") is indexed with no passage too.
+			noText := func(id string) bool {
+				if want, ok := luther4Texts[id]; ok && slug == "the-annotated-luther-volume-4-pastoral-writings" {
+					return want == ""
+				}
+				return topical
+			}
 			for _, in := range inputs {
-				if !topical && (in.Ref == nil || *in.Ref == "") {
+				if !noText(in.ID) && (in.Ref == nil || *in.Ref == "") {
 					t.Errorf("%s %q carries no preaching text: it is left out and the report says why", in.ID, in.Title)
 				}
 				if in.Date != nil || in.Series != nil {
@@ -2603,7 +2670,8 @@ func TestHiddenSermonIndexFilesImportAndPassTheChecker(t *testing.T) {
 				t.Errorf("lines dropped: %v", rep.Dropped)
 			}
 			for _, r := range rows {
-				if r.Ref == nil && !topical {
+				id := strings.Replace(r.ID[strings.LastIndex(r.ID, ".")+1:], "-", "~", 1)
+				if r.Ref == nil && !noText(id) {
 					t.Errorf("row %s %q has no ref after the import: the book table refused the passage", r.ID, r.Title)
 				}
 			}
