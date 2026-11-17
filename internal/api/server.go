@@ -35,6 +35,14 @@ type Config struct {
 	Origins []string         // the origins CORS allows (ParseOrigins)
 	Log     io.Writer        // one line a request; nil writes none
 	Now     func() time.Time // the rate limiter's clock; nil is time.Now
+
+	// /v1/text (text.go): where a sermon's page is kept (empty is
+	// sermon-index/text under the user's cache directory), how it is
+	// fetched (nil is a polite https GET) and the pause between two
+	// fetches from one host (0 is DefaultTextDelay).
+	TextDir   string
+	TextFetch func(ctx context.Context, url string) ([]byte, error)
+	TextDelay time.Duration
 }
 
 // ParseOrigins reads a comma-separated list of origins, dropping blanks
@@ -54,6 +62,7 @@ type server struct {
 	db      *pgxpool.Pool
 	version string
 	errLog  *log.Logger
+	pages   *pageCache
 }
 
 // New is the API's handler: the routes inside the request log, CORS and
@@ -67,7 +76,8 @@ func New(c Config) http.Handler {
 	if logw == nil {
 		logw = io.Discard
 	}
-	s := &server{db: c.DB, version: c.Version, errLog: log.New(logw, "", 0)}
+	s := &server{db: c.DB, version: c.Version, errLog: log.New(logw, "", 0),
+		pages: newPageCache(c.TextDir, c.TextFetch, c.TextDelay)}
 
 	mux := http.NewServeMux()
 	// A "GET" pattern answers HEAD too.
@@ -77,6 +87,7 @@ func New(c Config) http.Handler {
 	mux.HandleFunc("GET /v1/sermons", s.sermons)
 	mux.HandleFunc("GET /v1/themes", s.themes)
 	mux.HandleFunc("GET /v1/search", s.search)
+	mux.HandleFunc("GET /v1/text", s.text)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, http.StatusNotFound, "not_found", "no such route: "+r.URL.Path+" (the routes are in docs/api.md)")
 	})

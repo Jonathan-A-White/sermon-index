@@ -33,4 +33,5 @@ credit = "Charles Haddon Spurgeon; the Christian Classics Ethereal Library (ccel
 homepage = "https://ccel.org/ccel/spurgeon"
 terms_url = "https://ccel.org/about/copyright.html"
 added = 2026-11-05
+text = "public-domain"
 on_by_default = false

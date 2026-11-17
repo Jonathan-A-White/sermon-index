@@ -10,7 +10,8 @@
 //
 // DATABASE_URL is a Postgres URL (postgres://user:password@host:port/db).
 // serve also reads SERMONS_ADDR (default 127.0.0.1:8790) and
-// SERMONS_ORIGINS (the origins CORS allows, comma-separated).
+// SERMONS_ORIGINS (the origins CORS allows, comma-separated) and
+// SERMONS_TEXT_DIR (where /v1/text keeps the pages it fetches).
 // A directory under root whose name begins with '_' (the template, the test
 // fixtures) is never checked or loaded by --all.
 package main
@@ -315,6 +316,7 @@ func runServe(ctx context.Context, args []string, stderr io.Writer, getenv func(
 			DB:      db,
 			Version: version,
 			Origins: api.ParseOrigins(origins),
+			TextDir: getenv("SERMONS_TEXT_DIR"),
 			Log:     stderr,
 		}),
 		ReadHeaderTimeout: 10 * time.Second,

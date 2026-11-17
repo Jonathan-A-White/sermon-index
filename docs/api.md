@@ -15,6 +15,7 @@
   - [The theme tier](#the-theme-tier)
 - [GET /v1/themes](#get-v1themes)
 - [GET /v1/search](#get-v1search)
+- [GET /v1/text](#get-v1text)
 - [Errors](#errors)
 - [Not done yet](#not-done-yet)
 
@@ -33,6 +34,7 @@ curl -s 'http://127.0.0.1:8790/v1/sermons?ref=rom.5.8'
 | --- | --- | --- |
 | `DATABASE_URL` | (required) | The Postgres URL. If the database is down when `serve` starts, it still starts, logs a warning, and answers 503 until the database answers. |
 | `SERMONS_ADDR` | `127.0.0.1:8790` | The address to listen on (`10.88.0.2:8790` on the Laptop, behind the VPS). |
+| `SERMONS_TEXT_DIR` | `sermon-index/text` under the user's cache directory (`~/.cache` on Linux) | Where `/v1/text` keeps the pages it fetches (never in the repository). |
 | `SERMONS_ORIGINS` | `https://lampas.allmymind.org,http://localhost:5173` | The origins a browser may read the API from (CORS), comma-separated. |
 
 `serve` stops cleanly on SIGINT or SIGTERM, letting requests in flight finish (up to 10 seconds).
@@ -547,6 +549,53 @@ Example (400): `GET /v1/search?q=`
 }
 ```
 
+## GET /v1/text
+
+The words of a public-domain text sermon, for a reader that reads it aloud or shows it: `GET /v1/text?id=<sermon id>`, with `source=<source id>` when two sources have a sermon of that id (an id is only unique within a source; without `source` such an id is `400` `ambiguous_id`, naming the sources).
+
+Only a source whose `source.toml` says `text = "public-domain"` is served (so far `spurgeon-ccel`; [sources.md](sources.md#sourcetoml)). The index keeps facts, not words, so the words are **fetched on demand** from the sermon's own page (its row's `url`), read, and **cached on disk** under `SERMONS_TEXT_DIR`, never in the repository: one fetch a sermon, ever, then every request is answered from the disk. A host is fetched politely: one request at a time, at least 10 seconds apart (CCEL's `Crawl-delay`), with a `User-Agent` that names this service. The first request for a sermon therefore takes a second or two, and a request that would have to wait more than 20 seconds for its turn is `503` `busy` with `Retry-After`; ask again.
+
+The answer is `{id, title, source, url, paragraphs}`: `title` is the row's, `url` the page the words were read from, and `paragraphs` the sermon in order as plain text: the preaching text's line first, then the body, and a sub-heading as a paragraph of its own. It is the sermon only: not the site's navigation, not the head block of the sermon (its number, date, preacher and place), not a note or a footnote, and no markup; character references are read (`&amp;` is `&`) and white space is single spaces. Only a page of a host that has a reader (`readers` in `internal/api/text.go`; today `ccel.org`) is served.
+
+The example's words are stand-ins: the fixtures' page is `sources/_fixtures/ccel-pages/sermons06.xxiv.html`, CCEL's markup for Spurgeon's sermon 311 with its words replaced, and the test server answers every address with it.
+
+Example: `GET /v1/text?id=1`
+
+```json
+{
+  "id": "1",
+  "title": "The Immutability of God",
+  "source": "spurgeon-20",
+  "url": "https://ccel.org/ccel/spurgeon/sermons01/sermons01.i.html",
+  "paragraphs": [
+    "“A placeholder for the preaching text.”—Job 8:7.",
+    "First paragraph of the sermon, a few plain words standing in for CCEL’s page.",
+    "Second paragraph, with an emphasis and a Job 8:7 reference & an ampersand.",
+    "Third paragraph, which ends the body."
+  ]
+}
+```
+
+Errors: `id` missing or empty is 400 `bad_id`; no sermon of that id (in that source) is 404 `not_found`; a sermon whose source is not marked public-domain text, or whose page's host has no reader, is 404 `no_text` (its `detail` says why). If the page cannot be fetched it is 502 `fetch_failed`; if CCEL answers 200 with a page that has no sermon on it (it does so for a section it does not have), 502 `no_text_in_page`. Neither failure is kept, so the next request fetches again.
+
+Example (404): `GET /v1/text?id=nosuch`
+
+```json
+{
+  "error": "not_found",
+  "detail": "no sermon has the id 'nosuch'"
+}
+```
+
+Example (400): `GET /v1/text`
+
+```json
+{
+  "error": "bad_id",
+  "detail": "id is required: a sermon's id, such as 311 (and source, when two sources have that id)"
+}
+```
+
 ## Errors
 
 Every error is `{error, detail}`: `error` a stable code a client may branch on, `detail` a sentence for a person.
@@ -557,11 +606,15 @@ Every error is `{error, detail}`: `error` a stable code a client may branch on, 
 | 400 | `bad_tier`, `bad_theme`, `bad_direct` | `tier` is not `passage`, `theme`, `passage,theme` or `theme-only`; `theme` is not `<theme source>:<topic>`; `direct` is not `only`. |
 | 400 | `bad_limit`, `bad_offset` | `limit` is not 1 to 200; `offset` is not 0 or more. |
 | 400 | `bad_query` | `q` is empty or over 200 characters. |
-| 404 | `not_found` | No such route (`/` itself is the page above). |
+| 400 | `bad_id`, `ambiguous_id` | `/v1/text`: `id` is missing; two served sources have that id and `source` is not given. |
+| 404 | `not_found` | No such route (`/` itself is the page above); `/v1/text`: no such sermon. |
+| 404 | `no_text` | `/v1/text`: the sermon's source is not public-domain text, or its page's host has no reader. |
 | 405 | `method_not_allowed` | A method other than GET, HEAD or OPTIONS; `Allow: GET, HEAD, OPTIONS`. |
 | 429 | `rate_limited` | Past the rate limit; `Retry-After` says when to try again. |
 | 500 | `internal` | A query failed while the database answers; the error is logged. |
+| 502 | `fetch_failed`, `no_text_in_page` | `/v1/text`: the sermon's page could not be fetched, or has no sermon on it. |
 | 503 | `unavailable` | The database does not answer. |
+| 503 | `busy` | `/v1/text`: the wait for the host's turn is over 20 seconds; `Retry-After` says when to ask again. |
 
 ## Not done yet
 

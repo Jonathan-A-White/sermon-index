@@ -5,7 +5,7 @@
 #
 # from https://ccel.org/ccel/spurgeon/sermons01.xml to sermons63.xml, read on
 # 2026-11-05. The index keeps facts only: a number, a title, a reference, the
-# addresses; no sentence of a sermon is written anywhere.
+# addresses; no sentence of a sermon is written in this repository (/v1/text fetches the words on demand and caches them on disk).
 #
 # What the tool counted (2026-11-05):
 #   3,539 sermon entries read; 3,543 rows and 3,531 distinct sermon numbers.
@@ -55,12 +55,19 @@ The words are public domain: Spurgeon died in 1892 and the last volume was \
 printed in 1917. What CCEL adds (its typing, markup and any introduction) is \
 under CCEL's terms above. The index keeps only a number, a title, a \
 reference, a date and the addresses of CCEL's page and Spurgeon Gems' pdf, \
-never the words or CCEL's markup, so CCEL's terms bind the pages we link to, \
-not these rows. A sermon's title and its reference are read from CCEL's \
-ThML."""
+never the words or CCEL's markup in the repository, so CCEL's terms bind the \
+pages we link to, not these rows. The words are fetched on demand: when a \
+reader asks /v1/text for a sermon the service reads CCEL's page once, politely \
+(one request at a time, at least 10 seconds apart, CCEL's Crawl-delay), \
+serves only the sermon's own paragraphs (not CCEL's introductions or special \
+contents) and caches the page on disk, not in the repository, for the \
+personal, educational or non-profit use CCEL's terms allow. A sermon's title \
+and its reference are read from CCEL's ThML."""
 
 credit = "Christian Classics Ethereal Library, Calvin University"
 homepage = "https://ccel.org/ccel/spurgeon"
 terms_url = "https://ccel.org/about/copyright.html"
 added = 2026-11-05
 on_by_default = true
+# /v1/text serves the words of these sermons (see licence_note).
+text = "public-domain"

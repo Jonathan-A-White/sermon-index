@@ -19,6 +19,7 @@ var homeRoutes = []struct{ Path, What string }{
 	{"/v1/sermons", "sermons on a passage (?ref=), most relevant first"},
 	{"/v1/themes", "topics that treat a passage (?ref=)"},
 	{"/v1/search", "sermons by words (?q=)"},
+	{"/v1/text", "the words of a public-domain text sermon (?id=)"},
 }
 
 var homeTmpl = template.Must(template.New("home").Parse(`<!doctype html>

@@ -94,14 +94,29 @@ func loadedDB(t *testing.T) *pgxpool.Pool {
 
 func newTestServer(t *testing.T, db *pgxpool.Pool) *testServer {
 	t.Helper()
+	return newTestServerWith(t, db, nil)
+}
+
+// newTestServerWith is newTestServer with the config changed by set. Unless
+// set says otherwise /v1/text reads the saved CCEL page, never the network,
+// into a cache directory of its own.
+func newTestServerWith(t *testing.T, db *pgxpool.Pool, set func(*Config)) *testServer {
+	t.Helper()
 	ts := &testServer{log: &syncBuffer{}, clock: &clock{t: time.Date(2026, 11, 5, 12, 0, 0, 0, time.UTC)}}
-	ts.h = New(Config{
-		DB:      db,
-		Version: testVersion,
-		Origins: ParseOrigins(DefaultOrigins),
-		Log:     ts.log,
-		Now:     ts.clock.now,
-	})
+	c := Config{
+		DB:        db,
+		Version:   testVersion,
+		Origins:   ParseOrigins(DefaultOrigins),
+		Log:       ts.log,
+		Now:       ts.clock.now,
+		TextFetch: newPageFetcher(t).fetch,
+		TextDir:   t.TempDir(),
+		TextDelay: time.Millisecond,
+	}
+	if set != nil {
+		set(&c)
+	}
+	ts.h = New(c)
 	return ts
 }
 
@@ -223,7 +238,7 @@ func TestDocExamples(t *testing.T) {
 			routes[path] = true
 		}
 	}
-	for _, r := range []string{"/v1/health", "/v1/sources", "/v1/sermons", "/v1/themes", "/v1/search"} {
+	for _, r := range []string{"/v1/health", "/v1/sources", "/v1/sermons", "/v1/themes", "/v1/search", "/v1/text"} {
 		if !routes[r] {
 			t.Errorf("docs/api.md has no 200 example for %s", r)
 		}
@@ -520,7 +535,7 @@ func TestBareAddressIsAPage(t *testing.T) {
 	for _, want := range []string{
 		"Sermon index",
 		"2 sources", "20 sermons",
-		"/v1/health", "/v1/sources", "/v1/sermons", "/v1/themes", "/v1/search",
+		"/v1/health", "/v1/sources", "/v1/sermons", "/v1/themes", "/v1/search", "/v1/text",
 		`href="/v1/sermons?ref=rom.5.8"`,
 		"docs/api.md",
 	} {
