@@ -79,16 +79,25 @@ const (
 	KindNotes
 	KindEpisode
 	KindSeries
+	KindSeriesIndex
 )
 
 // seriesURL is the Morning RePhil series on the church's site, which lists
 // every episode with its date and share code, twelve a View More.
 const seriesURL = "https://brookfieldfirst.org/media/series/4fmk6cd/morning-rephil"
 
+// seriesIndexURL is the church site's list of its series, fifteen to a page:
+// page n after the first is seriesIndexURL + "page/n/". Subsplash's own sermon
+// list holds only the newest 200 items, so the series pages (each lists every
+// sermon of its series, twelve a View More) are the way to the older ones.
+const seriesIndexURL = "https://brookfieldfirst.org/media/"
+
 var (
-	sermonURLRE  = regexp.MustCompile(`^https://subsplash\.com/u/brookfieldfirst/media/d/([0-9a-z]+)-([a-z0-9-]+)$`)
-	captchaWords = []string{"captcha", "verify you are human", "verify you're human", "unusual traffic", "are you a robot", "not a robot"}
-	loginWords   = []string{"sign in", "log in", "password"}
+	seriesPageRE  = regexp.MustCompile(`^https://brookfieldfirst\.org/media/series/([0-9a-z]+)/[a-z0-9-]+$`)
+	seriesIndexRE = regexp.MustCompile(`^https://brookfieldfirst\.org/media/(?:page/[0-9]+/)?$`)
+	sermonURLRE   = regexp.MustCompile(`^https://subsplash\.com/u/brookfieldfirst/media/d/([0-9a-z]+)-([a-z0-9-]+)$`)
+	captchaWords  = []string{"captcha", "verify you are human", "verify you're human", "unusual traffic", "are you a robot", "not a robot"}
+	loginWords    = []string{"sign in", "log in", "password"}
 )
 
 // CodeOf is the short-link code and slug of a sermon's address
@@ -102,10 +111,11 @@ func CodeOf(address string) (code, slug string, ok bool) {
 	return m[1], m[2], true
 }
 
-// readable is whether the tool may load the address: the sermon list or a
-// sermon's own page, and nothing else.
+// readable is whether the tool may load the address: the sermon list, a
+// sermon's own page, the church site's series index and a series' page, and
+// nothing else.
 func readable(address string) bool {
-	if address == listURL || address == seriesURL {
+	if address == listURL || address == seriesURL || seriesIndexRE.MatchString(address) || seriesPageRE.MatchString(address) {
 		return true
 	}
 	_, _, ok := CodeOf(address)
@@ -132,8 +142,17 @@ func Check(p Page, kind Kind) error {
 		}
 	}
 	if kind == KindSeries {
-		if !strings.HasPrefix(p.URL, seriesURL) {
-			return Stop{"unexpected page: " + p.URL + " is not the Morning RePhil series"}
+		if !seriesPageRE.MatchString(strings.TrimSuffix(p.URL, "/")) {
+			return Stop{"unexpected page: " + p.URL + " is not a series of the church's site"}
+		}
+		return nil
+	}
+	if kind == KindSeriesIndex {
+		if p.Status >= 400 || strings.Contains(low, "page not found") {
+			return Stop{fmt.Sprintf("unexpected page: HTTP %d, not found at %s", p.Status, p.URL)}
+		}
+		if !seriesIndexRE.MatchString(p.URL) {
+			return Stop{"unexpected page: " + p.URL + " is not the church's list of series"}
 		}
 		return nil
 	}
@@ -457,9 +476,10 @@ type SeriesItem struct {
 	Title  string
 	Date   string
 	Code   string
+	Slug   string
 }
 
-var seriesLinkRE = regexp.MustCompile(`^https://brookfieldfirst\.org/media/([0-9a-z]+)/[a-z0-9-]+$`)
+var seriesLinkRE = regexp.MustCompile(`^https://brookfieldfirst\.org/media/([0-9a-z]+)/([a-z0-9-]+)$`)
 
 // ParseSeries reads the episodes the series page shows so far, newest first.
 // Each anchor's text is the title and, on the next line, the date.
@@ -487,7 +507,7 @@ func ParseSeries(p Page) ([]SeriesItem, error) {
 			return nil, Stop{"unexpected page: an episode of " + p.URL + " has the date '" + ls[1] + "'"}
 		}
 		seen[m[1]] = true
-		it := SeriesItem{Title: ls[0], Date: t.Format(dateLayout), Code: m[1]}
+		it := SeriesItem{Title: ls[0], Date: t.Format(dateLayout), Code: m[1], Slug: m[2]}
 		if n := RephilNumber(ls[0]); n > 0 {
 			it.Number = n
 		}
@@ -497,4 +517,24 @@ func ParseSeries(p Page) ([]SeriesItem, error) {
 		return nil, Stop{"unexpected page: no episode in the series at " + p.URL}
 	}
 	return items, nil
+}
+
+// ParseSeriesIndex reads a page of the church site's list of series: the
+// address of each series it shows, in the order shown. A page with none is no
+// index.
+func ParseSeriesIndex(p Page) ([]string, error) {
+	var out []string
+	seen := map[string]bool{}
+	for _, l := range p.Links {
+		m := seriesPageRE.FindStringSubmatch(l.Href)
+		if m == nil || seen[m[1]] {
+			continue
+		}
+		seen[m[1]] = true
+		out = append(out, l.Href)
+	}
+	if len(out) == 0 {
+		return nil, Stop{"unexpected page: no series in the list at " + p.URL}
+	}
+	return out, nil
 }

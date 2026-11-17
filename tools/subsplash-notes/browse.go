@@ -37,9 +37,12 @@ type Config struct {
 	Series       string
 	EpisodePages bool
 	SeriesOnly   bool // read the series page and not the sermon list
-	Verify       int  // when over 0: compare the newest n sermons already recorded, write nothing
-	Now          func() time.Time
-	Sleep        func(time.Duration)
+	// SeriesIndex is the church site's list of its series (seriesIndexURL);
+	// empty reads none.
+	SeriesIndex string
+	Verify      int // when over 0: compare the newest n sermons already recorded, write nothing
+	Now         func() time.Time
+	Sleep       func(time.Duration)
 	// PDFText is the text of the notes PDF kept for a row, for Verify; nil
 	// leaves the notes text uncompared.
 	PDFText func(rowID string) (string, error)
@@ -98,6 +101,9 @@ type browseRun struct {
 	rephil   []RephilRow
 	seen     []Item // the list so far, newest first
 	pages    int
+	// fromSeries is how many of seen came from the series pages, after the
+	// list's own.
+	fromSeries int
 }
 
 // Browse walks the list newest to oldest through b and, for each sermon not
@@ -189,12 +195,160 @@ func (r *browseRun) walk(ctx context.Context) error {
 	if r.cfg.Verify > 0 {
 		return nil
 	}
+	if err := r.sweepSeries(ctx); err != nil {
+		return err
+	}
 	if r.cfg.EpisodePages {
 		if err := r.pendingEpisodes(ctx, pending); err != nil {
 			return err
 		}
 	}
 	return r.series(ctx)
+}
+
+// ---- the series pages: the sermons older than the list holds
+
+// atLimit is whether the run has visited as many pages as it was given.
+func (r *browseRun) atLimit() bool {
+	return r.cfg.Limit > 0 && r.res.Visited >= r.cfg.Limit
+}
+
+// sweepSeries reads the sermons the sermon list does not show. Subsplash's list
+// holds only the newest 200 items, so after it the church site's series index
+// is read, and each series' page (View More pressed until it shows all of its
+// sermons); every sermon of them not already seen is read as one of the list
+// is. Morning RePhil has its own pass and is left out here.
+func (r *browseRun) sweepSeries(ctx context.Context) error {
+	if r.cfg.SeriesIndex == "" || r.atLimit() {
+		return nil
+	}
+	urls, err := r.seriesList(ctx)
+	if err != nil {
+		return err
+	}
+	have := map[string]bool{}
+	for _, it := range r.seen {
+		have[it.Code] = true
+	}
+	for a := range r.links {
+		if code, _, ok := CodeOf(a); ok {
+			have[code] = true
+		}
+	}
+	for _, u := range urls {
+		if r.atLimit() {
+			r.say("stopped at the limit of %d pages visited; the next run goes on from here", r.cfg.Limit)
+			return nil
+		}
+		if u == r.cfg.Series || strings.HasPrefix(u, seriesURL) {
+			continue
+		}
+		items, err := r.seriesItems(ctx, u)
+		if err != nil {
+			return err
+		}
+		for _, si := range items {
+			if have[si.Code] || RephilNumber(si.Title) != 0 {
+				continue
+			}
+			if r.atLimit() {
+				r.say("stopped at the limit of %d pages visited; the next run goes on from here", r.cfg.Limit)
+				return nil
+			}
+			have[si.Code] = true
+			it := Item{Title: si.Title, Code: si.Code, Slug: si.Slug}
+			r.seen = append(r.seen, it)
+			r.fromSeries++
+			if err := r.sermon(ctx, it); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// seriesList reads the series index's pages, 15 series to a page, and gives
+// the address of every series.
+func (r *browseRun) seriesList(ctx context.Context) ([]string, error) {
+	var urls []string
+	seen := map[string]bool{}
+	add := func(p Page) (int, error) {
+		if err := Check(p, KindSeriesIndex); err != nil {
+			return 0, err
+		}
+		got, err := ParseSeriesIndex(p)
+		if err != nil {
+			return 0, err
+		}
+		for _, u := range got {
+			if !seen[u] {
+				seen[u] = true
+				urls = append(urls, u)
+			}
+		}
+		return len(got), nil
+	}
+	p, err := r.pb.Open(ctx, r.cfg.SeriesIndex)
+	if err != nil {
+		return nil, err
+	}
+	per, err := add(p)
+	if err != nil {
+		return nil, err
+	}
+	// The count of series and the number on the first page give the pages; a
+	// page that gives no count would end the sweep silently at the first page.
+	if p.Total == 0 {
+		return nil, Stop{"unexpected page: no count of series at " + p.URL}
+	}
+	pages := 1
+	if p.Total > per {
+		pages = (p.Total + per - 1) / per
+	}
+	const mostPages = 40 // a guard against a count gone wrong
+	if pages > mostPages {
+		return nil, Stop{fmt.Sprintf("unexpected page: the series index claims %d pages at %s", pages, p.URL)}
+	}
+	for n := 2; n <= pages; n++ {
+		if p, err = r.pb.Open(ctx, fmt.Sprintf("%spage/%d/", r.cfg.SeriesIndex, n)); err != nil {
+			return nil, err
+		}
+		if _, err := add(p); err != nil {
+			return nil, err
+		}
+	}
+	return urls, nil
+}
+
+// seriesItems reads a series' page and presses View More until it shows every
+// sermon, and gives them, newest first. The sermons are read after, since each
+// takes the tab away from the series page.
+func (r *browseRun) seriesItems(ctx context.Context, address string) ([]SeriesItem, error) {
+	p, err := r.pb.Open(ctx, address)
+	if err != nil {
+		return nil, err
+	}
+	for {
+		if err := Check(p, KindSeries); err != nil {
+			return nil, err
+		}
+		items, err := ParseSeries(p)
+		if err != nil {
+			return nil, err
+		}
+		if !p.More || (p.Total > 0 && len(items) >= p.Total) {
+			return items, nil
+		}
+		if p, err = r.pb.More(ctx); err != nil {
+			return nil, err
+		}
+		if err := Check(p, KindSeries); err != nil {
+			return nil, err
+		}
+		if now, err := ParseSeries(p); err == nil && len(now) <= len(items) {
+			return nil, Stop{"unexpected page: View More added no sermon at " + p.URL}
+		}
+	}
 }
 
 func (r *browseRun) pendingEpisodes(ctx context.Context, pending []Item) error {
@@ -688,6 +842,9 @@ func (r *browseRun) writeFeed() error {
 		f.Here = &here
 	}
 	f.Note = fmt.Sprintf("%d of %d list pages walked, %d recorded, %d sermon links, %d episodes", r.pageNo(), r.pages, r.res.Recorded, r.res.Linked, r.res.Episodes)
+	if r.fromSeries > 0 {
+		f.Note += fmt.Sprintf(", %d sermons from the series pages", r.fromSeries)
+	}
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
 	enc.SetEscapeHTML(false)
@@ -698,7 +855,7 @@ func (r *browseRun) writeFeed() error {
 }
 
 func (r *browseRun) pageNo() int {
-	n := (len(r.seen) + 19) / 20
+	n := (len(r.seen) - r.fromSeries + 19) / 20
 	if n < 1 {
 		n = 1
 	}

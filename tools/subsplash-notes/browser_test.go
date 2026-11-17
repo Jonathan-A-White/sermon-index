@@ -186,6 +186,10 @@ type fakeBrowser struct {
 	fail   Page
 	series []Page // the series page, then after each View More
 	more   int
+	// moreBy holds, for any other series page by its address, the pages after
+	// each View More there (the first is what Open gives).
+	moreBy map[string][]Page
+	moreAt map[string]int
 }
 
 func (f *fakeBrowser) note(what string) {
@@ -205,6 +209,10 @@ func (f *fakeBrowser) Open(_ context.Context, url string) (Page, error) {
 	if url == seriesURL {
 		return f.series[0], nil
 	}
+	if q, ok := f.moreBy[url]; ok {
+		f.moreAt[url] = 0
+		return q[0], nil
+	}
 	p, ok := f.pages[url]
 	if !ok {
 		return Page{URL: url, Status: 200, Text: "Page not found\nLogged in as x\n"}, nil
@@ -219,6 +227,10 @@ func (f *fakeBrowser) OpenNotes(context.Context) (Page, error) {
 
 func (f *fakeBrowser) More(context.Context) (Page, error) {
 	f.note("more")
+	if q, ok := f.moreBy[f.cur]; ok {
+		f.moreAt[f.cur]++
+		return q[f.moreAt[f.cur]], nil
+	}
 	f.more++
 	return f.series[f.more], nil
 }
@@ -229,7 +241,7 @@ func (f *fakeBrowser) ListPage(_ context.Context, n int) (Page, error) {
 }
 
 func newFake() *fakeBrowser {
-	return &fakeBrowser{clk: &clock{now: time.Date(2026, 11, 16, 12, 0, 0, 0, time.UTC)}, pages: map[string]Page{}, notes: map[string]Page{}}
+	return &fakeBrowser{clk: &clock{now: time.Date(2026, 11, 16, 12, 0, 0, 0, time.UTC)}, pages: map[string]Page{}, notes: map[string]Page{}, moreBy: map[string][]Page{}, moreAt: map[string]int{}}
 }
 
 func TestPacedNeverUnderTenSeconds(t *testing.T) {
@@ -634,7 +646,7 @@ func TestParseSeries(t *testing.T) {
 	if err != nil || len(items) != 2 {
 		t.Fatalf("%v %v", items, err)
 	}
-	if items[0] != (SeriesItem{Number: 3, Title: "Morning RePhil #3", Date: "2026-11-13", Code: "ccccccc"}) || items[1].Number != 0 || items[1].Date != "2026-11-09" {
+	if items[0] != (SeriesItem{Number: 3, Title: "Morning RePhil #3", Date: "2026-11-13", Code: "ccccccc", Slug: "morning-rephil-3"}) || items[1].Number != 0 || items[1].Date != "2026-11-09" {
 		t.Errorf("items %+v", items)
 	}
 	more, err := ParseSeries(Page{URL: seriesURL, Links: []Link{{Text: "Morning RePhil #4\nJun 15, 2025\u00a0 \u2022 Pastor Example", Href: "https://brookfieldfirst.org/media/ddddddd/x"}}})

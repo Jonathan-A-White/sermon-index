@@ -8,7 +8,7 @@
 //	subsplash-notes address [--key <file>] [--postern <url>]
 //	subsplash-notes fetch [--key <file>] [--postern <url>] [--since n] [--rows rows.jsonl] [--out records.jsonl] [--notes <dir>]
 //	subsplash-notes forward-confirm [--key <file>] [--postern <url>]
-//	subsplash-notes browse [--cdp <url>] [--rows rows.jsonl] [--out records.jsonl] [--notes <dir>] [--links-out <file>] [--rephil <file>] [--feed <file>] [--pace 10s] [--limit n] [--verify n] [--series <url>] [--series-only] [--episode-pages]
+//	subsplash-notes browse [--cdp <url>] [--rows rows.jsonl] [--out records.jsonl] [--notes <dir>] [--links-out <file>] [--rephil <file>] [--feed <file>] [--pace 10s] [--limit n] [--verify n] [--series <url>] [--series-index <url>] [--series-only] [--episode-pages]
 //	subsplash-notes [--alerts <file>|-] [--rows rows.jsonl] [--out records.jsonl]
 //
 // keygen makes the family's key once, at ~/.config/sermon-index/postern-alerts.key
@@ -317,9 +317,10 @@ func browseCmd(args []string, stdout, stderr io.Writer) int {
 	limit := fs.Int("limit", 0, "the most sermon and episode pages to read (0: all)")
 	verify := fs.Int("verify", 0, "compare the newest n sermons already recorded by mail, writing nothing")
 	series := fs.String("series", seriesURL, "the Morning RePhil series page to read for every episode ('' for none)")
+	seriesIndex := fs.String("series-index", seriesIndexURL, "the church site's list of series, whose pages hold the sermons older than the sermon list's newest 200 ('' for none)")
 	seriesOnly := fs.Bool("series-only", false, "read the series page and not the sermon list")
 	episodePages := fs.Bool("episode-pages", false, "also load each new episode's own page, to keep any text it carries")
-	if !parse(fs, args, stderr, "subsplash-notes browse [--cdp <url>] [--rows rows.jsonl] [--out records.jsonl] [--notes <dir>] [--links-out <file>] [--rephil <file>] [--feed <file>] [--pace 10s] [--limit n] [--verify n] [--series <url>] [--series-only] [--episode-pages]") {
+	if !parse(fs, args, stderr, "subsplash-notes browse [--cdp <url>] [--rows rows.jsonl] [--out records.jsonl] [--notes <dir>] [--links-out <file>] [--rephil <file>] [--feed <file>] [--pace 10s] [--limit n] [--verify n] [--series <url>] [--series-index <url>] [--series-only] [--episode-pages]") {
 		return 2
 	}
 	rows, err := readRows(*rowsPath)
@@ -333,7 +334,7 @@ func browseCmd(args []string, stdout, stderr io.Writer) int {
 	defer b.Close()
 	notes := *notesDir
 	cfg := Config{Rows: rows, Out: *out, NotesDir: notes, LinksOut: *linksOut, Rephil: *rephil, Feed: *feed,
-		Interval: *pace, Limit: *limit, Verify: *verify, Series: *series, SeriesOnly: *seriesOnly, EpisodePages: *episodePages, PDFText: func(id string) (string, error) { return pdfText(filepath.Join(notes, id+".pdf")) }}
+		Interval: *pace, Limit: *limit, Verify: *verify, Series: *series, SeriesIndex: *seriesIndex, SeriesOnly: *seriesOnly, EpisodePages: *episodePages, PDFText: func(id string) (string, error) { return pdfText(filepath.Join(notes, id+".pdf")) }}
 	res, err := Browse(context.Background(), b, cfg, stdout)
 	fmt.Fprintf(stdout, "%d page loads, %d sermon and episode pages read; %d recorded, %d sermon links, %d episodes", res.Loads, res.Visited, res.Recorded, res.Linked, res.Episodes)
 	if *verify > 0 {
