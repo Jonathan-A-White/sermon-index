@@ -12,6 +12,10 @@
 # The link (https://ref.ly/logosres/LLS:ANNOTLUTV1?off=<offset>) opens the book at the
 # sermon in Logos for an owner of the book and for no one else. It is UNVERIFIED: no
 # one has tapped one yet.
+#
+# Each row's `topics` (mw-qtu3zvz.198) were added by hand, short subject labels read from the
+# book's own introduction to the sermon; logos-import does not write them, so re-making
+# rows.jsonl with the command above must be followed by putting them back.
 
 id = "luther-annotated-1-logos"
 name = "Martin Luther's topical sermons in The Annotated Luther, Volume 1 (his Logos library)"
