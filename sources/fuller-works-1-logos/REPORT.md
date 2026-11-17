@@ -7,12 +7,12 @@ Written by `go run ./tools/logos-import --in <vault>/plans/sermons-2026-11-05/th
 ## Counts
 
 ```
-lines read:                          84
-rows written:                        84
+lines read:                          92
+rows written:                        92
 lines dropped:                       0
-rows with a ref:                     84
-  of them read from the label:       84
-  of them with cited references:     55
+rows with a ref:                     92
+  of them read from the label:       92
+  of them with cited references:     58
 rows with no ref:                    0
 series rows (ref over >3 chapters):  0
 rows with their own date:            0
