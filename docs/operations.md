@@ -70,7 +70,7 @@ The order is kept so nothing is lost: **the PDF on disk, then the records file i
 
 1. `mw browser open https://subsplash.com/brookfieldfirst/media` and sign in himself over VNC (the tool types no password and keeps no session; `mw browser close` deletes the session). `mw browser status` prints the DevTools address (`http://127.0.0.1:9222`, which is `--cdp`'s default; only an address on this machine is taken).
 2. From `~/sermon-index`: `go run ./tools/subsplash-notes browse`. It needs `pdftotext` only for `--verify`.
-3. Then `go run ./tools/subsplash-links --links data/subsplash-browser-links.txt`, which files the addresses on their rows with no request at all (the address is in the file already, so there is nothing to look up). The hourly script does not read that file yet.
+3. Then `go run ./tools/subsplash-links --links data/subsplash-browser-links.txt`, which files the addresses on their rows with no request at all (the address is in the file already, so there is nothing to look up). The hourly script reads that file too (SUBSPLASH_BROWSER_LINKS names another), so this step is only needed between hourly runs.
 
 **What it reads.** One tab, one page load at a time, at least 10 s between two loads (`--pace` cannot go lower): the sermon list (`https://subsplash.com/brookfieldfirst/media`, then its pages 2 to the last, `?page=n`, the address its pager gives them), each sermon's page (`/u/brookfieldfirst/media/d/<code>-<slug>`), its notes (the Notes button's page) and each Morning RePhil episode's page. An address that is none of those is refused before it is loaded. The share link is the short link its code makes (`https://brookfieldfirst.subspla.sh/<code>`): the code is in the sermon's address, so the Share button is never pressed.
 

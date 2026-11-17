@@ -158,7 +158,7 @@ func newHourlyRig(t *testing.T) *hourlyRig {
 	for rel, body := range map[string]string{
 		"sources/brookfield-first/rows.jsonl":   hourlyRows,
 		"sources/brookfield-first/passages.tsv": "series\tdate\ttitle\tspeaker\tpassage\trow\n",
-		".gitignore":                            "data/subsplash-links-cache.jsonl\ndata/subsplash-notes.jsonl\n",
+		".gitignore":                            "data/subsplash-links-cache.jsonl\ndata/subsplash-notes.jsonl\ndata/subsplash-browser-links.txt\n",
 	} {
 		if err := os.WriteFile(filepath.Join(r.clone, rel), []byte(body), 0o644); err != nil {
 			t.Fatal(err)
@@ -970,5 +970,30 @@ func TestHourlyPutsANotesRecordsTitleAndPassageOnItsRow(t *testing.T) {
 	commits := h.commits()
 	if out, code = h.run("scripts/subsplash-hourly.sh", "FAKE_NOTES_RECORDS="+records); code != 0 || h.commits() != commits {
 		t.Errorf("second run exit %d, commits %s -> %s:\n%s", code, commits, h.commits(), out)
+	}
+}
+
+// The addresses `subsplash-notes browse` keeps in data/subsplash-browser-links.txt
+// (git-ignored, full addresses, no short link in any message) are filed on
+// their rows by the hourly run, beside the links in the inbox.
+func TestHourlyFilesTheBrowserLinksOnTheirRows(t *testing.T) {
+	h := newHourlyRig(t)
+	// v5 ("God's Quiet Work") has no message in the inbox, only the browser's file.
+	file := filepath.Join(h.clone, "data/subsplash-browser-links.txt")
+	if err := os.WriteFile(file, []byte("https://subsplash.com/u/brookfieldfirst/media/d/ccc3333-gods-quiet-work\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out, code := h.hourly()
+	if code != 0 {
+		t.Fatalf("exit %d:\n%s", code, out)
+	}
+	if h.altURLs() != 3 {
+		t.Errorf("%d rows hold an alt_url, want 3 (v1, v2 and v5 by the browser's file):\n%s", h.altURLs(), h.file("sources/brookfield-first/rows.jsonl"))
+	}
+	if !strings.Contains(h.file("sources/brookfield-first/rows.jsonl"), `"alt_url":"https://subsplash.com/u/brookfieldfirst/media/d/ccc3333-gods-quiet-work"`) {
+		t.Errorf("v5 has no alt_url from the browser's file:\n%s", h.file("sources/brookfield-first/rows.jsonl"))
+	}
+	if st := git(t, h.clone, "status", "--porcelain"); st != "" {
+		t.Errorf("the tree is not clean:\n%s", st)
 	}
 }

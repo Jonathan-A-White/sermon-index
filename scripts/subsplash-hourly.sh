@@ -43,7 +43,8 @@
 #   3. the link list: every https://brookfieldfirst.subspla.sh/<code> in the
 #      Postern inbox's messages ($POSTERN_INBOX, default ~/.local/state/mw/
 #      postern/inbox), in a temporary file outside the checkout, and every
-#      search PDF in the inbox that pdftohtml can read;
+#      search PDF in the inbox that pdftohtml can read, and the full addresses
+#      in data/subsplash-browser-links.txt (subsplash-notes browse's, git-ignored);
 #   4. subsplash-links over those and the records, which writes each row's
 #      alt_url (one HEAD per short link it has never seen, the cache keeps the
 #      rest) and appends one line to $SERMON_INDEX_HOME/.local/state/sermon-index/
@@ -162,6 +163,14 @@ if [ -d "$INBOX" ]; then
 		grep -o 'brookfieldfirst\.subspla\.sh/[A-Za-z0-9]*' | sort -u | sed 's|^|https://|' > "$TMP/links.txt" || true
 fi
 say "$(wc -l < "$TMP/links.txt" | tr -d ' ') shared links in $INBOX"
+# The full addresses `subsplash-notes browse` keeps (git-ignored): the same
+# list, so each is filed on its row with no request (the address is in it).
+BROWSER_LINKS=${SUBSPLASH_BROWSER_LINKS:-data/subsplash-browser-links.txt}
+if [ -s "$BROWSER_LINKS" ]; then
+	cat "$BROWSER_LINKS" >> "$TMP/links.txt"
+	echo >> "$TMP/links.txt"
+	say "$(grep -c . "$BROWSER_LINKS") addresses in $BROWSER_LINKS"
+fi
 set -- --links "$TMP/links.txt" --progress "$PROGRESS"
 if [ -d "$INBOX" ] && command -v pdftohtml >/dev/null 2>&1; then
 	for f in "$INBOX"/*.pdf; do
