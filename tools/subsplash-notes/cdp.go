@@ -379,8 +379,10 @@ func firstLine(s string) string {
 
 // settled waits for the page to be loaded and its text to stop changing (the
 // pages are single-page apps that fill in after the load), looking at it
-// every Poll for at most Settle. These looks load nothing.
-func (c *CDP) settled(w *wsConn, notSame, urlPrefix string) (snap, error) {
+// every Poll for at most Settle. These looks load nothing. A sermon page
+// (wantNotes) is not taken to have no Notes button until Grace has passed: the
+// button can render after the text has held still.
+func (c *CDP) settled(w *wsConn, notSame, urlPrefix string, wantNotes bool) (snap, error) {
 	deadline := time.Now().Add(c.Settle)
 	var prev snap
 	stable := 0
@@ -395,6 +397,9 @@ func (c *CDP) settled(w *wsConn, notSame, urlPrefix string) (snap, error) {
 		// The app can show "Page not found" for a moment before its data
 		// arrives: a page that says so is given a while to change.
 		young := strings.Contains(strings.ToLower(s.Text), "page not found") && time.Until(deadline) > c.Settle-c.Grace
+		if wantNotes && !s.Notes && time.Until(deadline) > c.Settle-c.Grace {
+			young = true
+		}
 		if !young && s.Ready == "complete" && s.Text != "" && s.Text != notSame && strings.HasPrefix(s.URL, urlPrefix) && s.Text == prev.Text {
 			stable++
 			if stable >= 2 {
@@ -409,6 +414,11 @@ func (c *CDP) settled(w *wsConn, notSame, urlPrefix string) (snap, error) {
 		}
 		time.Sleep(c.Poll)
 	}
+}
+
+func isSermonAddress(address string) bool {
+	_, _, ok := CodeOf(address)
+	return ok
 }
 
 func (c *CDP) page(s snap, status int) Page {
@@ -448,7 +458,7 @@ func (c *CDP) Open(_ context.Context, address string) (Page, error) {
 		return Page{}, fmt.Errorf("the browser could not load %s: %s", address, nav.ErrorText)
 	}
 	// Until the tab is on the address, what it shows is the page before.
-	s, err := c.settled(c.ws, "", address)
+	s, err := c.settled(c.ws, "", address, isSermonAddress(address))
 	if err != nil {
 		return Page{}, err
 	}
@@ -490,7 +500,7 @@ func (c *CDP) OpenNotes(_ context.Context) (Page, error) {
 				if err != nil {
 					return Page{}, err
 				}
-				s, err := c.settled(w, "", "https://notes.subsplash.com/")
+				s, err := c.settled(w, "", "https://notes.subsplash.com/", false)
 				w.Close()
 				if resp, herr := c.http.Get(c.Endpoint + "/json/close/" + t.ID); herr == nil {
 					resp.Body.Close()
@@ -502,7 +512,7 @@ func (c *CDP) OpenNotes(_ context.Context) (Page, error) {
 			}
 		}
 		if s, err := c.snapshot(c.ws); err == nil && s.URL != here && strings.HasPrefix(s.URL, "https://notes.subsplash.com/") {
-			s, err = c.settled(c.ws, "", "https://notes.subsplash.com/")
+			s, err = c.settled(c.ws, "", "https://notes.subsplash.com/", false)
 			if err != nil {
 				return Page{}, err
 			}
@@ -556,7 +566,7 @@ func (c *CDP) More(_ context.Context) (Page, error) {
 	if err := c.press(`document.querySelector('#view-more-button')`); err != nil {
 		return Page{}, err
 	}
-	s, err := c.settled(c.ws, prev.Text, "")
+	s, err := c.settled(c.ws, prev.Text, "", false)
 	if err != nil {
 		return Page{}, err
 	}
@@ -565,7 +575,7 @@ func (c *CDP) More(_ context.Context) (Page, error) {
 		if _, err := c.eval(c.ws, `(() => { const e = document.querySelector('#view-more-button'); if (e) e.click(); return "" })()`); err != nil {
 			return Page{}, err
 		}
-		if s, err = c.settled(c.ws, prev.Text, ""); err != nil {
+		if s, err = c.settled(c.ws, prev.Text, "", false); err != nil {
 			return Page{}, err
 		}
 	}

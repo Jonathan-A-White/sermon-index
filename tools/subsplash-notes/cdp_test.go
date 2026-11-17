@@ -21,10 +21,15 @@ import (
 // WebSocket answers the few commands CDP sends. status is the HTTP status it
 // reports for the document it "loads".
 type fakeChromium struct {
-	srv      *httptest.Server
-	status   int
-	page     string // the snapshot JSON the page evaluates to
-	commands []string
+	srv    *httptest.Server
+	status int
+	page   string // the snapshot JSON the page evaluates to
+	// late, when set, is what the page evaluates to from the lateAfter-th
+	// evaluation since the last navigation on: a page that fills in slowly.
+	late      string
+	lateAfter int
+	looks     int
+	commands  []string
 }
 
 func (f *fakeChromium) start(t *testing.T) {
@@ -54,10 +59,16 @@ func (f *fakeChromium) start(t *testing.T) {
 			reply := fmt.Sprintf(`{"id":%d,"result":{}}`, req.ID)
 			switch req.Method {
 			case "Page.navigate":
+				f.looks = 0
 				// An event first, as Chromium does, then the reply.
 				writeServerFrame(conn, fmt.Sprintf(`{"method":"Network.responseReceived","params":{"type":"Document","response":{"url":"https://subsplash.com/brookfieldfirst/media","status":%d}}}`, f.status))
 			case "Runtime.evaluate":
-				v, _ := json.Marshal(f.page)
+				f.looks++
+				page := f.page
+				if f.late != "" && f.looks > f.lateAfter {
+					page = f.late
+				}
+				v, _ := json.Marshal(page)
 				reply = fmt.Sprintf(`{"id":%d,"result":{"result":{"type":"string","value":%s}}}`, req.ID, v)
 			}
 			writeServerFrame(conn, reply)
@@ -152,6 +163,49 @@ func TestCDPOpenReadsThePageAndItsStatus(t *testing.T) {
 	}
 	if err := Check(p, KindList); err == nil {
 		t.Error("a 429 did not stop")
+	}
+}
+
+// A sermon page whose text has held still but whose Notes button renders a
+// moment later is still given its button: a page with no button is waited for
+// a while (Grace) before it is taken to have none.
+func TestCDPSermonNotesLate(t *testing.T) {
+	const addr = "https://subsplash.com/u/brookfieldfirst/media/d/3nxf2bb-unfinished-business"
+	page := func(notes bool) string {
+		return `{"url":"` + addr + `","title":"Unfinished Business","ready":"complete","text":"Unfinished Business\nNov 8, 2026","account":true,"notes":` + fmt.Sprint(notes) + `}`
+	}
+	f := &fakeChromium{status: 200, page: page(false), late: page(true), lateAfter: 6}
+	f.start(t)
+	c, err := NewCDP(f.srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	c.Poll, c.Settle, c.Grace = 5*time.Millisecond, 5*time.Second, 400*time.Millisecond
+	p, err := c.Open(context.Background(), addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !p.HasNotes {
+		t.Errorf("the Notes button rendered after the text held still and was missed (%d looks)", f.looks)
+	}
+
+	// A sermon that has no button at all is still given up on, after the wait.
+	f = &fakeChromium{status: 200, page: page(false)}
+	f.start(t)
+	c2, err := NewCDP(f.srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c2.Close()
+	c2.Poll, c2.Settle, c2.Grace = 5*time.Millisecond, 5*time.Second, 400*time.Millisecond
+	start := time.Now()
+	p, err = c2.Open(context.Background(), addr)
+	if err != nil || p.HasNotes {
+		t.Fatalf("a sermon with no button: %v, HasNotes %v", err, p.HasNotes)
+	}
+	if time.Since(start) > 4*time.Second {
+		t.Errorf("a page with no button was waited for %v", time.Since(start))
 	}
 }
 
