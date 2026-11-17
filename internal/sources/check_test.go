@@ -145,6 +145,22 @@ func TestByKey(t *testing.T) {
 	expectFault(t, with("by = \"  \"\n"), "source.toml: by is empty: leave it out instead")
 }
 
+func TestTextKey(t *testing.T) {
+	with := func(text string) map[string]string {
+		return map[string]string{"source.toml": goodToml + text, "rows.jsonl": goodRow}
+	}
+	d, fs := Read(writeSource(t, with("text = \"public-domain\"\n")))
+	if len(fs) != 0 || d.Source.Text != TextPublicDomain {
+		t.Errorf("read: %q %+v", faultStrings(fs), d.Source)
+	}
+	d, _ = Read(writeSource(t, map[string]string{"source.toml": goodToml, "rows.jsonl": goodRow}))
+	if d.Source.Text != "" {
+		t.Errorf("no text: %+v", d.Source)
+	}
+	expectFault(t, with("text = \"\"\n"), "source.toml: text '' is not 'public-domain': leave it out for a source whose words are not served")
+	expectFault(t, with("text = \"copyright\"\n"), "source.toml: text 'copyright' is not 'public-domain': leave it out for a source whose words are not served")
+}
+
 func TestLanguageKey(t *testing.T) {
 	with := func(lang string) map[string]string {
 		return map[string]string{"source.toml": goodToml + lang, "rows.jsonl": goodRow}

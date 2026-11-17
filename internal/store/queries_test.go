@@ -862,3 +862,36 @@ func TestThemeSermonsDirectPassageRowAndThemeCounts(t *testing.T) {
 		}
 	}
 }
+
+// A source's `text` is stored and found with its sermons by TextSermons; a
+// source without one is found but not served.
+func TestTextSermonsKnowWhichSourcesServeText(t *testing.T) {
+	ctx := context.Background()
+	open := sermonSource(t, "open", `{"id": "1", "title": "One", "url": "https://example.org/1"}`)
+	b, err := os.ReadFile(filepath.Join(open, "source.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(open, "source.toml"), append(b, []byte("text = \"public-domain\"\n")...), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	closed := sermonSource(t, "closed", `{"id": "1", "title": "Two", "url": "https://example.org/2"}`)
+	db := loaded(t, open, closed)
+	got, err := store.TextSermons(ctx, db, "1", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []store.TextSermon{
+		{Source: "closed", ID: "1", Title: "Two", URL: "https://example.org/2", Text: false},
+		{Source: "open", ID: "1", Title: "One", URL: "https://example.org/1", Text: true},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("TextSermons: %+v", got)
+	}
+	if got, _ := store.TextSermons(ctx, db, "1", "open"); len(got) != 1 || got[0].Source != "open" {
+		t.Errorf("in one source: %+v", got)
+	}
+	if got, _ := store.TextSermons(ctx, db, "9", ""); len(got) != 0 {
+		t.Errorf("no such id: %+v", got)
+	}
+}

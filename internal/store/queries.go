@@ -458,3 +458,34 @@ func Search(ctx context.Context, db *pgxpool.Pool, q string) ([]Hit, error) {
 // Verses counts the verses from the ordinal lo to the ordinal hi, both
 // inclusive (passage.Verses).
 func Verses(lo, hi int) int { return passage.Verses(lo, hi) }
+
+// TextSermon is a sermon found for /v1/text: its key, its title and url,
+// and whether its source serves public-domain text (source.toml `text`).
+type TextSermon struct {
+	Source string
+	ID     string
+	Title  string
+	URL    string
+	Text   bool
+}
+
+// TextSermons finds the sermons with this id, in one source when source is
+// not empty, else in every sermon source (ids are only unique within a
+// source), by source id.
+func TextSermons(ctx context.Context, db *pgxpool.Pool, id, source string) ([]TextSermon, error) {
+	rows, err := db.Query(ctx, `
+		SELECT m.source_id, m.id, m.title, m.url, s.text = 'public-domain'
+		FROM sermons m JOIN sources s ON s.id = m.source_id
+		WHERE m.id = $1 AND ($2 = '' OR m.source_id = $2)
+		ORDER BY m.source_id`, id, source)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (TextSermon, error) {
+		var t TextSermon
+		var ok *bool
+		err := r.Scan(&t.Source, &t.ID, &t.Title, &t.URL, &ok)
+		t.Text = ok != nil && *ok
+		return t, err
+	})
+}

@@ -34,7 +34,7 @@ func TestUpAppliesOnceAndASecondRunIsANoOp(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(pending, []string{"0001_init", "0002_search", "0003_theme_verses", "0004_source_language", "0005_sermon_topics", "0006_source_by"}) {
+	if !reflect.DeepEqual(pending, []string{"0001_init", "0002_search", "0003_theme_verses", "0004_source_language", "0005_sermon_topics", "0006_source_by", "0007_source_text"}) {
 		t.Errorf("pending before = %v", pending)
 	}
 
@@ -42,7 +42,7 @@ func TestUpAppliesOnceAndASecondRunIsANoOp(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(applied, []string{"0001_init", "0002_search", "0003_theme_verses", "0004_source_language", "0005_sermon_topics", "0006_source_by"}) {
+	if !reflect.DeepEqual(applied, []string{"0001_init", "0002_search", "0003_theme_verses", "0004_source_language", "0005_sermon_topics", "0006_source_by", "0007_source_text"}) {
 		t.Errorf("first Up applied %v", applied)
 	}
 	again, err := Up(ctx, db)
@@ -56,8 +56,8 @@ func TestUpAppliesOnceAndASecondRunIsANoOp(t *testing.T) {
 	if err := db.QueryRow(ctx, "select count(*) from schema_migrations").Scan(&n); err != nil {
 		t.Fatal(err)
 	}
-	if n != 6 {
-		t.Errorf("schema_migrations has %d rows, want 6", n)
+	if n != 7 {
+		t.Errorf("schema_migrations has %d rows, want 7", n)
 	}
 	pending, err = Pending(ctx, db)
 	if err != nil {
@@ -237,7 +237,7 @@ func TestSermonTopicsMigrationKeepsLoadedRows(t *testing.T) {
 		t.Fatal(err)
 	}
 	applied, err := Up(ctx, db)
-	if err != nil || !reflect.DeepEqual(applied, []string{"0005_sermon_topics", "0006_source_by"}) {
+	if err != nil || !reflect.DeepEqual(applied, []string{"0005_sermon_topics", "0006_source_by", "0007_source_text"}) {
 		t.Fatalf("Up over 0004: %v %v", applied, err)
 	}
 	var n int
@@ -274,7 +274,7 @@ func TestSourceByMigrationKeepsLoadedSources(t *testing.T) {
 		t.Fatal(err)
 	}
 	applied, err := Up(ctx, db)
-	if err != nil || !reflect.DeepEqual(applied, []string{"0006_source_by"}) {
+	if err != nil || !reflect.DeepEqual(applied, []string{"0006_source_by", "0007_source_text"}) {
 		t.Fatalf("Up over 0005: %v %v", applied, err)
 	}
 	var by *string

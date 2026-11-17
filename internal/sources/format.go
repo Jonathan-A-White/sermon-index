@@ -62,11 +62,19 @@ type Source struct {
 	// no preacher (optional): only a source of one church's or one preacher's
 	// sermons sets it. It is never written into a row's preacher.
 	By string `toml:"by"`
+	// Text says the source's sermons are public-domain text that /v1/text
+	// may fetch from each row's url on demand and serve (optional; only
+	// TextPublicDomain is a value). A source that leaves it out never has
+	// its words served.
+	Text string `toml:"text"`
 
 	// HostRules are what `sermons check --urls` does for a host, by host
 	// name (optional): see HostRule and DefaultHostRules.
 	HostRules map[string]HostRule `toml:"host_rules"`
 }
+
+// TextPublicDomain is the one value of a source's `text`.
+const TextPublicDomain = "public-domain"
 
 // DefaultLanguage is the language of a source that does not say.
 const DefaultLanguage = "en"
@@ -237,6 +245,12 @@ func Read(dir string) (*Dir, []Fault) {
 		}
 		if md.IsDefined("by") && strings.TrimSpace(s.By) == "" {
 			add(SourceFile, 0, "by is empty: leave it out instead")
+		}
+		if md.IsDefined("text") && s.Text != TextPublicDomain {
+			add(SourceFile, 0, "text '%s' is not '%s': leave it out for a source whose words are not served", s.Text, TextPublicDomain)
+		}
+		if md.IsDefined("text") && s.Kind != KindSermons {
+			add(SourceFile, 0, "text is only for a source of sermons")
 		}
 		if md.IsDefined("licence_note") && strings.TrimSpace(s.LicenceNote) == "" {
 			add(SourceFile, 0, "licence_note is empty: leave it out instead")
