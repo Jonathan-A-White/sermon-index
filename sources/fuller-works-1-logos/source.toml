@@ -1,4 +1,4 @@
-# Andrew Fuller's sermons in the Complete Works, Volume 1, 84 rows, found inside a book the Logos library does not type as a
+# Andrew Fuller's sermons in the Complete Works, Volume 1, 92 rows, found inside a book the Logos library does not type as a
 # sermon book (mw-qtu3zvz.117), made by
 #
 #   go run ./tools/logos-import --in data/logos-index/the-complete-works-of-andrew-fuller-volume-1-memoirs-sermons-etc-sermons.jsonl --id fuller-works-1-logos --out sources/fuller-works-1-logos

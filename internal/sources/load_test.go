@@ -621,7 +621,7 @@ func TestLoadLogosArchives(t *testing.T) {
 		{"edwards-works-1-logos", 5, 5, 0, 0},
 		{"edwards-works-2-logos", 63, 63, 0, 0},
 		{"luther-annotated-4-logos", 3, 3, 0, 0},
-		{"fuller-works-1-logos", 84, 84, 0, 0},
+		{"fuller-works-1-logos", 92, 92, 0, 0},
 		{"fuller-works-3-logos", 89, 88, 1, 0},
 		// Luther's sermons, no text in the heading (mw-qtu3zvz.130): volume 1's
 		// three name none in their introductions, volume 2's is on Philippians

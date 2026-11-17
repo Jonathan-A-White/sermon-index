@@ -2520,6 +2520,53 @@ func TestFletcherVolume4SermonsAreIndexed(t *testing.T) {
 	}
 }
 
+// fullerVolume1HeadingTexts are the eight sermons of Fuller's Works volume 1 that
+// mw-qtu3zvz.117 left out as "no preaching text printed" although their heading
+// prints one in a form its survey did not read: "(Mal. 4:5, 6)", "(Jas 1:4)",
+// "(Eccles. 1:15)", "(Tit. 1:15)" and the like (mw-qtu3zvz.200). The row's ref
+// is the text's first verse; "Sermon on the Mount" and Letters II to IV, which
+// print no text and are about composing sermons, stay out.
+var fullerVolume1HeadingTexts = map[string]string{
+	"2~607163":  "Hag.1.2",
+	"2~753063":  "Num.14.8",
+	"2~1015753": "Mal.4.5",
+	"2~1293816": "Eccl.1.17",
+	"2~1471001": "Jas.1.4",
+	"2~1723291": "Mal.3.16",
+	"2~1810027": "Eccl.1.15",
+	"2~2119001": "Titus.1.15",
+}
+
+func TestFullerVolume1SermonsWithAHeadingTextAreIndexed(t *testing.T) {
+	const slug = "the-complete-works-of-andrew-fuller-volume-1-memoirs-sermons-etc"
+	inputs := readFile(t, filepath.Join("../../data/logos-index", slug+"-sermons.jsonl"))
+	rows, rep := BuildSource([]File{{Name: slug, Inputs: inputs}}, false)
+	if len(rep.Dropped) != 0 {
+		t.Errorf("lines dropped: %v", rep.Dropped)
+	}
+	if len(rows) < 90 {
+		t.Errorf("%d rows, want at least 90 (84 read earlier and the 8 whose heading prints a text)", len(rows))
+	}
+	byID := map[string]*string{}
+	for _, r := range rows {
+		if r.Ref == nil {
+			t.Errorf("%s %q has no ref", r.ID, r.Title)
+		}
+		byID[r.ID[strings.LastIndex(r.ID, ".")+1:]] = r.Ref
+	}
+	for id, want := range fullerVolume1HeadingTexts {
+		got := byID[strings.ReplaceAll(id, "~", "-")]
+		if got == nil || *got != want {
+			t.Errorf("%s: ref %v, want %s (the heading prints it)", id, got, want)
+		}
+	}
+	for _, in := range inputs {
+		if strings.HasPrefix(in.Title, "Sermon on the Mount") || strings.HasPrefix(in.Title, "Letter ") {
+			t.Errorf("%s %q prints no text and is not a sermon on one: it stays out", in.ID, in.Title)
+		}
+	}
+}
+
 func TestHiddenSermonIndexFilesImportAndPassTheChecker(t *testing.T) {
 	paths, err := filepath.Glob("../../data/logos-index/*-sermons.jsonl")
 	if err != nil {
