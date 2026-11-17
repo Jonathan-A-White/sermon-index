@@ -188,6 +188,8 @@ func writeSermons(ctx context.Context, tx pgx.Tx, d *Dir, c *Counts) error {
 		seen[k] = true
 		kSermon, kRole, kRef, kSpan = append(kSermon, sermon), append(kRole, role), append(kRef, ref), append(kSpan, span)
 	}
+	// A row's Topics (free subject labels, mw-qtu3zvz.198) are checked and kept in
+	// rows.jsonl but not loaded: no column holds them yet, and the API does not serve them.
 	for _, r := range d.Rows {
 		if r.IsSeries() {
 			continue // a series is kept as a sermon but has no passage: nothing a passage asks for matches it

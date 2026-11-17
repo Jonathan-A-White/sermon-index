@@ -108,6 +108,11 @@ type Row struct {
 	DurationS *int     `json:"duration_s,omitempty"`
 	Cited     []string `json:"cited,omitempty"`
 	Notes     *string  `json:"notes,omitempty"`
+	// Topics are the subjects the sermon is about, short plain labels in
+	// the row's own words, for a sermon that has no passage to hang a theme
+	// on (optional; not a link to a topic of a theme source, which is what
+	// sermon-topics.jsonl is for).
+	Topics []string `json:"topics,omitempty"`
 	// Series: the row is a series or a whole book, wider than one text
 	// (three chapters is the most a text has). It is kept and found by its
 	// title, but it has no passage and no passage matches it.

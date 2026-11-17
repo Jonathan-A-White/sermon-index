@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -631,5 +632,58 @@ func TestTheFixturesSermonTopicsCheckClean(t *testing.T) {
 	d, fs = checked("../../sources/_template")
 	if len(fs) != 0 || d.HasSermonTopics || d.SermonTopics != nil {
 		t.Errorf("the template: %q %+v", faultStrings(fs), d)
+	}
+}
+
+func TestTopicsIsAnOptionalListOfStrings(t *testing.T) {
+	src := func(topics string) map[string]string {
+		return map[string]string{"source.toml": goodToml, "rows.jsonl": `{"id": "1", "title": "One", "url": "https://example.org/1", "topics": ` + topics + `}`}
+	}
+	d, faults := Read(writeSource(t, src(`["grace", "indulgences"]`)))
+	if len(faults) != 0 || len(d.Rows) != 1 || !reflect.DeepEqual(d.Rows[0].Topics, []string{"grace", "indulgences"}) {
+		t.Fatalf("topics not read: %q %+v", faultStrings(faults), d.Rows)
+	}
+	if fs := Check(writeSource(t, src(`["grace", "indulgences"]`))); len(fs) != 0 {
+		t.Errorf("a row with topics and no ref: %q", faultStrings(fs))
+	}
+	// A topic that is not a string is refused, and so is a list that is not a list.
+	for _, bad := range []string{`["grace", 7]`, `[null]`, `[["grace"]]`, `"grace"`, `{"a": "b"}`} {
+		fs := faultStrings(Check(writeSource(t, src(bad))))
+		if len(fs) != 1 || !strings.HasPrefix(fs[0], "rows.jsonl:1: ") || !strings.Contains(fs[0], "topics") {
+			t.Errorf("topics %s: faults %q", bad, fs)
+		}
+	}
+	expectFault(t, src(`["grace", " "]`), "rows.jsonl:1: topics: a topic is empty")
+	expectFault(t, src(`[]`), "rows.jsonl:1: topics is empty: leave it out instead")
+	expectFault(t, src(`["grace", "Grace"]`), "rows.jsonl:1: topics: 'Grace' repeats 'grace'")
+}
+
+// The Luther sermons that print no preaching text carry the topics their
+// introductions give them (mw-qtu3zvz.198).
+func TestLutherSermonsCarryTopics(t *testing.T) {
+	for _, c := range []struct {
+		dir, id string
+		want    []string
+	}{
+		{"luther-annotated-1-logos", "ANNOTLUTV1.1-409450", []string{"indulgences", "grace", "penance", "satisfaction", "scholastic theology"}},
+		{"luther-annotated-2-logos", "ANNOTLUTV2.1-367708", []string{"righteousness", "alien and proper righteousness", "faith", "two regimes"}},
+		{"luther-annotated-5-logos", "NNTTDLTHR05.1-503661", []string{"marriage", "married love", "children", "chastity"}},
+	} {
+		dir := "../../sources/" + c.dir
+		d, faults := Read(dir)
+		if len(faults) != 0 {
+			t.Fatalf("%s: %q", c.dir, faultStrings(faults))
+		}
+		if fs := Check(dir); len(fs) != 0 {
+			t.Errorf("%s: %q", c.dir, faultStrings(fs))
+		}
+		for _, r := range d.Rows {
+			if len(r.Topics) == 0 {
+				t.Errorf("%s: row %s has no topics", c.dir, r.ID)
+			}
+			if r.ID == c.id && !reflect.DeepEqual(r.Topics, c.want) {
+				t.Errorf("%s: topics %q, want %q", r.ID, r.Topics, c.want)
+			}
+		}
 	}
 }

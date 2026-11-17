@@ -242,6 +242,23 @@ func checkRows(d *Dir) []Fault {
 				r.cited = append(r.cited, rg)
 			}
 		}
+		if r.Topics != nil {
+			if len(r.Topics) == 0 {
+				add("topics is empty: leave it out instead")
+			}
+			first := map[string]string{}
+			for _, tp := range r.Topics {
+				key := strings.ToLower(strings.TrimSpace(tp))
+				switch {
+				case key == "":
+					add("topics: a topic is empty")
+				case first[key] != "":
+					add("topics: '%s' repeats '%s'", tp, first[key])
+				default:
+					first[key] = tp
+				}
+			}
+		}
 		if r.URL == "" {
 			add("url is missing")
 		} else if msg := checkURL(r.URL); msg != "" {
