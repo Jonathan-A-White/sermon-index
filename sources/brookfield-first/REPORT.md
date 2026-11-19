@@ -9,9 +9,9 @@ Written by `go run ./tools/brookfield-youtube` from the YouTube Data API v3 (cha
 - Videos seen: 524 (the entries of the channel's uploads playlist)
 - Skipped: 0
 - Sermons: 355 (every video that is not a Morning RePhil), in `rows.jsonl`
-  - with a preacher: 116
-  - with a passage: 219 (series among them: 2, each a text over more than 3 chapters, kept with its first chapter and matched by no passage)
-  - with neither: 133
+  - with a preacher: 120
+  - with a passage: 223 (series among them: 2, each a text over more than 3 chapters, kept with its first chapter and matched by no passage)
+  - with neither: 129
 - Morning RePhil episodes: 224, in `data/morning-rephil.jsonl`
 - Date range: 2020-03-15 to 2026-11-17
 - Quota used: 12 units (1 channels.list and 11 playlistItems.list, 1 unit each; the daily allowance is 10,000)
@@ -22,7 +22,7 @@ A row's date is the day its title prints ("August 23, 2020"), which is the Sunda
 
 ## What was not sorted
 
-- **Videos kept with no passage and no preacher: 133.** Most are whole services ("Online Service | October 25, 2026") whose title and description name neither. They are listed by title and date, found by search, and matched by no passage.
+- **Videos kept with no passage and no preacher: 129.** Most are whole services ("Online Service | October 25, 2026") whose title and description name neither. They are listed by title and date, found by search, and matched by no passage.
 - **Videos with a passage but no preacher: 106; with a preacher but no passage: 3.**
 - **Descriptions that print a sermon title: 26.** The title of the sermon is not kept (the story keeps only the video's own title, and the licence note keeps description text out); the preacher and the passage beside it are.
 - **Passages the book table refuses: 0**.
@@ -33,11 +33,11 @@ A row's date is the day its title prints ("August 23, 2020"), which is the Sunda
 
 `passages.tsv` is the church's own list of its sermons (series, Sunday, title, speaker, passage), typed by hand from screenshots of the church's app that the Governor took, or (the lines with a `row`) copied from a message in which he gave a sermon's title, date, preacher and passage as he read them in the app, for a sermon that has no notes; no tool reads the app. Each entry is matched to the one YouTube row of its date (a line with a `row` to that row, which tools/subsplash-links found within a day of the date), and that row takes the sermon's title, its preacher and its passage and keeps its watch link. An entry that cannot be matched to exactly one row, or whose passage the book table refuses, is named here and changes nothing; nothing is guessed.
 
-- Entries in the list: 203
-- Merged into a row: 203
+- Entries in the list: 207
+- Merged into a row: 207
 - Of them from the Governor's messages: 65
 - Of them from the notes mails: 111
-- Rows with a preacher: 116 of 355 (109 before the speakers of three rows were read: the Governor's word of 2026-11-12 for "When Angels Go to Church", and the header of the notes PDFs of two others). The mails name no speaker and the YouTube titles and descriptions name none beyond those already read, so the other 239 have none; nothing is guessed from who usually preaches:
+- Rows with a preacher: 120 of 355 (109 before the speakers of three rows were read: the Governor's word of 2026-11-12 for "When Angels Go to Church", and the header of the notes PDFs of two others). The mails name no speaker and the YouTube titles and descriptions name none beyond those already read, so the other 235 have none; nothing is guessed from who usually preaches:
   - `VvUNg8E1aPo` 2020-09-27, Brookfield First - Online Service | September 27, 2020
   - `wl9DPCXJRQU` 2020-10-04, Brookfield First - Online Service | October 4, 2020
   - `xL6Do-BIVIY` 2020-10-11, Brookfield First - Online Service | October 11, 2020
@@ -170,10 +170,6 @@ A row's date is the day its title prints ("August 23, 2020"), which is the Sunda
   - `oSCKhNSiSY8` 2023-11-12, The Carnal Christian
   - `xSLYZDhSLew` 2023-11-19, Built to Last
   - `vjyLGESSrQI` 2023-11-26, Found Faithful
-  - `_sjI7JQOmJg` 2023-12-03, Brookfield First - Online Service | December 3, 2023
-  - `AR53xv-Ku4g` 2023-12-10, Brookfield First - Online Service | December 10, 2023
-  - `Nm_0i3rWro4` 2023-12-17, Brookfield First - Online Service | December 17, 2023
-  - `yxuTboAxbjw` 2023-12-24, Brookfield First - Online Service | December 24, 2023
   - `lUM4I5QGV4M` 2023-12-31, Following Jesus into 2024
   - `-6kwEEFZJk4` 2024-01-07, If You Walk With God
   - `WLpfcR2_L-E` 2024-01-14, Brookfield First - Online Service | January 14, 2024
