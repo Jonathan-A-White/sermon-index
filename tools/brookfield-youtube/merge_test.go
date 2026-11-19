@@ -591,3 +591,30 @@ func TestBrookfieldFirstRowsCarryTheListsSpeakers(t *testing.T) {
 		t.Errorf("Gc3PYgXzzjQ notes do not cite his message: %q", n)
 	}
 }
+
+// The Dec 2023 Ruth series (his report, mw-o9rgo8m): the four Sundays were
+// bare 'Online Service' rows with no ref, so the reader's 'Sermons for Ruth 4'
+// said 'No sermons here.' Each checked-in row carries the title, preacher and
+// chapter the church's app shows for it.
+func TestBrookfieldFirstRuthSeriesRowsCarryTitlePreacherAndRef(t *testing.T) {
+	rows := readRowsFile(t, filepath.Join("..", "..", "sources", "brookfield-first", "rows.jsonl"))
+	by := map[string]sources.Row{}
+	for _, r := range rows {
+		by[r.ID] = r
+	}
+	for _, w := range []struct{ id, title, preacher, ref string }{
+		{"_sjI7JQOmJg", "Back to Bethlehem", "Phil Morgan", "Ruth.1"},
+		{"AR53xv-Ku4g", "Unwrapping Providence", "Sam Morgan", "Ruth.2"},
+		{"Nm_0i3rWro4", "The Kinsman-Redeemer", "Phil Morgan", "Ruth.3"},
+		{"yxuTboAxbjw", "The Romance of Christmas", "Sam Morgan", "Ruth.4"},
+	} {
+		r, ok := by[w.id]
+		if !ok {
+			t.Errorf("row %s is missing", w.id)
+			continue
+		}
+		if r.Title != w.title || str(r.Preacher) != w.preacher || str(r.Ref) != w.ref {
+			t.Errorf("row %s has title %q preacher %q ref %q, want %q %q %q", w.id, r.Title, str(r.Preacher), str(r.Ref), w.title, w.preacher, w.ref)
+		}
+	}
+}
