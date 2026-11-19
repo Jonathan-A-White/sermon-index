@@ -618,3 +618,31 @@ func TestBrookfieldFirstRuthSeriesRowsCarryTitlePreacherAndRef(t *testing.T) {
 		}
 	}
 }
+
+// A line from the church's app read through the Governor's browser
+// (from = browse, written by subsplash-notes inventory-fill) sets the title,
+// preacher and passage it carries, says so in the row's note, and is counted
+// apart from the messages and the notes mails.
+func TestMergeABrowseLineSaysWhereItCameFrom(t *testing.T) {
+	rows := rowsForMerge()
+	l, err := ReadList(writeTSV(t, "series\tdate\ttitle\tspeaker\tpassage\trow\tfrom\n"+
+		"Letters\t2026-11-01\tLightning in Clay Pots\tPhil Morgan\t2 Corinthians 13\tvidA\tbrowse\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := MergeList(rows, l)
+	if m.Merged != 1 || len(m.Problems) != 0 || m.FromBrowse != 1 || m.FromNotes != 0 || m.FromMessages != 0 {
+		t.Fatalf("%+v", m)
+	}
+	a := rowByID(rows, "vidA")
+	if str(a.Preacher) != "Phil Morgan" || str(a.Ref) != "2Cor.13" || a.Title != "Lightning in Clay Pots" {
+		t.Errorf("row %+v", a)
+	}
+	n := str(a.Notes)
+	if !strings.Contains(n, "signed-in browser") || !strings.Contains(n, "Series: Letters.") || strings.Contains(n, "message the Governor sent") {
+		t.Errorf("notes %q", n)
+	}
+	if !strings.Contains(listNoteText(m), "signed-in browser") || strings.Contains(listNoteText(m), "No tool read the app") {
+		t.Errorf("the source note: %s", listNoteText(m))
+	}
+}

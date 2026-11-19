@@ -339,6 +339,9 @@ type Sermon struct {
 	Speaker   string
 	Reference string // as printed
 	HasNotes  bool
+	// Series is the series the page names after its buttons ("More from
+	// <series>"); empty when it names none.
+	Series string
 }
 
 // ParseSermon reads a sermon's page: the title is the line above the date line
@@ -360,6 +363,12 @@ func ParseSermon(p Page) (Sermon, error) {
 			continue
 		}
 		s := Sermon{Code: code, Title: ls[i-1], Date: t.Format(dateLayout), HasNotes: p.HasNotes}
+		for _, l := range ls[i+1:] {
+			if name, ok := strings.CutPrefix(l, "More from "); ok && strings.TrimSpace(name) != "" {
+				s.Series = strings.TrimSpace(name)
+				break
+			}
+		}
 		if m[2] != "" {
 			for _, part := range strings.Split(m[2], " • ") {
 				part = strings.TrimSpace(part)
@@ -381,6 +390,7 @@ func ParseSermon(p Page) (Sermon, error) {
 // NotesPage is a sermon's notes page: the title and passage of its first line,
 // the date of its second, and the page's text, which is kept.
 type NotesPage struct {
+	URL       string // the address the notes page is at
 	Title     string
 	Reference string
 	Date      string // YYYY-MM-DD, empty when the page prints none
@@ -403,7 +413,7 @@ func ParseNotes(p Page) (NotesPage, error) {
 	if m == nil {
 		return NotesPage{}, Stop{"unexpected page: the notes page " + p.URL + " does not open with a quoted title"}
 	}
-	n := NotesPage{Title: strings.TrimSpace(m[1]), Reference: strings.TrimSpace(m[2]), Text: p.Text}
+	n := NotesPage{URL: p.URL, Title: strings.TrimSpace(m[1]), Reference: strings.TrimSpace(m[2]), Text: p.Text}
 	for _, l := range ls[1:] {
 		if pm := notesPartRE.FindStringSubmatch(l); pm != nil {
 			if t, err := time.Parse("January 2, 2006", pm[1]); err == nil {

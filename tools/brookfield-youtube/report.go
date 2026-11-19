@@ -184,7 +184,12 @@ func listNoteText(m *Merge) string {
 	if m.FromNotes > 0 {
 		notes = fmt.Sprintf(" The title and passage of %d of them are those of the sermon notes the church's app mailed the Governor (tools/subsplash-notes), written to the list by tools/subsplash-links --read-notes.", m.FromNotes)
 	}
-	return fmt.Sprintf("The title, preacher and passage of %d rows come instead from the church's own list of its sermons, sources/brookfield-first/passages.tsv, matched to the videos by date: %d typed by hand from screenshots of the church's app that the Governor took, and %d from messages the Governor sent, each read by him in the church's app (these are sermons that have no notes)."+notes+" No tool read the app, so Subsplash's terms on automated reading are not engaged. The Governor shows the list to the pastor and removes it on an objection. It holds no YouTube data, so the 30 days do not bind it.", m.Merged, m.Merged-m.FromMessages-m.FromNotes, m.FromMessages)
+	terms := "No tool read the app, so Subsplash's terms on automated reading are not engaged."
+	if m.FromBrowse > 0 {
+		notes += fmt.Sprintf(" The title, preacher or passage of %d of them were read from the app through the Governor's own signed-in browser, at a polite pace, on his word and at his account's risk (tools/subsplash-notes inventory), and written to the list by inventory-fill.", m.FromBrowse)
+		terms = "Apart from those read through his browser, no tool read the app."
+	}
+	return fmt.Sprintf("The title, preacher and passage of %d rows come instead from the church's own list of its sermons, sources/brookfield-first/passages.tsv, matched to the videos by date: %d typed by hand from screenshots of the church's app that the Governor took, and %d from messages the Governor sent, each read by him in the church's app (these are sermons that have no notes)."+notes+" "+terms+" The Governor shows the list to the pastor and removes it on an objection. It holds no YouTube data, so the 30 days do not bind it.", m.Merged, m.Merged-m.FromMessages-m.FromNotes-m.FromBrowse, m.FromMessages)
 }
 
 // countsMarkdown is the counts of REPORT.md's section on the list, up to the
@@ -197,6 +202,9 @@ func (m *Merge) countsMarkdown() string {
 	w("- Of them from the Governor's messages: %d\n", m.FromMessages)
 	if m.FromNotes > 0 {
 		w("- Of them from the notes mails: %d\n", m.FromNotes)
+	}
+	if m.FromBrowse > 0 {
+		w("- Of them from the church's app, through the Governor's browser: %d\n", m.FromBrowse)
 	}
 	if m.Counted {
 		w("- Rows with a preacher: %d of %d (109 before the speakers of three rows were read: the Governor's word of 2026-11-12 for \"When Angels Go to Church\", and the header of the notes PDFs of two others). The mails name no speaker and the YouTube titles and descriptions name none beyond those already read, so the other %d have none; nothing is guessed from who usually preaches:\n", m.RowsPreacher, m.RowsPreacher+len(m.NoPreacher), len(m.NoPreacher))

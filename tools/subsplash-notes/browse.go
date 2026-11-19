@@ -41,8 +41,12 @@ type Config struct {
 	// empty reads none.
 	SeriesIndex string
 	Verify      int // when over 0: compare the newest n sermons already recorded, write nothing
-	Now         func() time.Time
-	Sleep       func(time.Duration)
+	// Inventory is the file of every sermon on the account (inventory.go); when
+	// set, each sermon not in it is read and written to it, and the Morning
+	// RePhil episodes are left alone.
+	Inventory string
+	Now       func() time.Time
+	Sleep     func(time.Duration)
 	// PDFText is the text of the notes PDF kept for a row, for Verify; nil
 	// leaves the notes text uncompared.
 	PDFText func(rowID string) (string, error)
@@ -57,6 +61,8 @@ type Result struct {
 	Verified int
 	Differ   int
 	Loads    int
+	// Inventoried is the sermons added to the inventory by this run.
+	Inventoried int
 }
 
 // RephilRow is a line of data/morning-rephil.jsonl: the YouTube fields of
@@ -104,6 +110,8 @@ type browseRun struct {
 	// fromSeries is how many of seen came from the series pages, after the
 	// list's own.
 	fromSeries int
+	// inv is the inventory so far, by code, when cfg.Inventory is set.
+	inv map[string]InvEntry
 }
 
 // Browse walks the list newest to oldest through b and, for each sermon not
@@ -132,6 +140,16 @@ func Browse(ctx context.Context, b Browser, cfg Config, out io.Writer) (Result, 
 	}
 	if err := r.readLinks(); err != nil {
 		return r.res, err
+	}
+	if cfg.Inventory != "" {
+		have, err := ReadInventory(cfg.Inventory)
+		if err != nil {
+			return r.res, err
+		}
+		r.inv = map[string]InvEntry{}
+		for _, e := range have {
+			r.inv[e.Code] = e
+		}
 	}
 	if r.rephil, err = readRephil(cfg.Rephil); err != nil {
 		return r.res, err
@@ -198,6 +216,9 @@ func (r *browseRun) walk(ctx context.Context) error {
 	if err := r.sweepSeries(ctx); err != nil {
 		return err
 	}
+	if r.inv != nil {
+		return nil // the episodes are not sermons: their own pass is browse's
+	}
 	if r.cfg.EpisodePages {
 		if err := r.pendingEpisodes(ctx, pending); err != nil {
 			return err
@@ -231,8 +252,8 @@ func (r *browseRun) sweepSeries(ctx context.Context) error {
 		have[it.Code] = true
 	}
 	for a := range r.links {
-		if code, _, ok := CodeOf(a); ok {
-			have[code] = true
+		if code, _, ok := CodeOf(a); ok && r.inv == nil {
+			have[code] = true // an inventory reads a sermon whose link is kept, too
 		}
 	}
 	for _, u := range urls {
@@ -384,6 +405,9 @@ func (r *browseRun) pendingEpisodes(ctx context.Context, pending []Item) error {
 // ---- sermons
 
 func (r *browseRun) sermon(ctx context.Context, it Item) error {
+	if r.inv != nil {
+		return r.inventorySermon(ctx, it)
+	}
 	addr := it.Address()
 	hasRecord := r.byTitle[foldTitle(it.Title)]
 	if r.cfg.Verify > 0 {
@@ -830,9 +854,15 @@ func (r *browseRun) writeFeed() error {
 		}
 	}
 	f := feedFile{ID: "subsplash-browse", Title: "Subsplash through the browser", Updated: r.cfg.Now().UTC().Format(time.RFC3339), Checks: []string{"read"}, Items: []feedItem{}}
+	if r.inv != nil {
+		f.ID, f.Title = "subsplash-inventory", "Subsplash inventory through the browser"
+	}
 	here := -1
 	for i, it := range r.seen {
 		done := r.links[it.Address()] || shares[it.Short()]
+		if r.inv != nil {
+			_, done = r.inv[it.Code]
+		}
 		f.Items = append(f.Items, feedItem{Label: it.Title, Link: it.Address(), Done: map[string]bool{"read": done}})
 		if done {
 			here = i
@@ -842,6 +872,9 @@ func (r *browseRun) writeFeed() error {
 		f.Here = &here
 	}
 	f.Note = fmt.Sprintf("%d of %d list pages walked, %d recorded, %d sermon links, %d episodes", r.pageNo(), r.pages, r.res.Recorded, r.res.Linked, r.res.Episodes)
+	if r.inv != nil {
+		f.Note = fmt.Sprintf("%d of %d list pages walked, %d sermons inventoried this run, %d in all", r.pageNo(), r.pages, r.res.Inventoried, len(r.inv))
+	}
 	if r.fromSeries > 0 {
 		f.Note += fmt.Sprintf(", %d sermons from the series pages", r.fromSeries)
 	}
@@ -895,7 +928,10 @@ func writeFileAtomic(path string, b []byte, mode os.FileMode) error {
 
 // DefaultFeed is where the Jobs page's feeds are kept on the Laptop: the same
 // directory the hourly script's feed is in.
-func DefaultFeed() string {
+func DefaultFeed() string { return DefaultFeedNamed("subsplash-browse.json") }
+
+// DefaultFeedNamed is the feed called name in that directory.
+func DefaultFeedNamed(name string) string {
 	dir := os.Getenv("POSTERN_DATA")
 	if dir == "" {
 		home, err := os.UserHomeDir()
@@ -904,7 +940,7 @@ func DefaultFeed() string {
 		}
 		dir = filepath.Join(home, ".local", "state", "postern")
 	}
-	return filepath.Join(dir, "jobs", "subsplash-browse.json")
+	return filepath.Join(dir, "jobs", name)
 }
 
 // pdfText is the text of a notes PDF, read with pdftotext.

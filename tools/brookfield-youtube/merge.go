@@ -133,7 +133,12 @@ type Merge struct {
 	// "notes"), written by tools/subsplash-links --read-notes; they are not
 	// counted in FromMessages.
 	FromNotes int
-	Problems  []Problem
+	// FromBrowse is how many of Merged are lines from the church's app read
+	// through the Governor's signed-in browser (from = "browse"), written by
+	// tools/subsplash-notes inventory-fill; they are counted in neither of the
+	// two above.
+	FromBrowse int
+	Problems   []Problem
 	// Counted is set by MergeRowsFile, which counts the rows after the merge:
 	// the rows with a preacher, with a passage, and series rows.
 	Counted                               bool
@@ -232,6 +237,18 @@ func MergeList(rows []sources.Row, l *List) *Merge {
 			r.Cited = nil
 			r.Series = nil
 			note = "Title, preacher and passage from the church's own list of its sermons (passages.tsv), matched to the video by date."
+		case e.From == fromBrowse:
+			note = "Title, preacher or passage the row lacked, from the church's app (Subsplash), read through the Governor's signed-in browser (tools/subsplash-notes inventory; passages.tsv), matched to the video by its id; what the row already had is kept."
+			if len(refs) > 0 {
+				r.Cited = nil
+				r.Series = nil
+				var ignored []string
+				setPassage(r, refs, "app", &ignored)
+				if r.IsSeries() {
+					first, _ := passage.Parse(refs[0])
+					note += fmt.Sprintf(" The passage %s spans %d chapters, so the row is a series; its ref is the first chapter.", first.OSIS, first.Chapters())
+				}
+			}
 		case len(refs) > 0 && fromNotes(e.From):
 			r.Cited = nil
 			r.Series = nil
@@ -268,6 +285,8 @@ func MergeList(rows []sources.Row, l *List) *Merge {
 		r.Notes = ptr(note)
 		m.Merged++
 		switch {
+		case e.From == fromBrowse:
+			m.FromBrowse++
 		case fromNotes(e.From):
 			m.FromNotes++
 		case e.Row != "":
@@ -276,6 +295,10 @@ func MergeList(rows []sources.Row, l *List) *Merge {
 	}
 	return m
 }
+
+// fromBrowse is the from column of a line tools/subsplash-notes inventory-fill
+// wrote from the church's app read through the signed-in browser.
+const fromBrowse = "browse"
 
 // fromNotes reports whether a line's from column marks a line written from a
 // notes mail: "notes", or "notes+<txid>" when its speaker is the Governor's

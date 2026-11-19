@@ -9,6 +9,8 @@
 //	subsplash-notes fetch [--key <file>] [--postern <url>] [--since n] [--rows rows.jsonl] [--out records.jsonl] [--notes <dir>]
 //	subsplash-notes forward-confirm [--key <file>] [--postern <url>]
 //	subsplash-notes browse [--cdp <url>] [--rows rows.jsonl] [--out records.jsonl] [--notes <dir>] [--links-out <file>] [--rephil <file>] [--feed <file>] [--pace 10s] [--limit n] [--verify n] [--series <url>] [--series-index <url>] [--series-only] [--episode-pages]
+//	subsplash-notes inventory [--cdp <url>] [--rows rows.jsonl] [--inventory <file>] [--links-out <file>] [--feed <file>] [--pace 10s] [--limit n] [--series-index <url>]
+//	subsplash-notes inventory-fill [--rows rows.jsonl] [--inventory <file>] [--passages passages.tsv] [--topics sermon-topics.jsonl] [--report <file>]
 //	subsplash-notes [--alerts <file>|-] [--rows rows.jsonl] [--out records.jsonl]
 //
 // keygen makes the family's key once, at ~/.config/sermon-index/postern-alerts.key
@@ -33,6 +35,13 @@
 // https://<host>/mail/vf-<token> on one of Postern's confirm hosts (see
 // confirmHosts; any other link is refused and not printed), makes no request but
 // the read of the alerts, and neither visits the link nor claims the alert.
+//
+// inventory reads every sermon on the Governor's signed-in Subsplash account
+// (the list, then the church site's series pages for the older ones), one page
+// at a time and by browse's own rules, and writes each to the inventory file;
+// inventory-fill, with no browser, matches each to its row with the mail's
+// matcher, adds to passages.tsv a line for each row lacking a title, preacher
+// or passage Subsplash has, and writes the report (docs/operations.md).
 //
 // browse is the second way in, through the signed-in browser `mw browser open`
 // starts on the Laptop (browser.go, browse.go, cdp.go): see browse below.
@@ -100,6 +109,11 @@ const (
 	defaultOut    = "data/subsplash-notes.jsonl"
 	defaultLinks  = "data/subsplash-browser-links.txt"
 	defaultRephil = "data/morning-rephil.jsonl"
+
+	defaultInventory = "data/subsplash-inventory.jsonl"
+	defaultPassages  = "sources/brookfield-first/passages.tsv"
+	defaultTopics    = "sources/brookfield-first/sermon-topics.jsonl"
+	defaultReport    = "docs/brookfield-first-subsplash-inventory.md"
 )
 
 func main() {
@@ -121,6 +135,10 @@ func cli(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			return forwardConfirmCmd(args[1:], stdout, stderr)
 		case "browse":
 			return browseCmd(args[1:], stdout, stderr)
+		case "inventory":
+			return inventoryCmd(args[1:], stdout, stderr)
+		case "inventory-fill":
+			return inventoryFillCmd(args[1:], stdout, stderr)
 		}
 	}
 	return readCmd(args, stdin, stdout, stderr)
@@ -574,4 +592,103 @@ func readRecords(path string) ([]Record, error) {
 		recs = append(recs, r)
 	}
 	return recs, nil
+}
+
+// inventoryCmd is subsplash-notes inventory: browse's walk, with browse's pace
+// and stops, that reads each sermon's page (and its notes page's address) into
+// the inventory file. A sermon already in it is not loaded again.
+func inventoryCmd(args []string, stdout, stderr io.Writer) int {
+	fs := flags("inventory", stderr)
+	endpoint := fs.String("cdp", DefaultCDP, "the browser's DevTools address (mw browser status): this machine only")
+	rowsPath := fs.String("rows", defaultRows, "the YouTube rows to match against")
+	inv := fs.String("inventory", defaultInventory, "the inventory file; read first and added to")
+	linksOut := fs.String("links-out", defaultLinks, "the file of sermon addresses for subsplash-links --links")
+	feed := fs.String("feed", DefaultFeedNamed("subsplash-inventory.json"), "the Jobs page's feed file ('' for none)")
+	pace := fs.Duration("pace", MinPace, "the time between two page loads (never under 10s)")
+	limit := fs.Int("limit", 0, "the most sermon pages to read (0: all)")
+	seriesIndex := fs.String("series-index", seriesIndexURL, "the church site's list of series, whose pages hold the sermons older than the sermon list's newest 200 ('' for none)")
+	usage := "subsplash-notes inventory [--cdp <url>] [--rows rows.jsonl] [--inventory <file>] [--links-out <file>] [--feed <file>] [--pace 10s] [--limit n] [--series-index <url>]"
+	if !parse(fs, args, stderr, usage) {
+		return 2
+	}
+	rows, err := readRows(*rowsPath)
+	if err != nil {
+		return fail(stderr, err)
+	}
+	b, err := NewCDP(*endpoint)
+	if err != nil {
+		return fail(stderr, err)
+	}
+	defer b.Close()
+	cfg := Config{Rows: rows, LinksOut: *linksOut, Feed: *feed, Interval: *pace, Limit: *limit, SeriesIndex: *seriesIndex, Inventory: *inv, Out: os.DevNull}
+	res, err := Browse(context.Background(), b, cfg, stdout)
+	all, _ := ReadInventory(*inv)
+	fmt.Fprintf(stdout, "%d page loads, %d sermon pages read; %d inventoried this run, %d in the inventory\n", res.Loads, res.Visited, res.Inventoried, len(all))
+	var st Stop
+	if errors.As(err, &st) {
+		fmt.Fprintln(stderr, "subsplash-notes inventory:", st.Error(), "(nothing more was written; sign in again if asked, then run it again: it resumes here)")
+		return 1
+	}
+	if err != nil {
+		return fail(stderr, err)
+	}
+	return 0
+}
+
+// inventoryFillCmd is subsplash-notes inventory-fill: no browser, no network.
+func inventoryFillCmd(args []string, stdout, stderr io.Writer) int {
+	fs := flags("inventory-fill", stderr)
+	rowsPath := fs.String("rows", defaultRows, "the YouTube rows to match against")
+	inv := fs.String("inventory", defaultInventory, "the inventory file")
+	passages := fs.String("passages", defaultPassages, "the church's list, which lines are added to")
+	topics := fs.String("topics", defaultTopics, "the file linking sermons to themes")
+	report := fs.String("report", defaultReport, "the report to write ('' for none)")
+	if !parse(fs, args, stderr, "subsplash-notes inventory-fill [--rows rows.jsonl] [--inventory <file>] [--passages passages.tsv] [--topics sermon-topics.jsonl] [--report <file>]") {
+		return 2
+	}
+	rows, err := readRows(*rowsPath)
+	if err != nil {
+		return fail(stderr, err)
+	}
+	entries, err := ReadInventory(*inv)
+	if err != nil {
+		return fail(stderr, err)
+	}
+	themed, err := rowsWithThemes(*topics)
+	if err != nil {
+		return fail(stderr, err)
+	}
+	res, err := Fill(entries, rows, FillFiles{Passages: *passages, Report: *report, RowsWithThemes: themed})
+	if err != nil {
+		return fail(stderr, err)
+	}
+	fmt.Fprintf(stdout, "%d sermons in the inventory: %d matched to a row, %d with no row; %d rows with no sermon; %d lines added to %s (%d titles, %d preachers, %d passages); verses %d, themes %d, neither %d\n",
+		res.Entries, res.Matched, res.OnlySubsplash, res.OnlyIndex, res.Lines, *passages, res.Title, res.Preacher, res.Passage, res.WithVerses, res.WithThemes, res.WithNeither)
+	return 0
+}
+
+// rowsWithThemes is the ids of the rows sermon-topics.jsonl links to a theme;
+// a missing file is none.
+func rowsWithThemes(path string) (map[string]bool, error) {
+	b, err := os.ReadFile(path)
+	if os.IsNotExist(err) {
+		return map[string]bool{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	out := map[string]bool{}
+	for n, l := range strings.Split(string(b), "\n") {
+		if strings.TrimSpace(l) == "" {
+			continue
+		}
+		var v struct {
+			Row string `json:"row"`
+		}
+		if err := json.Unmarshal([]byte(l), &v); err != nil {
+			return nil, fmt.Errorf("%s line %d: %w", path, n+1, err)
+		}
+		out[v.Row] = true
+	}
+	return out, nil
 }
