@@ -105,6 +105,21 @@ func TestInventoryWritesEverySermonNewestFirst(t *testing.T) {
 	}
 }
 
+// The sermon page's passage is kept when the notes' is the wider one.
+func TestInventoryKeepsTheSermonPagesPassage(t *testing.T) {
+	f, cfg := inventoryWorld(t)
+	f.notes[sermonURL("ooooooo", "the-older-sermon")] = notesPage("The Older Sermon", "Romans 8", "October 25, 2026")
+	if _, err := Browse(context.Background(), f, cfg, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	entries, _ := ReadInventory(cfg.Inventory)
+	for _, e := range entries {
+		if e.Code == "ooooooo" && (e.Passage != "Romans 8:1-4" || e.Ref != "Rom.8.1-Rom.8.4") {
+			t.Errorf("got %q %q", e.Passage, e.Ref)
+		}
+	}
+}
+
 func TestInventoryResumesAndChangesNothingWritten(t *testing.T) {
 	f, cfg := inventoryWorld(t)
 	// The first run stops at the third sermon with a 429.

@@ -122,6 +122,14 @@ func (r *browseRun) inventorySermon(ctx context.Context, it Item) error {
 		}
 	}
 	note, perr := r.note(s, np)
+	if s.Reference != "" && np.Reference != "" && np.Reference != s.Reference {
+		// The sermon page's passage can be the narrower ("Revelation 5:9-10"
+		// where the notes say "Revelation 5"): the page is what is shown first.
+		page, perr2 := r.note(s, NotesPage{})
+		if perr2 == nil {
+			note.Reference, note.Ref, note.Also, perr = page.Reference, page.Ref, page.Also, nil
+		}
+	}
 	e := InvEntry{Code: it.Code, Address: addr, Share: it.Short(), Date: note.Date, Title: note.Title, Preacher: s.Speaker,
 		Passage: note.Reference, Ref: note.Ref, Also: note.Also, Series: s.Series, HasNotes: s.HasNotes, NotesLink: np.URL}
 	if perr != nil {
