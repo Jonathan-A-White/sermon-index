@@ -78,8 +78,9 @@
 //
 // The date an alert gives can be the Saturday or the Monday of the Sunday it
 // is about (the mail's date is when the notes went out), so a Saturday or a
-// Monday is taken to the Sunday one day away; any other weekday is reported.
-// The Sunday must be within one day of exactly one YouTube row; none, or more
+// Monday is taken to the Sunday one day away; a Tuesday to a Friday (a midweek
+// service, a funeral, Christmas Day) keeps its own day.
+// The day must be within one day of exactly one YouTube row; none, or more
 // than one, is reported and the alert is not written. A second run over the
 // same alerts writes the same bytes; a record already written is never
 // replaced by an alert that says otherwise (that is reported).

@@ -32,10 +32,10 @@ func TestSundayOf(t *testing.T) {
 		{"2031-03-02", "2031-03-02", true}, // Sunday stays
 		{"2031-03-01", "2031-03-02", true}, // Saturday -> the next day
 		{"2031-03-03", "2031-03-02", true}, // Monday -> the day before
-		{"2031-03-04", "", false},          // Tuesday
-		{"2031-03-05", "", false},          // Wednesday
-		{"2031-03-06", "", false},
-		{"2031-03-07", "", false}, // Friday
+		{"2031-03-04", "2031-03-04", true}, // Tuesday: a midweek service keeps its own day
+		{"2031-03-05", "2031-03-05", true}, // Wednesday
+		{"2031-03-06", "2031-03-06", true}, // Thursday
+		{"2031-03-07", "2031-03-07", true}, // Friday
 		{"2031-02-30", "", false},
 		{"", "", false},
 	}
@@ -45,9 +45,35 @@ func TestSundayOf(t *testing.T) {
 			t.Errorf("SundayOf(%q) = %q, %v; want %q ok=%v", c.in, got, err, c.want, c.ok)
 		}
 	}
-	// The error names the weekday, not a guess.
-	if _, err := SundayOf("2031-03-05"); err == nil || !strings.Contains(err.Error(), "Wednesday") {
+	// Only a date that is not a date is refused.
+	if _, err := SundayOf("2031-02-30"); err == nil || !strings.Contains(err.Error(), "not a date") {
 		t.Errorf("error = %v", err)
+	}
+}
+
+// A sermon dated on a Wednesday (a midweek service, a funeral, Christmas Day)
+// is matched to the row within one day of that Wednesday, and its record keeps
+// the Wednesday as its date.
+func TestMatchMidweekSermonKeepsItsOwnDay(t *testing.T) {
+	rec, err := Match(note("2031-03-05"), vids("2031-03-02", "2031-03-05", "2031-03-09"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rec.ID != "vid-2031-03-05" || rec.Date != "2031-03-05" {
+		t.Errorf("record = %+v", rec)
+	}
+	// A Thursday row (YouTube's UTC date after a Wednesday evening) is within a day.
+	rec, err = Match(note("2031-03-05"), vids("2031-03-02", "2031-03-06"))
+	if err != nil || rec.ID != "vid-2031-03-06" || rec.Date != "2031-03-05" {
+		t.Errorf("record = %+v, err %v", rec, err)
+	}
+}
+
+// With no row near the Wednesday the reason names the Wednesday, not a Sunday.
+func TestMatchMidweekWithNoRowIsReported(t *testing.T) {
+	_, err := Match(note("2031-03-05"), vids("2031-03-02", "2031-03-09"))
+	if err == nil || !strings.Contains(err.Error(), "no row within one day of 2031-03-05") {
+		t.Errorf("err = %v", err)
 	}
 }
 
@@ -91,13 +117,6 @@ func TestMatchRowOneDayFromTheSunday(t *testing.T) {
 	}
 	if rec.ID != "vid-2031-03-03" || rec.Date != "2031-03-02" {
 		t.Errorf("record = %+v: the date is the Sunday, the id the row's", rec)
-	}
-}
-
-func TestMatchOtherWeekdayIsReported(t *testing.T) {
-	_, err := Match(note("2031-03-05"), vids("2031-03-02", "2031-03-05"))
-	if err == nil || !strings.Contains(err.Error(), "Wednesday") {
-		t.Errorf("a Wednesday alert: err = %v", err)
 	}
 }
 

@@ -14,7 +14,8 @@ import (
 const dateLayout = "2006-01-02"
 
 // Record is a sermon's date, title and passage, kept against the YouTube row
-// it was matched to. Date is the sermon's Sunday.
+// it was matched to. Date is the sermon's Sunday, or its own day for a sermon
+// preached midweek (see SundayOf).
 type Record struct {
 	ID    string `json:"id"` // the YouTube row's id
 	Date  string `json:"date"`
@@ -25,9 +26,11 @@ type Record struct {
 	Speaker string `json:"speaker,omitempty"`
 }
 
-// SundayOf is the sermon's Sunday for an alert date: a Sunday stays, a
-// Saturday or a Monday is taken to the Sunday one day away, and any other
-// weekday is an error, not a guess.
+// SundayOf is the sermon's day for an alert date: a Sunday stays, a Saturday
+// or a Monday is taken to the Sunday one day away (the alert is sent beside the
+// service), and a Tuesday to a Friday stays as it is, since a sermon dated then
+// is a midweek service, a funeral or Christmas Day, not a Sunday's sermon. Only
+// a date that is not a date is an error.
 func SundayOf(date string) (string, error) {
 	t, err := time.Parse(dateLayout, date)
 	if err != nil {
@@ -41,7 +44,7 @@ func SundayOf(date string) (string, error) {
 	case time.Monday:
 		return t.AddDate(0, 0, -1).Format(dateLayout), nil
 	}
-	return "", fmt.Errorf("%s %s is a %s: only a Sunday, or a Saturday or Monday beside one, is taken", t.Weekday(), date, t.Weekday())
+	return date, nil
 }
 
 // Match gives the note the one YouTube row within one day of its Sunday (a
@@ -82,7 +85,7 @@ func Match(n Note, rows []sources.Row) (Record, error) {
 		return Record{ID: hits[0], Date: sunday, Title: n.Title, Ref: n.Ref, Also: n.Also, Speaker: n.Speaker}, nil
 	}
 	sort.Strings(hits)
-	return Record{}, fmt.Errorf("more than one row within one day of Sunday %s (%s): not guessed", sunday, strings.Join(hits, ", "))
+	return Record{}, fmt.Errorf("more than one row within one day of %s (%s): not guessed", dayName(sunday), strings.Join(hits, ", "))
 }
 
 // noRowError is Match's answer when no row is within one day of the Sunday:
@@ -90,7 +93,16 @@ func Match(n Note, rows []sources.Row) (Record, error) {
 type noRowError struct{ sunday string }
 
 func (e noRowError) Error() string {
-	return fmt.Sprintf("no row within one day of Sunday %s", e.sunday)
+	return "no row within one day of " + dayName(e.sunday)
+}
+
+// dayName is "Sunday 2031-03-02" for a Sunday and "2031-03-05 (a Wednesday)"
+// for a midweek day, so a reason names the day it looked at.
+func dayName(day string) string {
+	if t, err := time.Parse(dateLayout, day); err == nil && t.Weekday() != time.Sunday {
+		return fmt.Sprintf("%s (a %s)", day, t.Weekday())
+	}
+	return "Sunday " + day
 }
 
 // TitleWindowDays is how far from the mail's Sunday a row may be dated for
