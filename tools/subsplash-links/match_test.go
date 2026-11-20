@@ -254,8 +254,8 @@ func TestLinkConflictResolvedByNotesRecordDate(t *testing.T) {
 
 // No claim's date is the row's: none is written, and the row is named once.
 func TestLinkConflictNoDateMatchesNamedOnce(t *testing.T) {
-	rs := []sources.Row{rowOn("aIVm", "Brookfield First Sunday Service (Live)", "2022-12-30", nil)}
-	slug := "brookfield-first-sunday-service-live"
+	rs := []sources.Row{rowOn("aIVm", "Walking in the Fear of the Lord", "2022-12-30", nil)}
+	slug := "walking-in-the-fear-of-the-lord"
 	res := Link(rs, nil, []Address{
 		dated("pzxx57g", slug, "2026-05-24"),
 		dated("y9782m5", slug, "2025-11-30"),
@@ -268,6 +268,41 @@ func TestLinkConflictNoDateMatchesNamedOnce(t *testing.T) {
 		if !strings.Contains(res.Report[0], w) {
 			t.Errorf("report %q lacks %q", res.Report[0], w)
 		}
+	}
+}
+
+// Subsplash's generic slug is on any sermon it gave no title, so the generic
+// row's title is no evidence: links with that slug and no row within a day of
+// their date claim no row, and are reported as unmatched, not as a conflict on
+// a row neither belongs to (pzxx57g, y9782m5 and aIVm0KqLf-E).
+func TestLinkGenericSlugWithNoRowNearItsDateIsUnmatched(t *testing.T) {
+	rs := []sources.Row{rowOn("aIVm", "Brookfield First Sunday Service (Live)", "2022-12-30", nil)}
+	slug := "brookfield-first-sunday-service-live"
+	res := Link(rs, nil, []Address{
+		dated("pzxx57g", slug, "2026-05-24"),
+		dated("y9782m5", slug, "2025-11-30"),
+		addr("nodate1", slug), // no date at all
+	})
+	if len(res.Set) != 0 || res.Already != 0 || len(res.Report) != 3 {
+		t.Fatalf("set = %v, already = %d, report = %v", res.Set, res.Already, res.Report)
+	}
+	for _, l := range res.Report {
+		if strings.Contains(l, "conflict") || strings.Contains(l, "aIVm") {
+			t.Errorf("line %q names the row or a conflict", l)
+		}
+		if !strings.Contains(l, "no row has this title and no note has it") {
+			t.Errorf("line %q is not an unmatched report", l)
+		}
+	}
+}
+
+// A generic slug whose date is within a day of the generic row still finds it.
+func TestLinkGenericSlugFindsTheGenericRowByDate(t *testing.T) {
+	rs := []sources.Row{rowOn("aIVm", "Brookfield First Sunday Service (Live)", "2022-12-30", nil)}
+	slug := "brookfield-first-sunday-service-live"
+	res := Link(rs, nil, []Address{dated("near111", slug, "2022-12-31")})
+	if res.Set["aIVm"] != addr("near111", slug).URL || len(res.Report) != 0 {
+		t.Errorf("set = %v, report = %v", res.Set, res.Report)
 	}
 }
 

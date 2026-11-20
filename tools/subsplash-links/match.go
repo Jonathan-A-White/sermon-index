@@ -217,10 +217,15 @@ func holds(alt string, a Address) bool {
 
 // find is the index of the row a slug belongs to, or why not.
 func find(rows []sources.Row, recs []Record, slug string) (int, string) {
+	// Subsplash gives its generic slug to any sermon it has no title for, so a
+	// row with the generic title is no evidence for it: such a link is found by
+	// its date alone (findByDate), or not at all.
 	var byTitle []int
-	for i, r := range rows {
-		if hasSlug(r.Title, slug) {
-			byTitle = append(byTitle, i)
+	if !genericSlug(slug) {
+		for i, r := range rows {
+			if hasSlug(r.Title, slug) {
+				byTitle = append(byTitle, i)
+			}
 		}
 	}
 	switch len(byTitle) {
@@ -375,6 +380,14 @@ func findByDate(rows []sources.Row, slug, date string) (int, bool) {
 func genericTitle(t string) bool {
 	t = strings.ToLower(strings.TrimSpace(t))
 	return strings.HasPrefix(t, "brookfield first") || strings.Contains(t, "online service")
+}
+
+// genericSlug is whether a slug is the one Subsplash gives a sermon with no
+// title of its own ("brookfield-first-sunday-service-live"): the slug of a
+// generic title that names no date. A generic title with a date in it
+// ("Brookfield First - Online Service | March 9, 2031") is one row's own.
+func genericSlug(slug string) bool {
+	return genericTitle(strings.ReplaceAll(slug, "-", " ")) && !strings.ContainsAny(slug, "0123456789")
 }
 
 // closeTitle is whether a row's title shares at least half of its words with
