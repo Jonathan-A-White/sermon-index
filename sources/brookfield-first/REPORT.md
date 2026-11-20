@@ -9,9 +9,9 @@ Written by `go run ./tools/brookfield-youtube` from the YouTube Data API v3 (cha
 - Videos seen: 524 (the entries of the channel's uploads playlist)
 - Skipped: 0
 - Sermons: 355 (every video that is not a Morning RePhil), in `rows.jsonl`
-  - with a preacher: 120
-  - with a passage: 223 (series among them: 2, each a text over more than 3 chapters, kept with its first chapter and matched by no passage)
-  - with neither: 129
+  - with a preacher: 238
+  - with a passage: 342 (series among them: 2, each a text over more than 3 chapters, kept with its first chapter and matched by no passage)
+  - with neither: 11
 - Morning RePhil episodes: 224, in `data/morning-rephil.jsonl`
 - Date range: 2020-03-15 to 2026-11-17
 - Quota used: 12 units (1 channels.list and 11 playlistItems.list, 1 unit each; the daily allowance is 10,000)
@@ -22,8 +22,8 @@ A row's date is the day its title prints ("August 23, 2020"), which is the Sunda
 
 ## What was not sorted
 
-- **Videos kept with no passage and no preacher: 129.** Most are whole services ("Online Service | October 25, 2026") whose title and description name neither. They are listed by title and date, found by search, and matched by no passage.
-- **Videos with a passage but no preacher: 106; with a preacher but no passage: 3.**
+- **Videos kept with no passage and no preacher: 11.** Most are whole services ("Online Service | October 25, 2026") whose title and description name neither. They are listed by title and date, found by search, and matched by no passage.
+- **Videos with a passage but no preacher: 106; with a preacher but no passage: 2.**
 - **Descriptions that print a sermon title: 26.** The title of the sermon is not kept (the story keeps only the video's own title, and the licence note keeps description text out); the preacher and the passage beside it are.
 - **Passages the book table refuses: 0**.
 - **Entries skipped: 0** (none was private, deleted or listed twice).
@@ -33,132 +33,19 @@ A row's date is the day its title prints ("August 23, 2020"), which is the Sunda
 
 `passages.tsv` is the church's own list of its sermons (series, Sunday, title, speaker, passage), typed by hand from screenshots of the church's app that the Governor took, or (the lines with a `row`) copied from a message in which he gave a sermon's title, date, preacher and passage as he read them in the app, for a sermon that has no notes; no tool reads the app. Each entry is matched to the one YouTube row of its date (a line with a `row` to that row, which tools/subsplash-links found within a day of the date), and that row takes the sermon's title, its preacher and its passage and keeps its watch link. An entry that cannot be matched to exactly one row, or whose passage the book table refuses, is named here and changes nothing; nothing is guessed.
 
-- Entries in the list: 207
-- Merged into a row: 207
+- Entries in the list: 344
+- Merged into a row: 344
 - Of them from the Governor's messages: 65
 - Of them from the notes mails: 111
-- Rows with a preacher: 120 of 355 (109 before the speakers of three rows were read: the Governor's word of 2026-11-12 for "When Angels Go to Church", and the header of the notes PDFs of two others). The mails name no speaker and the YouTube titles and descriptions name none beyond those already read, so the other 235 have none; nothing is guessed from who usually preaches:
-  - `VvUNg8E1aPo` 2020-09-27, Brookfield First - Online Service | September 27, 2020
-  - `wl9DPCXJRQU` 2020-10-04, Brookfield First - Online Service | October 4, 2020
-  - `xL6Do-BIVIY` 2020-10-11, Brookfield First - Online Service | October 11, 2020
-  - `GqC4hIsD1OI` 2020-11-08, Brookfield First - Online Service | November 8, 2020
-  - `NQXObToWy_c` 2020-11-15, Brookfield First - Online Service | November 15, 2020
-  - `MInGxyAEtXE` 2020-11-22, Brookfield First - Online Service | November 22, 2020
-  - `Am6yNJt4TzY` 2020-12-06, Brookfield First - Online Service | December 6, 2020
-  - `7spPk-u9usU` 2020-12-13, Brookfield First - Online Service | December 13, 2020
-  - `DyPvottPLtg` 2020-12-20, Brookfield First - Online Service | December 20, 2020
+- Of them from the church's app, through the Governor's browser: 137
+- Rows with a preacher: 238 of 355 (109 before the speakers of three rows were read: the Governor's word of 2026-11-12 for "When Angels Go to Church", and the header of the notes PDFs of two others). The mails name no speaker and the YouTube titles and descriptions name none beyond those already read, so the other 117 have none; nothing is guessed from who usually preaches:
   - `gcvih2LjlnM` 2020-12-25, Brookfield First - Christmas Eve Online 2020
-  - `6YNZhKe912Y` 2021-01-17, Brookfield First - Online Service | January 17, 2021
-  - `_2_snTNb1jI` 2021-01-24, Brookfield First - Online Service | January 24, 2021
-  - `j4MLeoZigo4` 2021-02-07, Brookfield First - Online Service | February 7, 2021
-  - `kys6RctQS2g` 2021-02-14, Brookfield First - Online Service | February 14, 2021
-  - `rukWhl2zJAg` 2021-02-21, Brookfield First - Online Service | February 21, 2021
-  - `qOwLPwQqnVY` 2021-02-28, Brookfield First - Online Service | February 28, 2021
-  - `cu0ev15P4Kc` 2021-03-07, Brookfield First - Online Service | March 7, 2021
-  - `k-3R7XKyUl4` 2021-03-14, Brookfield First - Online Service | March 14, 2021
-  - `Hj24rdeqeXw` 2021-03-21, Brookfield First - Online Service | March 21, 2021
-  - `I4WqgsscZLs` 2021-04-18, Brookfield First - Online Service | April 18, 2021
-  - `DIFiHC_yrUU` 2021-04-25, Brookfield First - Online Service | April 25, 2021
-  - `DKsL9Nn9S1k` 2021-05-16, Brookfield First - Online Service | May 16, 2021
-  - `-kSMhX2hpzU` 2021-05-30, Brookfield First - Online Service | May 30, 2021
-  - `ptenFGPsx7c` 2021-06-06, Brookfield First - Online Service | June 6, 2021
-  - `eC5s58LUFeo` 2021-06-27, Brookfield First - Online Service | June 27, 2021
-  - `UooB7u-_Ay4` 2021-07-11, Brookfield First - Online Service | July 11, 2021
-  - `2EAtmiCguL0` 2021-07-18, Brookfield First - Online Service | July 18, 2021
-  - `dhWyA9jwP9I` 2021-08-01, Brookfield First - Online Service | August 1, 2021
-  - `bCIP1NENvnM` 2021-08-15, Brookfield First - Online Service | August 15, 2021
-  - `bufto7HOmKE` 2021-08-29, Brookfield First - Online Service | August 29, 2021
-  - `L4F3FmnflSw` 2021-09-05, Brookfield First - Online Service | September 5, 2021
-  - `QOyOiwxyEDM` 2021-09-12, Brookfield First - Online Service | September 12, 2021
-  - `Q2Db15DwM-o` 2021-09-19, Brookfield First - Online Service | September 19, 2021
-  - `E1_XNsrVrKE` 2021-09-26, Brookfield First - Online Service | September 26, 2021
-  - `hWP4sJL46do` 2021-10-03, Brookfield First - Online Service | October 3, 2021
-  - `ID4QiNBIMnA` 2021-10-10, Brookfield First - Online Service | October 10, 2021
-  - `Pm5CfbOK_Ek` 2021-10-17, Brookfield First - Online Service | October 17, 2021
-  - `bJ6_nxi2Xyg` 2021-10-24, Brookfield First - Online Service | October 24, 2021
-  - `1QLIxaqs2rI` 2021-10-31, Brookfield First - Online Service | October 31, 2021
-  - `Jrs4NoOkPSk` 2021-11-14, Brookfield First - Online Service | November 14, 2021
-  - `3457BKVXJng` 2021-11-21, Brookfield First - Online Service | November 21, 2021
-  - `gE3O4Blctow` 2021-11-28, Brookfield First - Online Service | November 28, 2021
-  - `sptg5Ct1h2M` 2021-12-05, Brookfield First - Online Service | December 5, 2021
-  - `dAxIGuk0VPU` 2021-12-12, Brookfield First - Online Service | December 12, 2021
-  - `jCjZvRMiNis` 2021-12-19, Brookfield First - Online Service | December 19, 2021
-  - `2Jxsi-ls4SE` 2022-01-02, Brookfield First - Online Service | January 2, 2022
-  - `N1XxDzOqD54` 2022-01-16, Brookfield First - Online Service | January 16, 2022
-  - `Ulmz_nL9Vps` 2022-01-30, Brookfield First - Online Service | January 30, 2022
-  - `xKcuslZXMXo` 2022-02-06, Brookfield First - Online Service | February 6, 2022
-  - `kxxEHBlyMfg` 2022-02-13, Brookfield First - Online Service | February 13, 2022
-  - `t4gwDvadnoM` 2022-02-20, Brookfield First - Online Service | February 20, 2022
-  - `ctn9rhjBsUI` 2022-02-27, Brookfield First - Online Service | February 27, 2022
-  - `yox3MYM1GVg` 2022-03-06, Brookfield First - Online Service | March 6, 2022
-  - `S7soKliFRvk` 2022-03-13, Brookfield First - Online Service | March 13, 2022
-  - `_ZtVxuuj8as` 2022-03-20, Brookfield First - Online Service | March 20, 2022
-  - `zoH56IaujdI` 2022-03-27, Brookfield First - Online Service | March 27, 2022
-  - `wwAZ_xZlQaU` 2022-04-03, Brookfield First - Online Service | April 3, 2022
-  - `1elchTj3bbU` 2022-04-10, Brookfield First - Online Service | April 10, 2022
   - `tzrSm1iRQHY` 2022-04-16, Brookfield First - Online Service | Good Friday 2022
   - `vj7heoop0-s` 2022-04-18, Brookfield First - Online Service | Easter 2022
-  - `-ob6U_Y1Dz4` 2022-04-24, Brookfield First - Online Service | April 24, 2022
-  - `3VHs4I1IMdg` 2022-05-01, Brookfield First - Online Service | May 1, 2022
-  - `tM_k0dikL94` 2022-05-08, Brookfield First - Online Service | May 8, 2022
-  - `kZWiYoqUDeM` 2022-05-15, Brookfield First - Online Service | May 15, 2022
-  - `l8Vsq0D3NAs` 2022-05-29, Brookfield First - Online Service | May 29, 2022
-  - `Hn5xEcXyaz8` 2022-06-05, Brookfield First - Online Service | June 5, 2022
-  - `HRiWdVMO4YA` 2022-06-12, Brookfield First - Online Service | June 12, 2022
-  - `q1THgoxZusQ` 2022-06-19, Brookfield First - Online Service | June 19, 2022
-  - `sZx_7jGg2CY` 2022-06-26, Brookfield First - Online Service | June 26, 2022
-  - `mZsXpKanw68` 2022-07-03, Brookfield First - Online Service | July 3, 2022
-  - `2j9mSFQOjvI` 2022-07-10, Brookfield First - Online Service | July 10, 2022
-  - `NTVKcba8sqo` 2022-07-17, Brookfield First - Online Service | July 17, 2022
-  - `d2kDY4KT2Ng` 2022-07-24, Brookfield First - Online Service | July 24, 2022
-  - `LNdML8hIAbY` 2022-07-31, Brookfield First - Online Service | July 31, 2022
-  - `lMqGdkYfXTg` 2022-09-11, Brookfield First - Online Service | September 11, 2022
-  - `6PAZ_hJ1VSQ` 2022-09-18, Brookfield First - Online Service | September 18, 2022
-  - `wlb4NVvoxgs` 2022-09-25, Brookfield First - Online Service | September 25, 2022
-  - `I8FXyGrPB48` 2022-10-02, Brookfield First - Online Service | October 2, 2022
-  - `E5LpOXe-kSQ` 2022-10-16, Brookfield First - Online Service | October 16, 2022
-  - `rQOrSKJ9KU8` 2022-10-30, Brookfield First - Online Service | October 30, 2022
-  - `bAZSYaiidJQ` 2022-11-06, Brookfield First - Online Service | November 6, 2022
-  - `rP04FESm4WE` 2022-11-13, Brookfield First - Online Service | November 13, 2022
-  - `l1X4T9XHmlE` 2022-11-20, Brookfield First - Online Service | November 20, 2022
-  - `bxJ9CitE6ks` 2022-11-27, Brookfield First - Online Service | November 27, 2022
-  - `lXvpHVGZORE` 2022-12-04, Brookfield First - Online Service | December 4, 2022
-  - `V1GooOhh4wI` 2022-12-11, Brookfield First - Online Service | December 11, 2022
-  - `bEIBELe001I` 2022-12-18, Brookfield First - Online Service | December 18, 2022
   - `hYwIGU0aeSk` 2022-12-26, Brookfield First - Online Service | Christmas Day 2022
   - `9rSvG4EWHUk` 2022-12-30, Brookfield First - Online Service | Christmas Eve 2022
   - `aIVm0KqLf-E` 2022-12-30, Brookfield First Sunday Service (Live)
-  - `X6iod4NjgwI` 2023-01-22, Brookfield First - Online Service | January 22, 2023
-  - `FUpOG7Ty0aE` 2023-01-29, Brookfield First - Online Service | January 29, 2023
-  - `2Hna4vqryPI` 2023-02-05, Brookfield First - Online Service | February 5, 2023
-  - `qdB3qZ9Dj9o` 2023-02-12, Brookfield First - Online Service | February 12, 2023
-  - `aGTNTlP7I8g` 2023-02-19, Brookfield First - Online Service | February 19, 2023
-  - `ILy5nQsLowU` 2023-02-26, Brookfield First - Online Service | February 26, 2023
-  - `RRiy0gX0MRU` 2023-03-05, Brookfield First - Online Service | March 5, 2023
-  - `PZl1flyzBtA` 2023-03-12, Brookfield First - Online Service | March 12, 2023
-  - `IxKFrCjoIc0` 2023-03-19, Brookfield First - Online Service | March 19, 2023
-  - `m3nT1b7wTd0` 2023-03-26, Brookfield First - Online Service | March 26, 2023
-  - `zJP1d68QiW4` 2023-04-02, Brookfield First - Online Service | April 2, 2023
-  - `ONZDCCeQcGU` 2023-04-16, Brookfield First - Online Service | April 16, 2023
-  - `EWi-cCxHflo` 2023-04-23, Brookfield First - Online Service | April 23, 2023
-  - `NZXw1QTX_ac` 2023-04-30, Brookfield First - Online Service | April 30, 2023
-  - `UhUv6PKaj_M` 2023-05-07, Brookfield First - Online Service | May 7, 2023
-  - `Dz4l728uYKg` 2023-05-14, Brookfield First - Online Service | May 14, 2023
-  - `JPwUyCFnjas` 2023-05-21, Brookfield First - Online Service | May 21, 2023
-  - `phit6QCVVJY` 2023-06-04, Brookfield First - Online Service | June 4, 2023
-  - `AHDbjhrsXn0` 2023-06-11, Brookfield First - Online Service | June 11, 2023
-  - `ESNNqA16jGw` 2023-06-18, Brookfield First - Online Service | June 18, 2023
-  - `vsfXHowcunk` 2023-06-25, Brookfield First - Online Service | June 25, 2023
-  - `Ds8o43AmF_U` 2023-07-02, Brookfield First - Online Service | July 2, 2023
-  - `wt_QDWvLVwY` 2023-07-09, Brookfield First - Online Service | July 9, 2023
   - `82C-aS8JOKw` 2023-07-14, Welcome to the Brookfield First Youtube Channel!
-  - `VlIzfw7WpqE` 2023-07-16, Brookfield First - Online Service | July 16, 2023
-  - `Iv6CaELwntk` 2023-07-23, Brookfield First - Online Service | July 23, 2023
-  - `PMIblOZLiuM` 2023-07-30, Brookfield First - Online Service | July 30, 2023
-  - `oCZQHM9-aS8` 2023-08-06, Brookfield First - Online Service | August 6, 2023
-  - `91Dt2J3Utvs` 2023-08-13, Brookfield First - Online Service | August 13, 2023
-  - `xYKgRtjajFU` 2023-08-20, Brookfield First - Online Service | August 20, 2023
-  - `2PVNDh_SxI8` 2023-08-27, Brookfield First - Online Service | August 27, 2023
   - `RosBFCA-dUA` 2023-09-10, Dear 21st Century Church
   - `ZJN1he-Hhbs` 2023-09-17, All the Called
   - `R1m8CtFiHBc` 2023-09-24, Is Christ Divided?
@@ -172,9 +59,6 @@ A row's date is the day its title prints ("August 23, 2020"), which is the Sunda
   - `vjyLGESSrQI` 2023-11-26, Found Faithful
   - `lUM4I5QGV4M` 2023-12-31, Following Jesus into 2024
   - `-6kwEEFZJk4` 2024-01-07, If You Walk With God
-  - `WLpfcR2_L-E` 2024-01-14, Brookfield First - Online Service | January 14, 2024
-  - `3nj4hwUAKwU` 2024-01-21, Brookfield First - Online Service | January 21, 2024
-  - `tMMxFNvp4Jc` 2024-01-28, Brookfield First - Online Service | January 28, 2024
   - `52ea_kadhDU` 2024-02-04, The Now and the Not Yet
   - `Kb_hfL752jg` 2024-02-11, Daddy D̶a̶y̶ Discipleship Care
   - `HsqiEtRGkXI` 2024-02-18, The Surprising Grace of Church Discipline
@@ -198,7 +82,6 @@ A row's date is the day its title prints ("August 23, 2020"), which is the Sunda
   - `m7U7AiOm0Zk` 2024-07-07, Love, Liberty and the Pursuit of God's Glory
   - `RHv9aES72Ek` 2024-07-28, What the Lord's Supper Isn't
   - `YlW2X-9UM5Q` 2024-08-04, What the Lord's Supper IS
-  - `GJI_X_fDUXM` 2024-08-18, Brookfield First - Online Service | August 18, 2024
   - `GggUbYjr-3k` 2024-08-25, Unleashing the Power of Everybody
   - `bHmXpIDSBDg` 2024-09-01, The More Excellent Way
   - `iFn-zYQYjD8` 2024-09-15, The Gospel-Centered Life

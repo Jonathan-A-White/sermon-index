@@ -278,7 +278,7 @@ func TestFillReportCountsWhatSubsplashHasAndTheIndexLacks(t *testing.T) {
 		t.Errorf("verses/themes/neither %+v", res)
 	}
 	r := read(t, report)
-	for _, w := range []string{"3 sermons", "ONLYROW", "ccccccc", "Only On Subsplash", "2026-11-01"} {
+	for _, w := range []string{"3 sermons", "1 lines have `from` = `browse`", "ONLYROW", "ccccccc", "Only On Subsplash", "2026-11-01"} {
 		if !strings.Contains(r, w) {
 			t.Errorf("the report lacks %q:\n%s", w, r)
 		}

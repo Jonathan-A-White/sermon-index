@@ -1,5 +1,7 @@
 # Brookfield First rows with no passage (mw-o9rgo8m)
 
+> **Superseded 2026-11-19 (mw-qtu3zvz.59.38):** the church's Subsplash account was then read through the Governor's signed-in browser and the missing titles, preachers and passages were filled in from it (`docs/brookfield-first-subsplash-inventory.md`). The list and counts below are the snapshot before that; recount with the command below.
+
 A snapshot of `sources/brookfield-first/rows.jsonl` after the Dec 2023 Ruth series was filled in (mw-o9rgo8m): the rows that carry no `ref`, so no place in the Bible's reader lists them (rows match a place only by ref). Listed from the file by a one-off script; a later `go run ./tools/brookfield-youtube` run or `--merge-only` can fill more, so recount with `grep -vc '"ref"' sources/brookfield-first/rows.jsonl` (rows without a ref).
 
 **132 of 355 rows have no ref.** By year (the row's date):

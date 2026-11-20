@@ -316,7 +316,11 @@ func Fill(entries []InvEntry, rows []sources.Row, files FillFiles) (FillResult, 
 		}
 	}
 	if files.Report != "" {
-		if err := writeFileAtomic(files.Report, []byte(fillReport(res, entries, unmatched, claims, rows)), 0o644); err != nil {
+		bl, err := browseLines(files.Passages)
+		if err != nil {
+			return res, err
+		}
+		if err := writeFileAtomic(files.Report, []byte(fillReport(res, bl, entries, unmatched, claims, rows)), 0o644); err != nil {
 			return res, err
 		}
 	}
@@ -382,7 +386,7 @@ type invClaim struct {
 	how string
 }
 
-func fillReport(res FillResult, entries, unmatched []InvEntry, claims map[string][]invClaim, rows []sources.Row) string {
+func fillReport(res FillResult, bl browseCount, entries, unmatched []InvEntry, claims map[string][]invClaim, rows []sources.Row) string {
 	var b strings.Builder
 	w := func(format string, a ...any) { fmt.Fprintf(&b, format, a...) }
 	newest, oldest := "", ""
@@ -404,10 +408,10 @@ func fillReport(res FillResult, entries, unmatched []InvEntry, claims map[string
 	w("| Matched to one index row (by date, `MatchNote`) | %d |\n", res.Matched)
 	w("| On Subsplash, no row in the index | %d |\n", res.OnlySubsplash)
 	w("| Rows of the index with no sermon on Subsplash | %d |\n", res.OnlyIndex)
-	w("| Left to the church's list: two sermons claim one row | %d |\n", res.Shared)
-	w("| Matched, where the row's own title, preacher or passage is not Subsplash's (kept, not changed) | %d |\n", res.Differ)
+	w("| Left alone: two or more sermons claim one row, so none is chosen | %d |\n", res.Shared)
+	w("| Matched, and the row's title, preacher or passage still is not Subsplash's (the row's own is kept, not changed) | %d |\n", res.Differ)
 	w("\n## What went into passages.tsv\n\n")
-	w("%d lines (`from` = `browse`; a row already in the list is not written again, %d left to it): %d set a title, %d a preacher, %d a passage. A row keeps a title, preacher and passage it already has.\n\n", res.Lines, res.Listed, res.Title, res.Preacher, res.Passage)
+	w("%d lines have `from` = `browse`: each names its row by id and carries a title (the row's own unless it was a generic \"Online Service\" one), %d a preacher and %d a passage, set where the row lacked them. A row that already had a line in the list, and a row with nothing missing that Subsplash has, got none; a second run adds nothing.\n\n", bl.Lines, bl.Preacher, bl.Passage)
 	w("## Verses and themes\n\n")
 	w("| | Sermons |\n|---|---|\n")
 	w("| With verses (a passage, from Subsplash or the row) | %d |\n", res.WithVerses)
@@ -451,3 +455,36 @@ func dateOf(r sources.Row) string {
 }
 
 func cell(s string) string { return strings.ReplaceAll(clean(s), "|", "\\|") }
+
+// browseCount is what the lines of passages.tsv with from = "browse" carry.
+type browseCount struct{ Lines, Preacher, Passage int }
+
+func browseLines(path string) (browseCount, error) {
+	var c browseCount
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return c, err
+	}
+	header := false
+	for _, line := range strings.Split(string(b), "\n") {
+		if strings.TrimSpace(line) == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		if !header {
+			header = true
+			continue
+		}
+		f := strings.Split(strings.TrimRight(line, "\r"), "\t")
+		if len(f) < 7 || strings.TrimSpace(f[6]) != "browse" {
+			continue
+		}
+		c.Lines++
+		if strings.TrimSpace(f[3]) != "" {
+			c.Preacher++
+		}
+		if strings.TrimSpace(f[4]) != "" {
+			c.Passage++
+		}
+	}
+	return c, nil
+}
