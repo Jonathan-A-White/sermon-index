@@ -1,5 +1,7 @@
 # Brookfield First: the church's Subsplash account against the index (mw-qtu3zvz.59.38)
 
+<!-- toc: none -->
+
 Written by `go run ./tools/subsplash-notes inventory-fill` from the inventory `go run ./tools/subsplash-notes inventory` read through the Governor's signed-in browser (his allowed use of his own account, polite pace; docs/operations.md, "Reading Subsplash through the signed-in browser"). The inventory itself (`data/subsplash-inventory.jsonl`: link, date, title, preacher, passage, series, themes, notes link) is git-ignored like the links file; this report holds counts and ids only. A re-run rewrites it.
 
 **384 sermons** inventoried, 2026-11-15 back to 2020-01-05 (the Morning RePhil episodes are not sermons and are left out; `data/morning-rephil.jsonl` tracks them).

@@ -401,7 +401,7 @@ func fillReport(res FillResult, bl browseCount, entries, unmatched []InvEntry, c
 			}
 		}
 	}
-	w("# Brookfield First: the church's Subsplash account against the index (mw-qtu3zvz.59.38)\n\n")
+	w("# Brookfield First: the church's Subsplash account against the index (mw-qtu3zvz.59.38)\n\n<!-- toc: none -->\n\n")
 	w("Written by `go run ./tools/subsplash-notes inventory-fill` from the inventory `go run ./tools/subsplash-notes inventory` read through the Governor's signed-in browser (his allowed use of his own account, polite pace; docs/operations.md, \"Reading Subsplash through the signed-in browser\"). The inventory itself (`data/subsplash-inventory.jsonl`: link, date, title, preacher, passage, series, themes, notes link) is git-ignored like the links file; this report holds counts and ids only. A re-run rewrites it.\n\n")
 	w("**%d sermons** inventoried, %s back to %s (the Morning RePhil episodes are not sermons and are left out; `data/morning-rephil.jsonl` tracks them).\n\n", len(entries), newest, oldest)
 	w("| | Sermons |\n|---|---|\n")
