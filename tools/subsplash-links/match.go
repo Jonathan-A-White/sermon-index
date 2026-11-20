@@ -191,7 +191,7 @@ func Link(rows []sources.Row, recs []Record, addrs []Address) Result {
 		switch {
 		case row.AltURL == nil:
 			res.Set[row.ID] = c.addr.URL
-		case *row.AltURL == c.addr.URL:
+		case *row.AltURL == c.addr.URL || codeOf(*row.AltURL) == c.addr.Code:
 			res.Already++
 		default:
 			say(c.order, c.addr, "conflict: row %s already has alt_url %s; not replaced", row.ID, *row.AltURL)
@@ -389,4 +389,15 @@ func closeTitle(title, slug string) bool {
 		}
 	}
 	return false
+}
+
+// codeOf is the code of a sermon address (the part of its last path segment
+// before the first "-"), or "" for an address that is not one of the church's.
+func codeOf(u string) string {
+	rest, ok := strings.CutPrefix(u, addressPrefix)
+	if !ok {
+		return ""
+	}
+	code, _, _ := strings.Cut(rest, "-")
+	return code
 }

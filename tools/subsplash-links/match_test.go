@@ -331,3 +331,14 @@ not json
 		t.Errorf("missing: got = %v, err = %v", got, err)
 	}
 }
+
+// A row that holds the link's code under another slug (Subsplash spells an
+// apostrophe as "-s-" or "s") already holds that link: no conflict.
+func TestLinkSameCodeOtherSlugIsAlready(t *testing.T) {
+	rs := []sources.Row{rowOn("BIUj", "God's Strange Plan", "2025-01-05",
+		str(addressPrefix+"zqgpvn7-gods-strange-plan"))}
+	res := Link(rs, nil, []Address{addr("zqgpvn7", "god-s-strange-plan")})
+	if len(res.Set) != 0 || res.Already != 1 || len(res.Report) != 0 {
+		t.Errorf("set = %v, already = %d, report = %v", res.Set, res.Already, res.Report)
+	}
+}
