@@ -388,3 +388,24 @@ func TestRunProgressWithNothingLinked(t *testing.T) {
 		t.Errorf("nothing linked: %v", got)
 	}
 }
+
+// A Subsplash sermon code belongs to one sermon, so no two rows of the real
+// source hold the same code in their alt_url (aIVm0KqLf-E, 2022-12-30, held
+// Heart Surgeries' 6qkrpmp, which RzUTnvfZ2Y4, 2025-07-27, holds rightly).
+func TestRealRowsHoldNoSubsplashCodeTwice(t *testing.T) {
+	rf, err := readRowsFile("../../sources/brookfield-first/rows.jsonl")
+	if err != nil {
+		t.Fatal(err)
+	}
+	held := map[string]string{} // code -> row id
+	for _, r := range rf.rows {
+		if r.AltURL == nil || !strings.HasPrefix(*r.AltURL, addressPrefix) {
+			continue
+		}
+		code, _, _ := strings.Cut(strings.TrimPrefix(*r.AltURL, addressPrefix), "-")
+		if other, ok := held[code]; ok {
+			t.Errorf("rows %s and %s both hold Subsplash code %s", other, r.ID, code)
+		}
+		held[code] = r.ID
+	}
+}
