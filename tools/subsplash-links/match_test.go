@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -136,16 +138,15 @@ func TestLinkConflictAndAlready(t *testing.T) {
 	}
 }
 
-// Two different links claiming one row: neither is written.
+// Two different links claiming one row, neither with a date: neither is
+// written, and the row is named once.
 func TestLinkTwoLinksOneRow(t *testing.T) {
 	res := Link(rows(), nil, []Address{addr("aaa1111", "the-garden-gate"), addr("hhh8888", "the-garden-gate")})
-	if len(res.Set) != 0 || len(res.Report) != 2 {
-		t.Errorf("set = %v, report = %v", res.Set, res.Report)
+	if len(res.Set) != 0 || len(res.Report) != 1 {
+		t.Fatalf("set = %v, report = %v", res.Set, res.Report)
 	}
-	for _, line := range res.Report {
-		if !strings.Contains(line, "conflict") {
-			t.Errorf("line = %q", line)
-		}
+	if line := res.Report[0]; !strings.Contains(line, "conflict") || !strings.Contains(line, "aaa1111") || !strings.Contains(line, "hhh8888") {
+		t.Errorf("line = %q", line)
 	}
 }
 
@@ -189,5 +190,144 @@ func TestLinkByRecordDateWhenIDIsMissingOrUnknown(t *testing.T) {
 	res := Link(rs, rc, []Address{addr("ggg1111", "no-id-here"), addr("hhh2222", "unknown-id")})
 	if res.Set["v2"] != addr("ggg1111", "no-id-here").URL || res.Set["v5"] != addr("hhh2222", "unknown-id").URL {
 		t.Errorf("set = %v, report = %v", res.Set, res.Report)
+	}
+}
+
+// dated is an address with the date Subsplash gives its sermon.
+func dated(code, slug, date string) Address {
+	a := addr(code, slug)
+	a.Date = date
+	return a
+}
+
+func rowOn(id, title, date string, alt *string) sources.Row {
+	return sources.Row{ID: id, Title: title, URL: "https://www.youtube.com/watch?v=" + id, Date: str(date), AltURL: alt}
+}
+
+// Two links claim one row with different addresses: the one whose date is the
+// row's date is linked (the other is named, not written).
+func TestLinkConflictResolvedByDate(t *testing.T) {
+	rs := []sources.Row{rowOn("ZTuy", "Walking in the Fear of the Lord", "2026-01-25", nil)}
+	res := Link(rs, nil, []Address{
+		dated("phf3pj7", "walking-in-the-fear-of-the-lord", "2025-06-01"),
+		dated("z426dy7", "walking-in-the-fear-of-the-lord", "2026-01-25"),
+	})
+	if res.Set["ZTuy"] != addr("z426dy7", "walking-in-the-fear-of-the-lord").URL || len(res.Set) != 1 {
+		t.Errorf("set = %v, report = %v", res.Set, res.Report)
+	}
+	for _, l := range res.Report {
+		if strings.Contains(l, "none written") {
+			t.Errorf("report line %q says none written", l)
+		}
+	}
+}
+
+// The notes record's date stands in for a link with no date of its own.
+func TestLinkConflictResolvedByNotesRecordDate(t *testing.T) {
+	rs := []sources.Row{rowOn("r1", "The Narrow Door", "2031-03-09", nil)}
+	rc := []Record{{ID: "r1", Date: "2031-03-09", Title: "The Narrow Door"}}
+	res := Link(rs, rc, []Address{
+		dated("old1111", "the-narrow-door", "2029-03-10"),
+		addr("new2222", "the-narrow-door"), // no date: the one record's date, 2031-03-09
+	})
+	if res.Set["r1"] != addr("new2222", "the-narrow-door").URL {
+		t.Errorf("set = %v, report = %v", res.Set, res.Report)
+	}
+}
+
+// No claim's date is the row's: none is written, and the row is named once.
+func TestLinkConflictNoDateMatchesNamedOnce(t *testing.T) {
+	rs := []sources.Row{rowOn("aIVm", "Brookfield First Sunday Service (Live)", "2022-12-30", nil)}
+	slug := "brookfield-first-sunday-service-live"
+	res := Link(rs, nil, []Address{
+		dated("pzxx57g", slug, "2026-05-24"),
+		dated("y9782m5", slug, "2025-11-30"),
+		dated("6qkrpmp", slug, "2025-07-27"),
+	})
+	if len(res.Set) != 0 || len(res.Report) != 1 {
+		t.Fatalf("set = %v, report = %v", res.Set, res.Report)
+	}
+	for _, w := range []string{"aIVm", "pzxx57g", "y9782m5", "6qkrpmp", "none written"} {
+		if !strings.Contains(res.Report[0], w) {
+			t.Errorf("report %q lacks %q", res.Report[0], w)
+		}
+	}
+}
+
+// Two sermons on the row's date (one sermon in two series): none is guessed,
+// unless the row already holds one of them, which then stays and the other is
+// named.
+func TestLinkConflictSeveralDatesMatch(t *testing.T) {
+	slug := "walking-in-the-fear-of-the-lord"
+	two := []Address{dated("phf3pj7", slug, "2026-01-25"), dated("z426dy7", slug, "2026-01-25")}
+
+	res := Link([]sources.Row{rowOn("ZTuy", "Walking in the Fear of the Lord", "2026-01-25", nil)}, nil, two)
+	if len(res.Set) != 0 || len(res.Report) != 1 || !strings.Contains(res.Report[0], "phf3pj7") || !strings.Contains(res.Report[0], "z426dy7") {
+		t.Errorf("unheld: set = %v, report = %v", res.Set, res.Report)
+	}
+
+	held := str(addr("z426dy7", slug).URL)
+	res = Link([]sources.Row{rowOn("ZTuy", "Walking in the Fear of the Lord", "2026-01-25", held)}, nil, two)
+	if len(res.Set) != 0 || res.Already != 1 || len(res.Report) != 1 || !strings.Contains(res.Report[0], "phf3pj7") {
+		t.Errorf("held: set = %v, already = %d, report = %v", res.Set, res.Already, res.Report)
+	}
+}
+
+// A link whose title no row has is found by its date: a generic row of that
+// date, or the one row of that date whose title is close.
+func TestLinkNoTitleMatchFoundByDate(t *testing.T) {
+	rs := []sources.Row{
+		rowOn("g1", "Brookfield First Sunday Service (Live)", "2022-03-27", nil),
+		rowOn("o1", "Another Sermon Entirely", "2022-03-06", nil),
+		rowOn("f1", "Failure Isn't Final Hope", "2022-03-13", nil),
+		rowOn("f2", "Lessons Learned from Failure", "2022-04-03", nil),
+		rowOn("f3", "Dividing Line", "2022-04-03", nil),
+	}
+	res := Link(rs, nil, []Address{
+		dated("2g4g8b4", "lessons-learned-in-failure", "2022-03-27"),   // generic row, by date alone
+		dated("yxww5pq", "failure-isn-t-final", "2022-03-13"),          // close title
+		dated("lll1111", "lessons-learned-in-failure-2", "2022-04-03"), // close title among two rows
+	})
+	if res.Set["g1"] != addr("2g4g8b4", "lessons-learned-in-failure").URL {
+		t.Errorf("generic: set = %v, report = %v", res.Set, res.Report)
+	}
+	if res.Set["f1"] != addr("yxww5pq", "failure-isn-t-final").URL {
+		t.Errorf("close: set = %v, report = %v", res.Set, res.Report)
+	}
+	if res.Set["f2"] != addr("lll1111", "lessons-learned-in-failure-2").URL {
+		t.Errorf("close among two: set = %v, report = %v", res.Set, res.Report)
+	}
+}
+
+// With no date, or no row that date that fits, the old report stands.
+func TestLinkNoTitleMatchNoDateStillReported(t *testing.T) {
+	rs := []sources.Row{rowOn("o1", "Another Sermon Entirely", "2022-03-06", nil), rowOn("o2", "A Second One", "2022-03-06", nil)}
+	res := Link(rs, nil, []Address{
+		addr("aaa1111", "lessons-learned-in-failure"),
+		dated("bbb2222", "lessons-learned-in-failure", "2022-03-06"), // two rows, neither close nor generic
+	})
+	if len(res.Set) != 0 || len(res.Report) != 2 {
+		t.Fatalf("set = %v, report = %v", res.Set, res.Report)
+	}
+	for _, l := range res.Report {
+		if !strings.Contains(l, "no row has this title and no note has it") {
+			t.Errorf("line = %q", l)
+		}
+	}
+}
+
+func TestReadInventoryDates(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "inv.jsonl")
+	os.WriteFile(path, []byte(`{"code":"phf3pj7","date":"2026-01-25","title":"x"}
+not json
+{"code":"nodate"}
+{"code":"z426dy7","date":"2026-01-25"}
+`), 0o644)
+	got, err := ReadInventoryDates(path)
+	if err != nil || len(got) != 2 || got["phf3pj7"] != "2026-01-25" || got["z426dy7"] != "2026-01-25" {
+		t.Errorf("got = %v, err = %v", got, err)
+	}
+	if got, err := ReadInventoryDates(path + ".missing"); err != nil || len(got) != 0 {
+		t.Errorf("missing: got = %v, err = %v", got, err)
 	}
 }

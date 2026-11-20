@@ -32,6 +32,9 @@ type Address struct {
 	Code string
 	Slug string
 	URL  string // addressPrefix + Code + "-" + Slug, with no query
+	// Date is the date Subsplash gives the sermon (YYYY-MM-DD), when the
+	// inventory (data/subsplash-inventory.jsonl) knows the code; "" when not.
+	Date string
 }
 
 // ParseShort is the code of a short link on brookfieldfirst.subspla.sh, or

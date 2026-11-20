@@ -116,6 +116,7 @@ const (
 	defaultRows  = "sources/brookfield-first/rows.jsonl"
 	defaultNotes = "data/subsplash-notes.jsonl"
 	defaultCache = "data/subsplash-links-cache.jsonl"
+	defaultInv   = "data/subsplash-inventory.jsonl"
 	defaultList  = "sources/brookfield-first/passages.tsv"
 	defaultNoNot = "sources/brookfield-first/no-notes.tsv"
 )
@@ -186,6 +187,7 @@ func cli(args []string, stdout, stderr io.Writer, d deps) int {
 	rowsPath := fs.String("rows", defaultRows, "the rows to write alt_url to")
 	notesPath := fs.String("notes", defaultNotes, "the records file of tools/subsplash-notes (may be missing)")
 	notesPDFs := fs.String("notes-pdfs", defaultNotesPDFs(), "with --read-notes, where tools/subsplash-notes keeps the notes PDFs; a line takes the speaker its PDF's header names (\"none\" reads no PDF)")
+	invPath := fs.String("inventory", defaultInv, "the inventory of tools/subsplash-notes (may be missing): the date of each sermon's code, which settles a row two links claim")
 	cachePath := fs.String("cache", defaultCache, "the cache of code -> full address")
 	progressPath := fs.String("progress", "", "append one JSON line of progress to this file after a real run")
 	dry := fs.Bool("dry-run", false, "write nothing and make no request")
@@ -343,6 +345,15 @@ func cli(args []string, stdout, stderr io.Writer, d deps) int {
 		addrs = append(addrs, a)
 	}
 
+	dates, err := ReadInventoryDates(*invPath)
+	if err != nil {
+		return fail(err)
+	}
+	for i := range addrs {
+		if addrs[i].Date == "" {
+			addrs[i].Date = dates[addrs[i].Code]
+		}
+	}
 	res := Link(rf.rows, recs, addrs)
 	report = append(report, res.Report...)
 
@@ -386,6 +397,30 @@ func cli(args []string, stdout, stderr io.Writer, d deps) int {
 	}
 	fmt.Fprintf(stdout, "%d of %d linked\n", linked, len(rows))
 	return code
+}
+
+// ReadInventoryDates is the date of each sermon code in the inventory file
+// (tools/subsplash-notes inventory: one JSON line each with its code and date);
+// a file that does not exist holds none, and a line that is not JSON is skipped.
+func ReadInventoryDates(path string) (map[string]string, error) {
+	b, err := os.ReadFile(path)
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	dates := map[string]string{}
+	for _, line := range strings.Split(string(b), "\n") {
+		var e struct {
+			Code string `json:"code"`
+			Date string `json:"date"`
+		}
+		if json.Unmarshal([]byte(line), &e) == nil && e.Code != "" && e.Date != "" {
+			dates[e.Code] = e.Date
+		}
+	}
+	return dates, nil
 }
 
 // rowsFile is rows.jsonl read line by line, so that a line that is not
