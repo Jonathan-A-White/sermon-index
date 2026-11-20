@@ -9,6 +9,7 @@ Running the sermon index on the Laptop: where to look, what to do after a change
 - [What a wrong setting looks like](#what-a-wrong-setting-looks-like)
 - [The Brookfield First notes](#the-brookfield-first-notes)
 - [Reading Subsplash through the signed-in browser](#reading-subsplash-through-the-signed-in-browser)
+  - [The inventory of every sermon](#the-inventory-of-every-sermon)
 
 <!-- /toc -->
 
@@ -83,3 +84,13 @@ The order is kept so nothing is lost: **the PDF on disk, then the records file i
 **Check it against the mail.** `go run ./tools/subsplash-notes browse --verify 3` reads the newest three sermons that already have a mail-made record, says for each whether its title, date, row id, passage, link code and notes text (compared with the PDF's words, spaces left out) are the same, and writes nothing. A date line in the notes can differ by one day: the PDF a Saturday mail made prints that Saturday, the page the Sunday.
 
 **The Jobs page.** `--feed` (default `$POSTERN_DATA/jobs/subsplash-browse.json`, `~/.local/state/postern/jobs/` otherwise) is written after each sermon or episode with one tick ("read") for each item the list has shown, newest first, and the oldest read one as the place. The records it writes also tick "mail" and, once `subsplash-links` has run, "link" on the hourly feed `subsplash-links`.
+
+### The inventory of every sermon
+
+`go run ./tools/subsplash-notes inventory` reads every sermon on the Governor's signed-in account, newest to oldest, by the rules above (one tab, one load at a time, at least 10 s between two loads, the same stops at a login prompt, captcha, HTTP 429 or 403 or unexpected page; his B of 2026-11-16 covers it, the account's risk his). It walks the sermon list (newest 200), then the church site's series pages for the older ones, and loads **every** sermon's page, even one browse has read before, because the inventory needs what only that page shows: the preacher, the passage, the series (the line "More from <series>") and, from the Notes button, the address of the notes page. The Morning RePhil episodes are not sermons and are left to `browse`.
+
+It writes `data/subsplash-inventory.jsonl` (git-ignored, like the links file; `--inventory` names another), one line a sermon, newest first: `code`, `address`, `share`, `date`, `title`, `preacher`, `passage` (as printed), `ref` (OSIS), `series`, `themes`, `has_notes`, `notes_link`, and `row` (the id `MatchNote` gave it, the mail's matcher; there is no second one) or `no_row` with the reason. Each sermon's address is also added to the links file, as `browse` does. A sermon already in the inventory is not loaded again, so a second run resumes where the first stopped and changes no line already written; `--limit n` reads at most n sermon pages. The Jobs page has its own feed, `subsplash-inventory.json`.
+
+`themes` stays empty: the app's sermon page and its notes name no theme or tag, and the sermon-notes mails (Postern kind `sermon-notes`) carry a title, passage, date and sometimes a speaker. The "Related by Topic" the page prints lists other sermons, not tags.
+
+`go run ./tools/subsplash-notes inventory-fill` needs no browser. It matches each entry to its row with `MatchNote`, and for each row that lacks something Subsplash has (a generic title such as "Online Service | <date>", no preacher, no passage) appends one line to `sources/brookfield-first/passages.tsv` (`from` = `browse`, the row's id in `row`; a row the list already has a line for, and a row two sermons claim, are left alone; what the row already has is kept), then writes `docs/brookfield-first-subsplash-inventory.md`: what Subsplash has that the index lacks and the reverse (counts and ids), and the counts of sermons with verses, with themes and with neither. Run `go run ./tools/brookfield-youtube --merge-only` after it to put the lines on the rows and `go run ./tools/subsplash-links --links data/subsplash-browser-links.txt` to file the addresses. A second run adds nothing.

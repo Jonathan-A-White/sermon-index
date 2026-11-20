@@ -410,6 +410,18 @@ func ParseNotes(p Page) (NotesPage, error) {
 		return NotesPage{}, Stop{"unexpected page: nothing on the notes page " + p.URL}
 	}
 	m := notesTitleRE.FindStringSubmatch(ls[0])
+	if m == nil && len(ls) > 1 && strings.HasPrefix(ls[1], "Part of ") {
+		// Some notes print the title unquoted, "Title - Passage", before the
+		// same "Part of <series>" line: the passage is what follows the last
+		// " - " when it reads as one.
+		title, ref := ls[0], ""
+		if i := strings.LastIndex(ls[0], " - "); i > 0 {
+			if _, err := ReferencesToOSIS(strings.TrimSpace(ls[0][i+3:])); err == nil {
+				title, ref = ls[0][:i], ls[0][i+3:]
+			}
+		}
+		m = []string{ls[0], title, ref}
+	}
 	if m == nil {
 		return NotesPage{}, Stop{"unexpected page: the notes page " + p.URL + " does not open with a quoted title"}
 	}

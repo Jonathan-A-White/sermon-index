@@ -116,6 +116,22 @@ func TestParseNotes(t *testing.T) {
 	}
 }
 
+// Some notes print the title with no quotes and a hyphen before the passage.
+func TestParseNotesWithAnUnquotedTitle(t *testing.T) {
+	page := func(first string) Page {
+		return Page{URL: "https://notes.subsplash.com/fill-in/view?page=abc", Status: 200, Text: first + "\nPart of A Made-Up Series  August 18, 2024\n\nFirst point\n"}
+	}
+	n, err := ParseNotes(page("The Invented Gifts - 1 Corinthians 12:7-11"))
+	if err != nil || n.Title != "The Invented Gifts" || n.Reference != "1 Corinthians 12:7-11" || n.Date != "2024-08-18" || n.URL == "" {
+		t.Errorf("got %+v, %v", n, err)
+	}
+	// A hyphen in the title that no passage follows stays in the title.
+	n, err = ParseNotes(page("Grace - and Truth"))
+	if err != nil || n.Title != "Grace - and Truth" || n.Reference != "" {
+		t.Errorf("got %+v, %v", n, err)
+	}
+}
+
 func TestParseList(t *testing.T) {
 	items, pages, err := ParseList(listPage(10,
 		[2]string{"Morning RePhil #479", "fnnh79c"}, [2]string{"The Invented Sermon", "3nxf2bb"}, [2]string{"Morning RePhil #478", "b2kbz4b"}))
