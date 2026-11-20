@@ -191,7 +191,7 @@ func Link(rows []sources.Row, recs []Record, addrs []Address) Result {
 		switch {
 		case row.AltURL == nil:
 			res.Set[row.ID] = c.addr.URL
-		case *row.AltURL == c.addr.URL || codeOf(*row.AltURL) == c.addr.Code:
+		case holds(*row.AltURL, c.addr):
 			res.Already++
 		default:
 			say(c.order, c.addr, "conflict: row %s already has alt_url %s; not replaced", row.ID, *row.AltURL)
@@ -202,6 +202,17 @@ func Link(rows []sources.Row, recs []Record, addrs []Address) Result {
 		res.Report = append(res.Report, l.text)
 	}
 	return res
+}
+
+// holds says whether alt, a row's alt_url, is the address a: the same address,
+// or one of the same code under another spelling of the slug (Subsplash's
+// slug for an apostrophe is a hyphen or nothing). The code is the identity.
+func holds(alt string, a Address) bool {
+	if alt == a.URL {
+		return true
+	}
+	code := codeOf(alt)
+	return code != "" && code == a.Code
 }
 
 // find is the index of the row a slug belongs to, or why not.
@@ -283,7 +294,7 @@ func resolveClaims(row sources.Row, cs []claim, say sayFunc) []claim {
 	if len(onDate) > 1 && row.AltURL != nil {
 		var held []claim
 		for _, c := range onDate {
-			if c.addr.URL == *row.AltURL {
+			if holds(*row.AltURL, c.addr) {
 				held = append(held, c)
 			}
 		}

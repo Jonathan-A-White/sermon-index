@@ -138,6 +138,23 @@ func TestLinkConflictAndAlready(t *testing.T) {
 	}
 }
 
+// A row holding the same code under another slug spelling is already linked:
+// Subsplash's slug for an apostrophe is a hyphen or nothing, so the code is
+// the identity, not the whole address. A different code is still a conflict.
+func TestLinkSameCodeOtherSlugOrOtherCode(t *testing.T) {
+	rs := rows()
+	rs[5].AltURL = str(addr("bbb2222", "god-s-quiet-work").URL)
+	res := Link(rs, recs(), []Address{addr("bbb2222", "gods-quiet-work")})
+	if len(res.Set) != 0 || res.Already != 1 || len(res.Report) != 0 {
+		t.Errorf("set = %v, already = %d, report = %v", res.Set, res.Already, res.Report)
+	}
+	rs[5].AltURL = str(addr("zzz9999", "god-s-quiet-work").URL)
+	res = Link(rs, recs(), []Address{addr("bbb2222", "gods-quiet-work")})
+	if res.Already != 0 || len(res.Report) != 1 || !strings.Contains(res.Report[0], "conflict") {
+		t.Errorf("a different code: already = %d, report = %v", res.Already, res.Report)
+	}
+}
+
 // Two different links claiming one row, neither with a date: neither is
 // written, and the row is named once.
 func TestLinkTwoLinksOneRow(t *testing.T) {
