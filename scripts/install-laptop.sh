@@ -9,7 +9,9 @@
 #   1. builds `sermons` (go build, the git describe stamped in as the version)
 #      to ~/.local/bin/sermons;
 #   2. writes ~/.config/sermon-index/pg.env and env (mode 0600) if absent,
-#      with a password made once by `openssl rand -hex 24`, never printed;
+#      with a password made once by `openssl rand -hex 24`, never printed, and
+#      adds SERMONS_REPHIL (this checkout's data/morning-rephil.jsonl) to an
+#      env file that lacks it;
 #   3. copies deploy/laptop/*.service to ~/.config/systemd/user and runs
 #      `systemctl --user daemon-reload` when one changed;
 #   4. enables and starts the Postgres unit, waits for it (PG_WAIT seconds,
@@ -109,6 +111,16 @@ if [ ! -f "$CONF/env" ]; then
 	changed "wrote $CONF/env (0600)"
 fi
 PW=
+# SERMONS_REPHIL: the file /v1/rephil reads on every request, the checkout's own
+# data/morning-rephil.jsonl, so the refresh (scripts/refresh-brookfield.sh) is
+# what the next answer shows. Added to an env file that lacks it; a value
+# already there is the operator's and is left alone.
+ENV_CHANGED=0
+if ! grep -q '^SERMONS_REPHIL=' "$CONF/env"; then
+	printf 'SERMONS_REPHIL=%s\n' "$ROOT/data/morning-rephil.jsonl" >> "$CONF/env"
+	ENV_CHANGED=1
+	changed "added SERMONS_REPHIL=$ROOT/data/morning-rephil.jsonl to $CONF/env"
+fi
 ADDR=$(sed -n 's/^SERMONS_ADDR=//p' "$CONF/env" | head -n 1)
 [ -n "$ADDR" ] || die "$CONF/env has no SERMONS_ADDR"
 
@@ -162,7 +174,7 @@ case "$out" in *applied*) CHANGED=1 ;; esac
 
 # 5. The service.
 if systemctl --user is-enabled "$SVC_UNIT" >/dev/null 2>&1 && systemctl --user is-active "$SVC_UNIT" >/dev/null 2>&1; then
-	if [ "$BIN_CHANGED" = 1 ] || [ "$SVC_UNIT_CHANGED" = 1 ]; then
+	if [ "$BIN_CHANGED" = 1 ] || [ "$SVC_UNIT_CHANGED" = 1 ] || [ "$ENV_CHANGED" = 1 ]; then
 		systemctl --user restart "$SVC_UNIT"
 		changed "restarted $SVC_UNIT"
 	fi

@@ -304,6 +304,7 @@ func TestInstallWritesWhatItSays(t *testing.T) {
 		"DATABASE_URL=postgres://sermons:" + pw + "@127.0.0.1:5433/sermons",
 		"SERMONS_ADDR=10.88.0.2:8790",
 		"SERMONS_ORIGINS=https://lampas.allmymind.org,http://localhost:5173",
+		"SERMONS_REPHIL=" + filepath.Join(r.root, "data/morning-rephil.jsonl"),
 	} {
 		if !strings.Contains(env, want) {
 			t.Errorf("env lacks %s:\n%s", want, strings.ReplaceAll(env, pw, "<pw>"))

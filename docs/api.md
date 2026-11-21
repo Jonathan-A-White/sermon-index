@@ -16,6 +16,7 @@
 - [GET /v1/themes](#get-v1themes)
 - [GET /v1/search](#get-v1search)
 - [GET /v1/text](#get-v1text)
+- [GET /v1/rephil](#get-v1rephil)
 - [Errors](#errors)
 - [Not done yet](#not-done-yet)
 
@@ -35,6 +36,7 @@ curl -s 'http://127.0.0.1:8790/v1/sermons?ref=rom.5.8'
 | `DATABASE_URL` | (required) | The Postgres URL. If the database is down when `serve` starts, it still starts, logs a warning, and answers 503 until the database answers. |
 | `SERMONS_ADDR` | `127.0.0.1:8790` | The address to listen on (`10.88.0.2:8790` on the Laptop, behind the VPS). |
 | `SERMONS_TEXT_DIR` | `sermon-index/text` under the user's cache directory (`~/.cache` on Linux) | Where `/v1/text` keeps the pages it fetches (never in the repository). |
+| `SERMONS_REPHIL` | (none) | The file `/v1/rephil` reads on every request, the checkout's `data/morning-rephil.jsonl` (`scripts/install-laptop.sh` adds it to the service's env file). Not set, or unreadable: that route answers 503. |
 | `SERMONS_ORIGINS` | `https://lampas.allmymind.org,http://localhost:5173` | The origins a browser may read the API from (CORS), comma-separated. |
 
 `serve` stops cleanly on SIGINT or SIGTERM, letting requests in flight finish (up to 10 seconds).
@@ -596,6 +598,53 @@ Example (400): `GET /v1/text`
 }
 ```
 
+## GET /v1/rephil
+
+The *Morning RePhil* devotional episodes of Brookfield First (a short video a day, numbered), for a reader that shows one a day in order: `GET /v1/rephil`, no query. The answer is a **bare JSON array** (not `{rows}` like the routes above), **oldest first** (by `date`, then `number`), one row for every episode: `{number, title, date, share, video}`.
+
+- `number`: the episode's number (`Morning RePhil #309` is 309); `title` and `date` (`YYYY-MM-DD`) are the channel's.
+- `share`: the Subsplash share link (`https://brookfieldfirst.subspla.sh/<code>`), the link a reader opens; `null` for an episode with no share link yet (the newest, until its link is found).
+- `video`: the YouTube video id alone (`aGjZ0tgU47I`; the watch link is `https://www.youtube.com/watch?v=<video>`), `null` where it is not known (most are on the channel's own list; some are only on Subsplash).
+
+The episodes are not in the database: they are **read from `data/morning-rephil.jsonl` on every request** (`SERMONS_REPHIL`; 503 `unavailable` when it is not set or cannot be read, 500 `internal` when a line is not JSON). Two lines of the file with one number (the channel's video before its share link is found, and Subsplash's link) are one row with both. This is how the **30-day rule** of YouTube's Developer Policies is kept ([README](../README.md), "The Brookfield First refresh"): the `video` id is served only from the file as the last refresh wrote it, never held in memory, the database or a cache past it, so a refresh that drops a video drops its id from the next answer (an answer a client or the front door already holds may be five minutes old, as for every route). `notes_file` and the file's other fields are not served.
+
+The example is the test fixture `sources/_fixtures/rephil/morning-rephil.jsonl`, not the real list.
+
+Example: `GET /v1/rephil`
+
+```json
+[
+  {
+    "number": 300,
+    "title": "Morning RePhil #300",
+    "date": "2024-01-07",
+    "share": "https://brookfieldfirst.subspla.sh/hpp9pq4",
+    "video": null
+  },
+  {
+    "number": 302,
+    "title": "Morning RePhil #302",
+    "date": "2024-01-14",
+    "share": "https://brookfieldfirst.subspla.sh/br2bczk",
+    "video": "aGjZ0tgU47I"
+  },
+  {
+    "number": 303,
+    "title": "Morning RePhil #303",
+    "date": "2024-01-21",
+    "share": "https://brookfieldfirst.subspla.sh/thd5c6d",
+    "video": "LZEwbd652-Y"
+  },
+  {
+    "number": 304,
+    "title": "Morning RePhil #304",
+    "date": "2024-01-28",
+    "share": null,
+    "video": "yGY16nh3_ow"
+  }
+]
+```
+
 ## Errors
 
 Every error is `{error, detail}`: `error` a stable code a client may branch on, `detail` a sentence for a person.
@@ -611,9 +660,9 @@ Every error is `{error, detail}`: `error` a stable code a client may branch on, 
 | 404 | `no_text` | `/v1/text`: the sermon's source is not public-domain text, or its page's host has no reader. |
 | 405 | `method_not_allowed` | A method other than GET, HEAD or OPTIONS; `Allow: GET, HEAD, OPTIONS`. |
 | 429 | `rate_limited` | Past the rate limit; `Retry-After` says when to try again. |
-| 500 | `internal` | A query failed while the database answers; the error is logged. |
+| 500 | `internal` | A query failed while the database answers, or `/v1/rephil`'s file is not well formed; the error is logged. |
 | 502 | `fetch_failed`, `no_text_in_page` | `/v1/text`: the sermon's page could not be fetched, or has no sermon on it. |
-| 503 | `unavailable` | The database does not answer. |
+| 503 | `unavailable` | The database does not answer; `/v1/rephil`: its file is not set or cannot be read. |
 | 503 | `busy` | `/v1/text`: the wait for the host's turn is over 20 seconds; `Retry-After` says when to ask again. |
 
 ## Not done yet

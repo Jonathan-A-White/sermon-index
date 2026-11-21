@@ -104,14 +104,15 @@ func newTestServerWith(t *testing.T, db *pgxpool.Pool, set func(*Config)) *testS
 	t.Helper()
 	ts := &testServer{log: &syncBuffer{}, clock: &clock{t: time.Date(2026, 11, 5, 12, 0, 0, 0, time.UTC)}}
 	c := Config{
-		DB:        db,
-		Version:   testVersion,
-		Origins:   ParseOrigins(DefaultOrigins),
-		Log:       ts.log,
-		Now:       ts.clock.now,
-		TextFetch: newPageFetcher(t).fetch,
-		TextDir:   t.TempDir(),
-		TextDelay: time.Millisecond,
+		DB:         db,
+		Version:    testVersion,
+		Origins:    ParseOrigins(DefaultOrigins),
+		Log:        ts.log,
+		Now:        ts.clock.now,
+		TextFetch:  newPageFetcher(t).fetch,
+		TextDir:    t.TempDir(),
+		TextDelay:  time.Millisecond,
+		RephilFile: rephilFixture,
 	}
 	if set != nil {
 		set(&c)
@@ -238,7 +239,7 @@ func TestDocExamples(t *testing.T) {
 			routes[path] = true
 		}
 	}
-	for _, r := range []string{"/v1/health", "/v1/sources", "/v1/sermons", "/v1/themes", "/v1/search", "/v1/text"} {
+	for _, r := range []string{"/v1/health", "/v1/sources", "/v1/sermons", "/v1/themes", "/v1/search", "/v1/text", "/v1/rephil"} {
 		if !routes[r] {
 			t.Errorf("docs/api.md has no 200 example for %s", r)
 		}
