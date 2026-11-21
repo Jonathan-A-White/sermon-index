@@ -43,6 +43,10 @@ type Config struct {
 	TextDir   string
 	TextFetch func(ctx context.Context, url string) ([]byte, error)
 	TextDelay time.Duration
+
+	// /v1/rephil (rephil.go): the file of Morning RePhil episodes
+	// (data/morning-rephil.jsonl), read on every request; empty answers 503.
+	RephilFile string
 }
 
 // ParseOrigins reads a comma-separated list of origins, dropping blanks
@@ -63,6 +67,8 @@ type server struct {
 	version string
 	errLog  *log.Logger
 	pages   *pageCache
+
+	rephilFile string
 }
 
 // New is the API's handler: the routes inside the request log, CORS and
@@ -77,7 +83,7 @@ func New(c Config) http.Handler {
 		logw = io.Discard
 	}
 	s := &server{db: c.DB, version: c.Version, errLog: log.New(logw, "", 0),
-		pages: newPageCache(c.TextDir, c.TextFetch, c.TextDelay)}
+		pages: newPageCache(c.TextDir, c.TextFetch, c.TextDelay), rephilFile: c.RephilFile}
 
 	mux := http.NewServeMux()
 	// A "GET" pattern answers HEAD too.
@@ -88,6 +94,7 @@ func New(c Config) http.Handler {
 	mux.HandleFunc("GET /v1/themes", s.themes)
 	mux.HandleFunc("GET /v1/search", s.search)
 	mux.HandleFunc("GET /v1/text", s.text)
+	mux.HandleFunc("GET /v1/rephil", s.rephil)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, http.StatusNotFound, "not_found", "no such route: "+r.URL.Path+" (the routes are in docs/api.md)")
 	})
