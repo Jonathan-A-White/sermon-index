@@ -895,3 +895,112 @@ func TestTextSermonsKnowWhichSourcesServeText(t *testing.T) {
 		t.Errorf("no such id: %+v", got)
 	}
 }
+
+// A sermon's topics (free subject labels, mw-qtu3zvz.198, loaded by
+// mw-qtu3zvz.209) are served by mw-qtu3zvz.242: in the passage tier, in the
+// theme tier (a direct row too) and in search; a sermon with none leaves the
+// key out of its JSON.
+func TestSermonTopicsServed(t *testing.T) {
+	ctx := context.Background()
+	const id = "luther-annotated-1-logos"
+	want := []string{"indulgences", "grace", "penance", "satisfaction", "scholastic theology"}
+
+	// The Luther volume 1 sermon has no passage, so it is found only by a
+	// direct link to a topic: copy the source beside a theme source and link it.
+	parent := t.TempDir()
+	luther := filepath.Join(parent, id)
+	if err := os.Mkdir(luther, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range []string{"source.toml", "rows.jsonl"} {
+		b, err := os.ReadFile(filepath.Join("../../sources", id, f))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(luther, f), b, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	link := `{"row": "ANNOTLUTV1.1-409450", "theme": "tx", "topic": "narrow"}` + "\n"
+	if err := os.WriteFile(filepath.Join(luther, "sermon-topics.jsonl"), []byte(link), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	tx := themeSourceIn(t, parent, "tx")
+	plain := sermonSourceIn(t, parent, "plain",
+		`{"id": "1", "title": "Has topics", "ref": "Rom.5.8", "url": "https://example.org/1", "topics": ["love", "the cross"]}`,
+		`{"id": "2", "title": "Has none", "ref": "Rom.5.9", "url": "https://example.org/2"}`)
+	db := loaded(t, luther, tx, plain)
+
+	// The theme tier: the Luther sermon is a direct row.
+	_, trows, err := store.ThemeSermons(ctx, db, store.ThemeQuery{Span: ref(t, "Rom.5.8"), Limit: 50})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var found bool
+	for _, r := range trows {
+		if r.Source == id && r.ID == "ANNOTLUTV1.1-409450" {
+			found = true
+			if !reflect.DeepEqual(r.Topics, want) {
+				t.Errorf("theme tier: Luther topics = %v, want %v", r.Topics, want)
+			}
+			b, err := json.Marshal(r)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(string(b), `"topics":["indulgences","grace","penance","satisfaction","scholastic theology"]`) {
+				t.Errorf("theme tier JSON has no topics: %s", b)
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("the Luther sermon is not in the theme tier: %v", themeKeys(trows))
+	}
+
+	// The passage tier: a row with topics carries them, one with none omits the key.
+	_, rows, err := store.Sermons(ctx, db, store.SermonQuery{Span: ref(t, "Rom.5.8-Rom.5.9"), Limit: 50})
+	if err != nil {
+		t.Fatal(err)
+	}
+	seen := 0
+	for _, r := range rows {
+		if r.Source != "plain" {
+			continue
+		}
+		seen++
+		b, err := json.Marshal(r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		switch r.ID {
+		case "1":
+			if !reflect.DeepEqual(r.Topics, []string{"love", "the cross"}) || !strings.Contains(string(b), `"topics":["love","the cross"]`) {
+				t.Errorf("passage tier: %v %s", r.Topics, b)
+			}
+		case "2":
+			if r.Topics != nil || strings.Contains(string(b), "topics") {
+				t.Errorf("a sermon with none: %v %s", r.Topics, b)
+			}
+		}
+	}
+	if seen != 2 {
+		t.Errorf("passage tier answered %d of the plain sermons, want 2", seen)
+	}
+
+	// Search: a sermon hit carries its topics; a theme hit has none.
+	hits, err := store.Search(ctx, db, "indulgences grace")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, h := range hits {
+		if h.Kind == "sermon" && h.Source == id && !reflect.DeepEqual(h.Topics, want) {
+			t.Errorf("search: Luther topics = %v, want %v", h.Topics, want)
+		}
+	}
+	hits, err = store.Search(ctx, db, "Has topics")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) == 0 || !reflect.DeepEqual(hits[0].Topics, []string{"love", "the cross"}) {
+		t.Errorf("search Has topics: %+v", hits)
+	}
+}

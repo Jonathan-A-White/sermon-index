@@ -128,6 +128,7 @@ The answer is `{ref, total, rows}`: `ref` the reference read, in OSIS; `total` t
 | `kind` | `link`, `hosted` or `exposition`. |
 | `ref`, `role` | The passage that answered: the preaching text (`role: "text"`) when it overlaps, else the narrowest reference the sermon cites (`role: "cited"`) that does. |
 | `width` | That passage's length in verses (`Rom.5.12-Rom.6.4` is 14). |
+| `topics` | The sermon's free subject labels, an array of strings (`["indulgences", "grace"]`), as its source's `rows.jsonl` gives them ([sources.md](sources.md)). **Left out** (no key, not `null`) when the sermon has none, so an answer over a source with no topics is byte for byte what it was. They are not the `theme` of the theme tier, which names a topic of a theme source. The theme tier's rows and `/v1/search`'s sermon rows carry the same key. |
 
 **The order**: preaching texts before cited references; then narrower before wider, by the passage's span of verse ordinals, so a passage within one chapter comes before any that crosses a chapter boundary (a three-verse passage across Romans 5 and 6 comes after the whole of Romans 5; within one chapter it is the number of verses); then by source id; then by id, a number as a number (`9` before `10`).
 
@@ -495,6 +496,7 @@ Full-text search over the sermons' titles and preachers and the themes' labels: 
 | `ref` | A sermon's preaching text, or `null` (a sermon with none; every theme). |
 | `url` | A sermon's url; `null` for a theme. |
 | `rank` | Postgres `ts_rank`, to four places: higher is better; comparable only within one answer. |
+| `topics` | A sermon's free subject labels, as in [`/v1/sermons`](#get-v1sermons); left out when it has none and for every theme. Search does not look in them. |
 
 Example: `GET /v1/search?q=spurgeon+grace`
 

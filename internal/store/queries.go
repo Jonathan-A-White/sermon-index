@@ -91,6 +91,9 @@ type SermonRow struct {
 	Ref      string  `json:"ref"`
 	Role     string  `json:"role"`
 	Width    int     `json:"width"`
+	// Topics are the sermon's free subject labels (rows.jsonl `topics`), left
+	// out of the JSON when it has none.
+	Topics []string `json:"topics,omitempty"`
 }
 
 // The order of a passage answer, in SQL over a row with role, lo and hi
@@ -123,7 +126,7 @@ func Sermons(ctx context.Context, db *pgxpool.Pool, q SermonQuery) (int, []Sermo
 	}
 	rows, err := db.Query(ctx, `
 		WITH b AS (`+bestPassage+`)
-		SELECT s.source_id, s.id, s.title, s.preacher, s.date, s.url, s.alt_url, s.kind, b.ref_osis, b.role, b.lo, b.hi
+		SELECT s.source_id, s.id, s.title, s.preacher, s.date, s.url, s.alt_url, s.kind, b.ref_osis, b.role, b.lo, b.hi, s.topics
 		FROM b JOIN sermons s ON s.source_id = b.source_id AND s.id = b.sermon_id
 		ORDER BY b.role = 'text' DESC, b.hi - b.lo, s.source_id, `+fmt.Sprintf(naturalID, "s.id")+`
 		LIMIT $4 OFFSET $5`, q.Span.PG(), filter, srcs, q.Limit, q.Offset)
@@ -133,7 +136,7 @@ func Sermons(ctx context.Context, db *pgxpool.Pool, q SermonQuery) (int, []Sermo
 	out, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (SermonRow, error) {
 		var s SermonRow
 		var lo, hi int
-		err := r.Scan(&s.Source, &s.ID, &s.Title, &s.Preacher, &s.Date, &s.URL, &s.AltURL, &s.Kind, &s.Ref, &s.Role, &lo, &hi)
+		err := r.Scan(&s.Source, &s.ID, &s.Title, &s.Preacher, &s.Date, &s.URL, &s.AltURL, &s.Kind, &s.Ref, &s.Role, &lo, &hi, &s.Topics)
 		s.Width = Verses(lo, hi-1)
 		return s, err
 	})
@@ -373,7 +376,7 @@ func ThemeSermons(ctx context.Context, db *pgxpool.Pool, q ThemeQuery) (int, []T
 	rows, err := db.Query(ctx, `
 		WITH b AS (`+themeTier+`)
 		SELECT s.source_id, s.id, s.title, s.preacher, s.date, s.url, s.alt_url, s.kind, b.direct, b.ref_osis, b.lo, b.hi,
-		       b.theme_source, b.theme_id, b.label, b.part_n, b.part_label
+		       b.theme_source, b.theme_id, b.label, b.part_n, b.part_label, s.topics
 		FROM b JOIN sermons s ON s.source_id = b.source_id AND s.id = b.sermon_id
 		ORDER BY b.direct DESC, b.verses NULLS LAST,
 		         CASE WHEN b.direct THEN b.theme_source END, CASE WHEN b.direct THEN b.theme_id END,
@@ -388,7 +391,7 @@ func ThemeSermons(ctx context.Context, db *pgxpool.Pool, q ThemeQuery) (int, []T
 		var lo, hi *int
 		var part *int32
 		err := r.Scan(&s.Source, &s.ID, &s.Title, &s.Preacher, &s.Date, &s.URL, &s.AltURL, &s.Kind, &s.Direct, &ref, &lo, &hi,
-			&s.Theme.Source, &s.Theme.Topic, &s.Theme.Label, &part, &s.Theme.PartLabel)
+			&s.Theme.Source, &s.Theme.Topic, &s.Theme.Label, &part, &s.Theme.PartLabel, &s.Topics)
 		if ref != nil && lo != nil && hi != nil {
 			s.Ref, s.Role, s.Width = *ref, "text", Verses(*lo, *hi-1)
 		}
@@ -418,6 +421,9 @@ type Hit struct {
 	Ref    *string `json:"ref"`
 	URL    *string `json:"url"`
 	Rank   float64 `json:"rank"`
+	// Topics are a sermon's free subject labels, left out when it has none
+	// (and always for a theme).
+	Topics []string `json:"topics,omitempty"`
 }
 
 // Search is Postgres full-text search of q (websearch_to_tsquery, 'english')
@@ -432,12 +438,12 @@ func Search(ctx context.Context, db *pgxpool.Pool, q string) ([]Hit, error) {
 			       (SELECT p.ref_osis FROM sermon_passages p
 			        WHERE p.source_id = s.source_id AND p.sermon_id = s.id AND p.role = 'text'
 			        ORDER BY lower(p.span), p.ref_osis LIMIT 1) AS ref,
-			       s.url, ts_rank(s.search, q.q) AS rank
+			       s.url, ts_rank(s.search, q.q) AS rank, s.topics
 			FROM sermons s, q WHERE s.search @@ q.q
 			UNION ALL
-			SELECT 'theme', t.source_id, t.id, t.label, NULL, NULL, ts_rank(t.search, q.q)
+			SELECT 'theme', t.source_id, t.id, t.label, NULL, NULL, ts_rank(t.search, q.q), NULL::text[]
 			FROM themes t, q WHERE t.search @@ q.q)
-		SELECT kind, source_id, id, title, ref, url, round(rank::numeric, 4)::float8 AS r
+		SELECT kind, source_id, id, title, ref, url, round(rank::numeric, 4)::float8 AS r, topics
 		FROM h
 		ORDER BY r DESC, kind, source_id, `+fmt.Sprintf(naturalID, "id")+`
 		LIMIT $2`, q, SearchLimit)
@@ -446,7 +452,7 @@ func Search(ctx context.Context, db *pgxpool.Pool, q string) ([]Hit, error) {
 	}
 	out, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (Hit, error) {
 		var h Hit
-		err := r.Scan(&h.Kind, &h.Source, &h.ID, &h.Title, &h.Ref, &h.URL, &h.Rank)
+		err := r.Scan(&h.Kind, &h.Source, &h.ID, &h.Title, &h.Ref, &h.URL, &h.Rank, &h.Topics)
 		return h, err
 	})
 	if out == nil {
