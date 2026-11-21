@@ -604,7 +604,7 @@ The *Morning RePhil* devotional episodes of Brookfield First (a short video a da
 
 - `number`: the episode's number (`Morning RePhil #309` is 309); `title` and `date` (`YYYY-MM-DD`) are the channel's.
 - `share`: the Subsplash share link (`https://brookfieldfirst.subspla.sh/<code>`), the link a reader opens; `null` for an episode with no share link yet (the newest, until its link is found).
-- `video`: the YouTube video id alone (`aGjZ0tgU47I`; the watch link is `https://www.youtube.com/watch?v=<video>`), `null` where it is not known (168 of the episodes are on the channel's own list; the rest are only on Subsplash).
+- `video`: the YouTube video id alone (`aGjZ0tgU47I`; the watch link is `https://www.youtube.com/watch?v=<video>`), `null` where it is not known (most are on the channel's own list; some are only on Subsplash).
 
 The episodes are not in the database: they are **read from `data/morning-rephil.jsonl` on every request** (`SERMONS_REPHIL`; 503 `unavailable` when it is not set or cannot be read, 500 `internal` when a line is not JSON). Two lines of the file with one number (the channel's video before its share link is found, and Subsplash's link) are one row with both. This is how the **30-day rule** of YouTube's Developer Policies is kept ([README](../README.md), "The Brookfield First refresh"): the `video` id is served only from the file as the last refresh wrote it, never held in memory, the database or a cache past it, so a refresh that drops a video drops its id from the next answer (an answer a client or the front door already holds may be five minutes old, as for every route). `notes_file` and the file's other fields are not served.
 
