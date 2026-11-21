@@ -12,7 +12,7 @@ rows written:                        92
 lines dropped:                       0
 rows with a ref:                     92
   of them read from the label:       92
-  of them with cited references:     58
+  of them with cited references:     60
 rows with no ref:                    0
 series rows (ref over >3 chapters):  0
 rows with their own date:            0

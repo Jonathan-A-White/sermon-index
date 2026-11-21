@@ -2626,6 +2626,34 @@ func TestFullerVolume1SermonsWithAHeadingTextAreIndexed(t *testing.T) {
 	}
 }
 
+// The eight rows of fullerVolume1HeadingTexts were first written by hand
+// (mw-qtu3zvz.200) with no Logos session to read them through, so they had a
+// cited list holding only their own heading text and no section length. They
+// are re-read (mw-qtu3zvz.211): every one carries its length, and its first
+// cited passage is still the heading's own text.
+func TestFullerVolume1HeadingTextRowsCarryTheirReadLength(t *testing.T) {
+	const slug = "the-complete-works-of-andrew-fuller-volume-1-memoirs-sermons-etc"
+	inputs := readFile(t, filepath.Join("../../data/logos-index", slug+"-sermons.jsonl"))
+	seen := map[string]bool{}
+	for _, in := range inputs {
+		if _, ok := fullerVolume1HeadingTexts[in.ID]; !ok {
+			continue
+		}
+		seen[in.ID] = true
+		if in.Length == nil || *in.Length <= 0 {
+			t.Errorf("%s %q: no section length, it was not re-read through Logos", in.ID, in.Title)
+		}
+		if len(in.Cited) == 0 {
+			t.Errorf("%s %q: no cited list", in.ID, in.Title)
+		}
+	}
+	for id := range fullerVolume1HeadingTexts {
+		if !seen[id] {
+			t.Errorf("%s is not in the index file", id)
+		}
+	}
+}
+
 func TestHiddenSermonIndexFilesImportAndPassTheChecker(t *testing.T) {
 	paths, err := filepath.Glob("../../data/logos-index/*-sermons.jsonl")
 	if err != nil {
