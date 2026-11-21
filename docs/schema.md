@@ -26,7 +26,7 @@ sermons                     │         one line of rows.jsonl
   PK (source_id, id) ───────┼──┐      ('spurgeon-ccel', '104')
   source_id, source_kind='sermons' ──► sources (id, kind)  ON DELETE CASCADE
   title, preacher?, url (https), alt_url?, kind ('link'|'hosted'|'exposition'),
-  date? ('1855' | '1855-03' | '1855-03-18'), duration_s?, notes?
+  date? ('1855' | '1855-03' | '1855-03-18'), duration_s?, notes?, topics? (text[], migration 0008)
                             │  │
 sermon_passages             │  │      the sermon's preaching text and cited refs
   PK (source_id, sermon_id, role, ref_osis)

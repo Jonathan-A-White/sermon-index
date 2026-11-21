@@ -153,17 +153,17 @@ func writeSermons(ctx context.Context, tx pgx.Tx, d *Dir, c *Counts) error {
 	b := &pgx.Batch{}
 	for _, r := range d.Rows {
 		ids = append(ids, r.ID)
-		b.Queue(`INSERT INTO sermons (source_id, id, title, preacher, url, alt_url, kind, date, duration_s, notes)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		b.Queue(`INSERT INTO sermons (source_id, id, title, preacher, url, alt_url, kind, date, duration_s, notes, topics)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 			ON CONFLICT (source_id, id) DO UPDATE SET
 				title = EXCLUDED.title, preacher = EXCLUDED.preacher, url = EXCLUDED.url,
 				alt_url = EXCLUDED.alt_url, kind = EXCLUDED.kind, date = EXCLUDED.date,
-				duration_s = EXCLUDED.duration_s, notes = EXCLUDED.notes
+				duration_s = EXCLUDED.duration_s, notes = EXCLUDED.notes, topics = EXCLUDED.topics
 			WHERE (sermons.title, sermons.preacher, sermons.url, sermons.alt_url, sermons.kind,
-			       sermons.date, sermons.duration_s, sermons.notes)
+			       sermons.date, sermons.duration_s, sermons.notes, sermons.topics)
 			      IS DISTINCT FROM (EXCLUDED.title, EXCLUDED.preacher, EXCLUDED.url, EXCLUDED.alt_url,
-			       EXCLUDED.kind, EXCLUDED.date, EXCLUDED.duration_s, EXCLUDED.notes)`,
-			id, r.ID, r.Title, r.Preacher, r.URL, r.AltURL, r.KindOrDefault(), r.Date, r.DurationS, r.Notes)
+			       EXCLUDED.kind, EXCLUDED.date, EXCLUDED.duration_s, EXCLUDED.notes, EXCLUDED.topics)`,
+			id, r.ID, r.Title, r.Preacher, r.URL, r.AltURL, r.KindOrDefault(), r.Date, r.DurationS, r.Notes, r.Topics)
 	}
 	if err := tx.SendBatch(ctx, b).Close(); err != nil {
 		return fmt.Errorf("writing sermons: %w", err)
@@ -188,8 +188,6 @@ func writeSermons(ctx context.Context, tx pgx.Tx, d *Dir, c *Counts) error {
 		seen[k] = true
 		kSermon, kRole, kRef, kSpan = append(kSermon, sermon), append(kRole, role), append(kRef, ref), append(kSpan, span)
 	}
-	// A row's Topics (free subject labels, mw-qtu3zvz.198) are checked and kept in
-	// rows.jsonl but not loaded: no column holds them yet, and the API does not serve them.
 	for _, r := range d.Rows {
 		if r.IsSeries() {
 			continue // a series is kept as a sermon but has no passage: nothing a passage asks for matches it

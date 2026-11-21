@@ -1369,3 +1369,66 @@ func TestLoadSermonTopicsFollowTheirRow(t *testing.T) {
 		t.Errorf("%d links left", n)
 	}
 }
+
+// A row's topics (free subject labels, mw-qtu3zvz.198) are loaded into
+// sermons.topics (mw-qtu3zvz.209): a row with none has NULL, a reload keeps
+// them, and a row whose topics left the file loses them.
+func TestLoadTopics(t *testing.T) {
+	ctx := context.Background()
+	db := migrated(t)
+	read := func(id string) []string {
+		t.Helper()
+		var got []string
+		if err := db.QueryRow(ctx, `select topics from sermons where source_id = 'luther-annotated-1-logos' and id = $1`, id).Scan(&got); err != nil {
+			t.Fatal(err)
+		}
+		return got
+	}
+	dir := "../../sources/luther-annotated-1-logos"
+	if _, err := Load(ctx, db, dir); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"indulgences", "grace", "penance", "satisfaction", "scholastic theology"}
+	if got := read("ANNOTLUTV1.1-409450"); !reflect.DeepEqual(got, want) {
+		t.Errorf("ANNOTLUTV1.1-409450 topics = %v, want %v", got, want)
+	}
+	if _, err := Load(ctx, db, dir); err != nil {
+		t.Fatal(err)
+	}
+	if got := read("ANNOTLUTV1.1-409450"); !reflect.DeepEqual(got, want) {
+		t.Errorf("after a second load topics = %v, want %v", got, want)
+	}
+
+	// A row with no topics has none; one that loses them in the files loses them here.
+	if n := count(t, db, `select count(*) from sermons where source_id = 'luther-annotated-1-logos' and topics is not null and cardinality(topics) = 0`); n != 0 {
+		t.Errorf("%d rows hold an empty topics array, want NULL", n)
+	}
+	tmp := filepath.Join(t.TempDir(), "luther-annotated-1-logos")
+	if err := os.Mkdir(tmp, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	toml, err := os.ReadFile(filepath.Join(dir, "source.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(tmp, "source.toml"), toml, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	rows, err := os.ReadFile(filepath.Join(dir, "rows.jsonl"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stripped := regexp.MustCompile(`,"topics":\[[^\]]*\]`).ReplaceAll(rows, nil)
+	if string(stripped) == string(rows) {
+		t.Fatal("no topics in the copied rows to strip")
+	}
+	if err := os.WriteFile(filepath.Join(tmp, "rows.jsonl"), stripped, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Load(ctx, db, tmp); err != nil {
+		t.Fatal(err)
+	}
+	if got := read("ANNOTLUTV1.1-409450"); got != nil {
+		t.Errorf("after the topics left the file: %v, want none", got)
+	}
+}

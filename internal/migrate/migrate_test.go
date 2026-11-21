@@ -34,7 +34,7 @@ func TestUpAppliesOnceAndASecondRunIsANoOp(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(pending, []string{"0001_init", "0002_search", "0003_theme_verses", "0004_source_language", "0005_sermon_topics", "0006_source_by", "0007_source_text"}) {
+	if !reflect.DeepEqual(pending, []string{"0001_init", "0002_search", "0003_theme_verses", "0004_source_language", "0005_sermon_topics", "0006_source_by", "0007_source_text", "0008_sermon_topics_column"}) {
 		t.Errorf("pending before = %v", pending)
 	}
 
@@ -42,7 +42,7 @@ func TestUpAppliesOnceAndASecondRunIsANoOp(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(applied, []string{"0001_init", "0002_search", "0003_theme_verses", "0004_source_language", "0005_sermon_topics", "0006_source_by", "0007_source_text"}) {
+	if !reflect.DeepEqual(applied, []string{"0001_init", "0002_search", "0003_theme_verses", "0004_source_language", "0005_sermon_topics", "0006_source_by", "0007_source_text", "0008_sermon_topics_column"}) {
 		t.Errorf("first Up applied %v", applied)
 	}
 	again, err := Up(ctx, db)
@@ -56,8 +56,8 @@ func TestUpAppliesOnceAndASecondRunIsANoOp(t *testing.T) {
 	if err := db.QueryRow(ctx, "select count(*) from schema_migrations").Scan(&n); err != nil {
 		t.Fatal(err)
 	}
-	if n != 7 {
-		t.Errorf("schema_migrations has %d rows, want 7", n)
+	if n != 8 {
+		t.Errorf("schema_migrations has %d rows, want 8", n)
 	}
 	pending, err = Pending(ctx, db)
 	if err != nil {
@@ -77,7 +77,7 @@ func TestSchemaV1(t *testing.T) {
 
 	want := map[string][]string{
 		"sources":         {"id", "name", "kind", "licence", "licence_note", "credit", "homepage", "terms_url", "added", "on_by_default"},
-		"sermons":         {"source_id", "id", "title", "preacher", "url", "alt_url", "kind", "date", "duration_s", "notes"},
+		"sermons":         {"source_id", "id", "title", "preacher", "url", "alt_url", "kind", "date", "duration_s", "notes", "topics"},
 		"sermon_passages": {"source_id", "sermon_id", "ref_osis", "role", "span"},
 		"themes":          {"source_id", "id", "label", "see"},
 		"theme_parts":     {"theme_source_id", "theme_id", "n", "label"},
@@ -237,7 +237,7 @@ func TestSermonTopicsMigrationKeepsLoadedRows(t *testing.T) {
 		t.Fatal(err)
 	}
 	applied, err := Up(ctx, db)
-	if err != nil || !reflect.DeepEqual(applied, []string{"0005_sermon_topics", "0006_source_by", "0007_source_text"}) {
+	if err != nil || !reflect.DeepEqual(applied, []string{"0005_sermon_topics", "0006_source_by", "0007_source_text", "0008_sermon_topics_column"}) {
 		t.Fatalf("Up over 0004: %v %v", applied, err)
 	}
 	var n int
@@ -274,7 +274,7 @@ func TestSourceByMigrationKeepsLoadedSources(t *testing.T) {
 		t.Fatal(err)
 	}
 	applied, err := Up(ctx, db)
-	if err != nil || !reflect.DeepEqual(applied, []string{"0006_source_by", "0007_source_text"}) {
+	if err != nil || !reflect.DeepEqual(applied, []string{"0006_source_by", "0007_source_text", "0008_sermon_topics_column"}) {
 		t.Fatalf("Up over 0005: %v %v", applied, err)
 	}
 	var by *string
