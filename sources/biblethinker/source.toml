@@ -43,7 +43,8 @@ Decision: the site has no terms of use and its robots.txt forbids nothing, so th
 The videos are YouTube's: a row's alt_url is the watch address of the video the post embeds, so the player reads it as it reads a Brookfield First row; YouTube's terms bind the videos the links open, not these rows. No YouTube API is called, so the 30-day limit on API data (sources/brookfield-first) does not apply."""
 
 credit = "Mike Winger, Bible Thinker (biblethinker.org)"
-homepage = "https://biblethinker.org/"
+# Not the site root (internal/sources/homepage_test.go): the largest of the four series.
+homepage = "https://biblethinker.org/mark/"
 terms_url = "https://biblethinker.org/disclaimer/"
 added = 2026-11-23
 on_by_default = false
