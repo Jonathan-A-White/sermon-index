@@ -362,3 +362,35 @@ func TestMatchNoteCarriesTheSpeakerIntoTheRecord(t *testing.T) {
 		t.Errorf("an empty speaker is written: %s", b)
 	}
 }
+
+// "Why the Mission Cannot Wait", Sunday 2026-11-15, Rev 5: YouTube dated the
+// video two days late and its title carries the passage and the preacher after
+// " | ". The alert's passage is the chapter, the row's a verse range in it.
+func TestMatchRowDatedTwoDaysAfterTheSundayByItsTitleAndPassage(t *testing.T) {
+	alert := alertsJSON(plainAlert("w2", 1, "Why the Mission Cannot Wait", "Revelation 5", "2026-11-15T00:00:00-05:00"))
+	rows := []sources.Row{
+		titledRow("QYbJqGWgXnc", "2026-11-17", "Why the Mission Cannot Wait | Revelation 5:9-10 | Pastor Phil Morgan", "Rev.5.9-Rev.5.10"),
+		titledRow("other", "2026-11-18", "A Different Sermon | Revelation 5:9-10 | Pastor Phil Morgan", "Rev.5.9-Rev.5.10"),
+		titledRow("samepassage", "2026-11-17", "Why the Mission Cannot Wait | Psalm 23 | Pastor Phil Morgan", "Ps.23"),
+	}
+	recs, report, err := Run(strings.NewReader(alert), rows, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(recs) != 1 || recs[0].ID != "QYbJqGWgXnc" || recs[0].Date != "2026-11-15" {
+		t.Fatalf("records = %+v report %v", recs, report)
+	}
+	if !strings.Contains(strings.Join(report, "\n"), "matched by title and passage, row dated 2026-11-17, mail dated 2026-11-15") {
+		t.Errorf("report = %v", report)
+	}
+}
+
+// A row of another title in the same week is not taken, though it shares the passage.
+func TestMatchByTitleIgnoresAnotherTitleWithTheSamePassage(t *testing.T) {
+	alert := alertsJSON(plainAlert("w3", 1, "Why the Mission Cannot Wait", "Revelation 5", "2026-11-15T00:00:00-05:00"))
+	rows := []sources.Row{titledRow("other", "2026-11-17", "A Different Sermon | Revelation 5:9-10 | Pastor Phil Morgan", "Rev.5.9-Rev.5.10")}
+	recs, _, err := Run(strings.NewReader(alert), rows, nil)
+	if err != nil || len(recs) != 0 {
+		t.Errorf("records %+v err %v", recs, err)
+	}
+}

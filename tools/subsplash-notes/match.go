@@ -8,6 +8,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/Jonathan-A-White/sermon-index/internal/passage"
 	"github.com/Jonathan-A-White/sermon-index/internal/sources"
 )
 
@@ -113,7 +114,9 @@ const TitleWindowDays = 14
 // second try: the one row within TitleWindowDays of the Sunday that has the
 // note's title (case, punctuation and spacing folded) and the same passage.
 // The church's list and the mail may differ by a week, and which is right is
-// not known, so the date is not asked. Two such rows, or only rows with
+// not known, so the date is not asked. A row's title may carry the passage and
+// the preacher after " | ", and its passage may be a verse range inside the
+// note's chapter (or the reverse): both count as the same. Two such rows, or only rows with
 // another passage, are an error naming them. how is empty for a match by
 // date, and says so for one by title and passage.
 func MatchNote(n Note, rows []sources.Row) (rec Record, how string, err error) {
@@ -127,7 +130,7 @@ func MatchNote(n Note, rows []sources.Row) (rec Record, how string, err error) {
 	var same, otherPassage []string
 	rowDate := map[string]string{}
 	for _, r := range rows {
-		if r.Date == nil || want == "" || foldTitle(r.Title) != want {
+		if r.Date == nil || want == "" || !hasTitle(r.Title, want) {
 			continue
 		}
 		rt, perr := time.Parse(dateLayout, *r.Date)
@@ -180,12 +183,38 @@ func sharesPlace(n Note, r sources.Row) bool {
 	}
 	for _, h := range have {
 		for _, p := range places {
-			if h == p {
+			if h == p || placesOverlap(h, p) {
 				return true
 			}
 		}
 	}
 	return false
+}
+
+// hasTitle is whether a row's title is the folded title want: the whole title,
+// or its part before the first " | " (YouTube titles read "Title | Passage |
+// Preacher").
+func hasTitle(title, want string) bool {
+	if foldTitle(title) == want {
+		return true
+	}
+	head, _, found := strings.Cut(title, " | ")
+	return found && foldTitle(head) == want
+}
+
+// placesOverlap is whether two OSIS places share a verse, so a chapter and a
+// verse range inside it are one place. A place that does not parse overlaps
+// nothing.
+func placesOverlap(a, b string) bool {
+	ra, err := passage.Parse(a)
+	if err != nil {
+		return false
+	}
+	rb, err := passage.Parse(b)
+	if err != nil {
+		return false
+	}
+	return ra.Lo <= rb.Hi && rb.Lo <= ra.Hi
 }
 
 // foldTitle is a title with case, punctuation and spacing folded away.
