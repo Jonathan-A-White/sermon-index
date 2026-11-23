@@ -6,7 +6,6 @@ import (
 	"sort"
 	"strings"
 	"time"
-	"unicode"
 
 	"github.com/Jonathan-A-White/sermon-index/internal/passage"
 	"github.com/Jonathan-A-White/sermon-index/internal/sources"
@@ -69,7 +68,7 @@ func Match(n Note, rows []sources.Row) (Record, error) {
 		}
 		if d := rt.Sub(st); d >= -24*time.Hour && d <= 24*time.Hour {
 			hits = append(hits, r.ID)
-			if foldTitle(r.Title) == foldTitle(n.Title) {
+			if sources.SameTitle(r.Title, n.Title) {
 				sameTitle = append(sameTitle, r.ID)
 			}
 		}
@@ -126,11 +125,10 @@ func MatchNote(n Note, rows []sources.Row) (rec Record, how string, err error) {
 		return rec, "", err
 	}
 	st, _ := time.Parse(dateLayout, nr.sunday)
-	want := foldTitle(n.Title)
 	var same, otherPassage []string
 	rowDate := map[string]string{}
 	for _, r := range rows {
-		if r.Date == nil || want == "" || !hasTitle(r.Title, want) {
+		if r.Date == nil || !sources.SameTitle(r.Title, n.Title) {
 			continue
 		}
 		rt, perr := time.Parse(dateLayout, *r.Date)
@@ -191,24 +189,5 @@ func sharesPlace(n Note, r sources.Row) bool {
 	return false
 }
 
-// hasTitle is whether a row's title is the folded title want: the whole title,
-// or its part before the first " | " (YouTube titles read "Title | Passage |
-// Preacher").
-func hasTitle(title, want string) bool {
-	if foldTitle(title) == want {
-		return true
-	}
-	head, _, found := strings.Cut(title, " | ")
-	return found && foldTitle(head) == want
-}
-
 // foldTitle is a title with case, punctuation and spacing folded away.
-func foldTitle(s string) string {
-	var b strings.Builder
-	for _, r := range s {
-		if unicode.IsLetter(r) || unicode.IsDigit(r) {
-			b.WriteRune(unicode.ToLower(r))
-		}
-	}
-	return b.String()
-}
+func foldTitle(s string) string { return sources.FoldTitle(s) }

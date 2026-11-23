@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/Jonathan-A-White/sermon-index/internal/passage"
+	"github.com/Jonathan-A-White/sermon-index/internal/sources"
 	"os"
 	"path/filepath"
 	"strings"
@@ -209,8 +210,9 @@ func TestEveryNotesRecordsTitleAndPassageIsOnItsRow(t *testing.T) {
 		}
 		row := rows[at]
 		// The church's own list may spell a title's case its own way ("How to
-		// Spot a Fable"); the words are the same.
-		if !strings.EqualFold(row.Title, rec.Title) {
+		// Spot a Fable"), and a YouTube title carries its passage and preacher
+		// after " | "; the words are the same.
+		if !sources.SameTitle(row.Title, rec.Title) {
 			t.Errorf("%s: the row's title is %q, the mail's is %q", rec.ID, row.Title, rec.Title)
 		}
 		if rec.Ref == "" {
