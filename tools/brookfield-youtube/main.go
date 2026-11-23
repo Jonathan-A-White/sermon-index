@@ -48,6 +48,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	_ "time/tzdata" // the church's zone, on a host with no zoneinfo
 
 	"github.com/Jonathan-A-White/sermon-index/internal/passage"
 	"github.com/Jonathan-A-White/sermon-index/internal/sources"
@@ -353,7 +354,7 @@ type Result struct {
 	TitleDates                            int // rows dated by the date their title prints
 	DescriptionTitles                     int // descriptions that print a sermon title (not kept)
 	BadRefs                               []Bad
-	Unnumbered                            []string // RePhil ids numbered by position
+	Unnumbered                            []string // RePhil ids with no number in the title
 	RepeatedNumbers                       []int    // RePhil numbers that two videos carry
 	First, Last                           string   // the dates of the oldest and the newest video
 
@@ -398,15 +399,25 @@ func Build(items []Item) *Result {
 
 	var dates []string
 	numbers := map[int]int{}
+	highest := 0 // the highest number an episode published so far carries
 	for _, it := range kept {
 		res.Published[it.VideoID] = it.Published
 		pubDate := datePart(it.Published)
 		if rephilRE.MatchString(it.Title) {
-			n := len(res.Rephil) + 1
+			// A title that prints no number is the next after the highest
+			// number printed before it; with none before, its place in
+			// publish order (1 is the oldest).
+			n := highest + 1
+			if highest == 0 {
+				n = len(res.Rephil) + 1
+			}
 			if m := rephilNumRE.FindStringSubmatch(it.Title); m != nil {
 				n, _ = strconv.Atoi(m[1])
 			} else {
 				res.Unnumbered = append(res.Unnumbered, it.VideoID)
+			}
+			if n > highest {
+				highest = n
 			}
 			numbers[n]++
 			res.Rephil = append(res.Rephil, RephilRow{Number: n, Title: it.Title, Date: pubDate, URL: watchURL + it.VideoID})
@@ -475,10 +486,23 @@ func Build(items []Item) *Result {
 
 func ptr[T any](v T) *T { return &v }
 
-// datePart is the day of an RFC 3339 instant, in UTC as YouTube gives it.
+// churchZone is where the church is: the day a video went up is the day on
+// the church's clock, not in UTC (YouTube's instant, 2026-11-21T03:37Z, is
+// the evening of the 20th in Connecticut).
+var churchZone = mustZone("America/New_York")
+
+func mustZone(name string) *time.Location {
+	loc, err := time.LoadLocation(name)
+	if err != nil {
+		panic(err)
+	}
+	return loc
+}
+
+// datePart is the day of an RFC 3339 instant on the church's clock.
 func datePart(rfc3339 string) string {
 	if t, err := time.Parse(time.RFC3339, rfc3339); err == nil {
-		return t.UTC().Format("2006-01-02")
+		return t.In(churchZone).Format("2006-01-02")
 	}
 	return ""
 }

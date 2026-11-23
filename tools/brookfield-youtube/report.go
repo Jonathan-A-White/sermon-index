@@ -31,7 +31,7 @@ func (r *Result) Markdown() string {
 	w("- Quota used: %d units (%d channels.list and %d playlistItems.list, 1 unit each; the daily allowance is 10,000)\n\n", r.Units, min(1, r.Units), max(r.Units-1, 0))
 
 	w("## Dates\n\n")
-	w("A row's date is the day its title prints (\"August 23, 2020\"), which is the Sunday of the service: %d rows. The others, and every Morning RePhil episode, carry the day YouTube published the video (UTC, so an evening upload can be a day later than the day in New York).\n\n", r.TitleDates)
+	w("A row's date is the day its title prints (\"August 23, 2020\"), which is the Sunday of the service: %d rows. The others, and every Morning RePhil episode, carry the day YouTube published the video on the clock in New York (YouTube gives the instant in UTC, so an evening upload would otherwise be a day late).\n\n", r.TitleDates)
 
 	w("## What was not sorted\n\n")
 	w("- **Videos kept with no passage and no preacher: %d.** Most are whole services (\"Online Service | October 25, 2026\") whose title and description name neither. They are listed by title and date, found by search, and matched by no passage.\n", r.neither())
@@ -59,7 +59,7 @@ func (r *Result) Markdown() string {
 	if len(r.Unnumbered) == 0 {
 		w(".\n")
 	} else {
-		w(". Each is numbered by its place in publish order among all the Morning RePhil episodes (1 is the oldest); that number is not the series' own and can repeat one that a title prints:\n")
+		w(". Each is numbered as the next after the highest number a title prints among the episodes published before it (or, with none before it, by its place in publish order, 1 being the oldest); check it against the series, since a number counted so can repeat one that a title prints:\n")
 		for _, id := range r.Unnumbered {
 			n := 0
 			for _, x := range r.Rephil {
