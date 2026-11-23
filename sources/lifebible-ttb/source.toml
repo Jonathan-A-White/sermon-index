@@ -1,0 +1,53 @@
+# Life Bible Ministry's Through the Bible, Pastor Paul LeBoutillier's
+# verse-by-verse teaching of all 66 books: one row a teaching page of
+# https://www.lifebibleministry.com/through-the-bible, written by
+#
+#   go run ./tools/lifebible-ttb --cache .lifebible-cache --out sources/lifebible-ttb
+#
+# from the site's sitemap (https://www.lifebibleministry.com/sitemap.xml) and
+# each page it lists, one request at a time, a second or more apart, with the
+# User-Agent "sermon-index-lifebible-ttb (+https://github.com/Jonathan-A-White/sermon-index)",
+# never a path robots.txt disallows. This file's rows.jsonl and REPORT.md are
+# rewritten by every run; edit the tool, not the files. Kept of a page: its
+# address, its title (whose opening is the passage) and the id of the YouTube
+# video it embeds. Nothing is downloaded: no audio, no video, no transcript, no
+# description. REPORT.md counts the sitemap's addresses, the rows and every
+# address that is not a row, with why.
+#
+# The site has NO terms of use (read 2026-11-23: /terms, /privacy,
+# /terms-of-use, /legal and /copyright all answer 404; the footer has no legal
+# link), so there is nothing to quote as a licence but what the site itself
+# says, which is quoted below, word for word, with the robots.txt block that
+# applies to this tool. The Governor's word to go ahead, given on that reading
+# on 2026-11-23, is in REPORT.md.
+
+id = "lifebible-ttb"
+name = "Life Bible Ministry's Through the Bible (Pastor Paul LeBoutillier)"
+kind = "sermons"
+
+# Read 2026-11-23 (the Builder of mw-qtu3zvz.280.1). No terms page exists:
+# /terms, /privacy, /terms-of-use, /legal and /copyright answer 404, and the
+# footer has no legal link. The words below are the only ones the site has on
+# the use of what it teaches, quoted from https://www.lifebibleministry.com/about
+# and its footer, then the robots.txt block for User-Agent: * (from
+# https://www.lifebibleministry.com/robots.txt), word for word:
+#   User-Agent: *
+#   Allow: /
+#   Disallow: /api/
+#   Disallow: /auth/
+#   Disallow: /console/
+#   Disallow: /locked/
+#   Disallow: /background
+licence = """
+No terms of use: the site has no terms page. Its /about page says: "Life Bible Ministry into a global teaching resource \u2014 where every message, transcript, and study is available completely free of charge to anyone in the world." and, under Our Mission, "To make thorough, verse-by-verse Bible teaching available to every person in the world \u2014 completely free of charge." Its footer reads: "\u00a9 2026 Life Bible Ministry \u00b7 Pastor Paul LeBoutillier". robots.txt, for User-Agent: *: "Allow: /", "Disallow: /api/", "Disallow: /auth/", "Disallow: /console/", "Disallow: /locked/", "Disallow: /background"."""
+
+licence_note = """
+The site states no terms, so none allows or forbids an index; its /about is a statement of purpose, not a clause on automated access or on linking. We keep only the address of each teaching's page, its title, the passage the title opens with, and the id of the YouTube video the page embeds; never audio, video, a transcript or a description. robots.txt allows `/` (the pages read here) and disallows only /api/, /auth/, /console/, /locked/ and /background, which the tool never asks for, and the tool is polite (one request at a time, a pause between, a User-Agent that names the project). The Governor said to go ahead on 2026-11-23 because robots.txt allows it, no terms say no, and only links, titles, passages and YouTube ids are kept. The videos are YouTube's and play in YouTube's player (@LifeBibleMinistry); the rows hold no YouTube data but an id the site itself prints. A row has no date: the page's upload date is the day the site imported its pages, not the day of the teaching. 52 rows teach over more than 3 chapters (Isaiah 1-4:1, Job 15-31) and are kept with their full ref, not as series: see REPORT.md."""
+
+credit = "Pastor Paul LeBoutillier, Life Bible Ministry (lifebibleministry.com)"
+homepage = "https://www.lifebibleministry.com/through-the-bible"
+terms_url = "https://www.lifebibleministry.com/robots.txt"
+added = 2026-11-23
+on_by_default = false
+
+# `by` is left out: every row names its preacher, Pastor Paul LeBoutillier.
