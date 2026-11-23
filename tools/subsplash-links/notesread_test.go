@@ -220,12 +220,8 @@ func TestEveryNotesRecordsTitleAndPassageIsOnItsRow(t *testing.T) {
 			t.Errorf("%s %q: the row has no passage, the mail says %s", rec.ID, rec.Title, rec.Ref)
 			continue
 		}
-		a, aerr := passage.Parse(*row.Ref)
-		b, berr := passage.Parse(rec.Ref)
-		if aerr != nil || berr != nil {
-			t.Errorf("%s: row %q or mail %q passage unreadable: %v %v", rec.ID, *row.Ref, rec.Ref, aerr, berr)
-		} else if a.OSIS != b.OSIS && (row.Series == nil || !*row.Series) {
-			t.Errorf("%s: the row's passage is %s, the mail's is %s", rec.ID, a.OSIS, b.OSIS)
+		if !passage.SamePlace(*row.Ref, rec.Ref) && (row.Series == nil || !*row.Series) {
+			t.Errorf("%s: the row's passage is %s, the mail's is %s", rec.ID, *row.Ref, rec.Ref)
 		}
 	}
 }
@@ -437,5 +433,42 @@ func TestReadNotesWritesTheSpeakerTheRecordNamesOnlyWhereTheRowHasNone(t *testin
 	}
 	if !strings.Contains(got, "\t2025-11-02\tThird One\t\tPsalms 24\tc1\tnotes\n") {
 		t.Errorf("c1's record names none:\n%s", got)
+	}
+}
+
+// His bug (QYbJqGWgXnc, 'Why the Mission Cannot Wait'): the row holds
+// Rev.5.9-Rev.5.10 and the mail says Rev.5; a verse range inside the mail's
+// chapter is the same passage, so the record is already there, not a problem.
+// A mail that says another chapter is still a problem.
+func TestReadNotesCountsARowsVerseRangeInsideTheMailsChapterAsTheSamePassage(t *testing.T) {
+	const wideRow = `{"id":"QYbJqGWgXnc","title":"Why the Mission Cannot Wait","ref":"Rev.5.9-Rev.5.10","url":"y9","kind":"link","date":"2026-11-15"}` + "\n"
+	for _, c := range []struct {
+		ref     string
+		problem bool
+	}{
+		{"Rev.5", false},
+		{"Rev.5.9-Rev.5.10", false},
+		{"Rev.6", true},
+		{"Matt.5", true},
+	} {
+		rows, recs, list := notesRig(t, passagesHeader)
+		rec := `{"id":"QYbJqGWgXnc","date":"2026-11-15","title":"Why the Mission Cannot Wait","ref":"` + c.ref + `"}` + "\n"
+		if err := os.WriteFile(rows, []byte(wideRow), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(recs, []byte(rec), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		res, err := RunNotes(recs, list, rows)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := strings.Join(res.Problems, "\n")
+		if c.problem && !strings.Contains(got, "QYbJqGWgXnc") {
+			t.Errorf("mail %s against Rev.5.9-Rev.5.10: no problem said (already %d)", c.ref, res.Already)
+		}
+		if !c.problem && (got != "" || res.Already != 1) {
+			t.Errorf("mail %s against Rev.5.9-Rev.5.10: problems %q, already %d", c.ref, got, res.Already)
+		}
 	}
 }

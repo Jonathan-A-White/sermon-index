@@ -183,7 +183,7 @@ func sharesPlace(n Note, r sources.Row) bool {
 	}
 	for _, h := range have {
 		for _, p := range places {
-			if h == p || placesOverlap(h, p) {
+			if h == p || passage.SamePlace(h, p) {
 				return true
 			}
 		}
@@ -200,21 +200,6 @@ func hasTitle(title, want string) bool {
 	}
 	head, _, found := strings.Cut(title, " | ")
 	return found && foldTitle(head) == want
-}
-
-// placesOverlap is whether two OSIS places share a verse, so a chapter and a
-// verse range inside it are one place. A place that does not parse overlaps
-// nothing.
-func placesOverlap(a, b string) bool {
-	ra, err := passage.Parse(a)
-	if err != nil {
-		return false
-	}
-	rb, err := passage.Parse(b)
-	if err != nil {
-		return false
-	}
-	return ra.Lo <= rb.Hi && rb.Lo <= ra.Hi
 }
 
 // foldTitle is a title with case, punctuation and spacing folded away.

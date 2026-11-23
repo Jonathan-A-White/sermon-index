@@ -364,9 +364,8 @@ func RunNotesWithSpeakers(notesPath, passagesPath, rowsPath, pdfDir string, text
 		if row.Ref != nil && *row.Ref != "" {
 			// The row has its passage. A difference is said and nothing is changed.
 			if row.Series == nil || !*row.Series {
-				a, aerr := passage.Parse(*row.Ref)
-				b, berr := passage.Parse(rec.Ref)
-				if aerr != nil || berr != nil || a.OSIS != b.OSIS {
+				// A verse range inside the mail's chapter is the same passage.
+				if !passage.SamePlace(*row.Ref, rec.Ref) {
 					problem(rec, fmt.Sprintf("row %s holds the passage %s and the mail says %s; the row is kept", row.ID, *row.Ref, rec.Ref))
 					continue
 				}
