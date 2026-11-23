@@ -1,4 +1,4 @@
-# Brookfield First (Brookfield Assembly of God, Brookfield CT), 355 sermon
+# Brookfield First (Brookfield Assembly of God, Brookfield CT), 356 sermon
 # videos of its YouTube channel @BrookfieldFirst, written by
 #
 #   YOUTUBE_API_KEY="$(mw secrets get youtube_api_key)" go run ./tools/brookfield-youtube
@@ -8,9 +8,9 @@
 # the tool, not the file. Nothing is downloaded: no video, no audio, no caption.
 #
 # What the tool counted (REPORT.md lists what it could not sort):
-#   524 videos seen, 355 sermons, 238 with a preacher, 342 with a passage
-#   (2 of them series, matched by no passage), 224 Morning RePhil episodes
-#   (in data/morning-rephil.jsonl, not here), dates 2020-03-15 to 2026-11-17.
+#   527 videos seen, 356 sermons, 238 with a preacher, 343 with a passage
+#   (2 of them series, matched by no passage), 225 Morning RePhil episodes
+#   (in data/morning-rephil.jsonl, not here), dates 2020-03-15 to 2026-11-23.
 #   344 of them carry the title, preacher and passage of the church's own list
 #   (passages.tsv, merged by date; see REPORT.md).
 #
