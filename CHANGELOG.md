@@ -2,6 +2,7 @@
 
 Newest first, one dated line per change a user of the service or its files could notice; a breaking change says so first.
 
+- 2026-11-23: Fixed: the Morning RePhil episodes are now refreshed from YouTube every day (18:00 UTC) instead of on the 1st and the 26th, so a Monday or Friday episode is listed (`GET /v1/rephil`) the same day; an episode that Subsplash had before YouTube listed it is now one row, not two (`data/morning-rephil.jsonl`, #479).
 - 2026-11-21: `GET /v1/sermons` (both tiers, direct rows too) and `GET /v1/search` now answer a sermon's `topics` (an array of its free subject labels; the key is left out when it has none, so an answer over a source with no topics is unchanged). docs/api.md.
 - 2026-11-21: `sermons load` now writes a row's `topics` (its free subject labels, such as the Luther sermons with no passage carry) to a new `sermons.topics` column; the API did not serve them until the next line. Migration `0008_sermon_topics_column`: run `sermons migrate` and then `sermons load --all sources/`. docs/sources.md.
 - 2026-11-16: `data/morning-rephil.jsonl` now lists all 223 Morning RePhil episodes of the series page (number, title, date and share link), 55 of them new, read through the Governor's signed-in browser by `tools/subsplash-notes browse`; the YouTube refresh keeps the new `share` field.

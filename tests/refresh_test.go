@@ -477,7 +477,7 @@ func TestRefreshUnits(t *testing.T) {
 			"ExecStart=/bin/sh %h/sermon-index/scripts/check-brookfield-stale.sh", "TimeoutStartSec=",
 		},
 		"sermon-index-brookfield-refresh.timer": {
-			"Description=", "OnCalendar=*-*-01,26 04:00:00 UTC", "Persistent=true", "WantedBy=timers.target",
+			"Description=", "OnCalendar=*-*-* 18:00:00 UTC", "Persistent=true", "WantedBy=timers.target",
 		},
 		"sermon-index-brookfield-stale.timer": {
 			"Description=", "OnCalendar=*-*-* 13:00:00 UTC", "Persistent=true", "WantedBy=timers.target",

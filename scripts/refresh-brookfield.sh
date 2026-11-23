@@ -5,8 +5,9 @@
 #
 # YouTube's Developer Policies (III.E.4) let this rig keep public API data for
 # 30 calendar days, then it must be deleted or refreshed. The Laptop's timer
-# sermon-index-brookfield-refresh.timer runs this on the 1st and the 26th of
-# every month (never more than 25 days apart); by hand it is the same command.
+# sermon-index-brookfield-refresh.timer runs this every day at 18:00 UTC, so a
+# Morning RePhil episode (Mondays and Fridays) is listed the same day; a run
+# spends about 12 units of the API's 10,000 a day. By hand it is the same command.
 #
 # What it does, in order:
 #   1. checks the checkout is on the branch (REFRESH_BRANCH, default main), that

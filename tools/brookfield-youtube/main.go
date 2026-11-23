@@ -288,6 +288,12 @@ func ReadRephil(path string) ([]RephilRow, error) {
 // notes file the file already holds for its video (matched on url), and adds
 // the episodes the file holds that have no url, which only Subsplash has, in
 // date order (an episode keeps its place among those of its own day).
+//
+// A line with no url whose number is the number of exactly one episode of the
+// channel's list that has no share link yet is that episode, which YouTube
+// listed after Subsplash did: its share link and notes file move onto the
+// YouTube row and the line is not kept twice. Two episodes with the number
+// match nothing here: the line stays, as it was.
 func KeepRephil(rows, kept []RephilRow) []RephilRow {
 	by := map[string]RephilRow{}
 	for _, k := range kept {
@@ -301,9 +307,25 @@ func KeepRephil(rows, kept []RephilRow) []RephilRow {
 		}
 	}
 	for _, k := range kept {
-		if k.URL == "" {
-			rows = append(rows, k)
+		if k.URL != "" {
+			continue
 		}
+		at := -1
+		for i, r := range rows {
+			if r.Number != k.Number {
+				continue
+			}
+			if at >= 0 {
+				at = -2
+				break
+			}
+			at = i
+		}
+		if at >= 0 && rows[at].Share == "" && rows[at].NotesFile == "" {
+			rows[at].Share, rows[at].NotesFile = k.Share, k.NotesFile
+			continue
+		}
+		rows = append(rows, k)
 	}
 	sort.SliceStable(rows, func(i, j int) bool { return rows[i].Date < rows[j].Date })
 	return rows

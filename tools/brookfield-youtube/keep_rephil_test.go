@@ -45,3 +45,33 @@ func TestReadRephilMissingFileHasNone(t *testing.T) {
 		t.Error("a bad line was read")
 	}
 }
+
+// An episode Subsplash had before YouTube did (a line with a share and no url)
+// is one row once YouTube lists it: the share and notes file move onto the
+// YouTube row, matched on the number, and the url-less line is not kept twice.
+func TestKeepRephilMergesAnEpisodeSubsplashHadFirst(t *testing.T) {
+	fresh := []RephilRow{
+		{Number: 478, Title: "Morning RePhil #478", Date: "2026-11-10", URL: "https://www.youtube.com/watch?v=a"},
+		{Number: 479, Title: "Morning RePhil #479", Date: "2026-11-13", URL: "https://www.youtube.com/watch?v=b"},
+	}
+	kept := []RephilRow{
+		{Number: 478, Title: "Morning RePhil #478", Date: "2026-11-10", URL: "https://www.youtube.com/watch?v=a", Share: "https://brookfieldfirst.subspla.sh/aaaaaaa"},
+		{Number: 479, Title: "Morning RePhil #479", Date: "2026-11-13", URL: "https://www.youtube.com/watch?v=b"},
+		{Number: 479, Title: "Morning RePhil #479", Date: "2026-11-13", Share: "https://brookfieldfirst.subspla.sh/fnnh79c", NotesFile: "n.txt"},
+		{Number: 480, Title: "Morning RePhil #480", Date: "2026-11-16", Share: "https://brookfieldfirst.subspla.sh/ccccccc"},
+	}
+	got := KeepRephil(fresh, kept)
+	want := []RephilRow{
+		kept[0],
+		{Number: 479, Title: "Morning RePhil #479", Date: "2026-11-13", URL: "https://www.youtube.com/watch?v=b", Share: "https://brookfieldfirst.subspla.sh/fnnh79c", NotesFile: "n.txt"},
+		kept[3],
+	}
+	if len(got) != len(want) {
+		t.Fatalf("got %d rows: %+v", len(got), got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("row %d: %+v, want %+v", i, got[i], want[i])
+		}
+	}
+}
