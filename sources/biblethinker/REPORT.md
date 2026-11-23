@@ -1,5 +1,7 @@
 # biblethinker: Bible Thinker's book series, Mike Winger
 
+<!-- toc: none -->
+
 Written by `go run ./tools/biblethinker --cache .biblethinker-cache --out sources/biblethinker --report sources/biblethinker/REPORT.md`; this file is rewritten by every run.
 
 One row an episode of a book-by-book series through the Bible on https://biblethinker.org: the post's address (`url`), the YouTube video the post itself embeds (`alt_url`, a watch address, which Lampas's `videoOf()` plays), the passage, the preacher Mike Winger, the date and the length. The posts of every other category (Q&A sessions, livestreams, topical talks, debates, interviews) are not read.
