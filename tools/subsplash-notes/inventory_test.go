@@ -284,3 +284,24 @@ func TestFillReportCountsWhatSubsplashHasAndTheIndexLacks(t *testing.T) {
 		}
 	}
 }
+
+func TestInventoryTitleWithBar(t *testing.T) {
+	rows := []sources.Row{
+		{ID: "BAR", Title: "Why the Mission Cannot Wait | Revelation 5:9-10 | Pastor Phil Morgan", Date: strp("2026-11-15"), Ref: strp("Rev.5.9-Rev.5.10"), Preacher: strp("Phil Morgan")},
+	}
+	entries := []InvEntry{
+		{Code: "aaaaaaa", Date: "2026-11-15", Title: "Why the Mission Cannot Wait", Preacher: "Phil Morgan", Passage: "Revelation 5:9-10", Ref: "Rev.5.9-Rev.5.10", Row: "BAR"},
+	}
+	dir := t.TempDir()
+	tsv := filepath.Join(dir, "passages.tsv")
+	if err := os.WriteFile(tsv, []byte("series\tdate\ttitle\tspeaker\tpassage\trow\tfrom\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	res, err := Fill(entries, rows, FillFiles{Passages: tsv})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Matched != 1 || res.Differ != 0 {
+		t.Errorf("a row titled 'Title | Passage | Preacher' read as differing from the inventory's 'Title': %+v", res)
+	}
+}

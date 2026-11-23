@@ -268,7 +268,7 @@ func Fill(entries []InvEntry, rows []sources.Row, files FillFiles) (FillResult, 
 		if !hasRef && !hasTheme {
 			res.WithNeither++
 		}
-		if row.Preacher != nil && e.Preacher != "" && *row.Preacher != e.Preacher || row.Ref != nil && e.Ref != "" && *row.Ref != e.Ref || !genericTitle(row.Title) && foldTitle(row.Title) != foldTitle(e.Title) {
+		if row.Preacher != nil && e.Preacher != "" && *row.Preacher != e.Preacher || row.Ref != nil && e.Ref != "" && *row.Ref != e.Ref || !genericTitle(row.Title) && !sources.SameTitle(row.Title, e.Title) {
 			res.Differ++
 		}
 		wantTitle := genericTitle(row.Title) && e.Title != "" && !genericTitle(e.Title)
