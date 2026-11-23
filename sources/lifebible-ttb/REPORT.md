@@ -8,13 +8,13 @@ Written by `go run ./tools/lifebible-ttb --cache .lifebible-cache --out sources/
 
 ```
 through-the-bible addresses in the sitemap:                        1074
-rows written:                                                      996
+rows written:                                                      995
   of them series (a whole book over 3 chapters):                   2
   of them over 3 chapters, not series:                             52
-addresses skipped:                                                 78
+addresses skipped:                                                 79
   the Through the Bible list page:                                 1
   a book page (the list of a book's teachings):                    66
-  no passage in the page title:                                    9
+  no passage in the page title:                                    10
   no YouTube video on the page:                                    1
   the same address (or row id) as an earlier one in the sitemap:   1
 ```
@@ -120,9 +120,10 @@ Its blocks for Googlebot, Bingbot, Google-Extended, GPTBot, ChatGPT-User, OAI-Se
 
 None.
 
-## Skipped: no passage in the page title (9)
+## Skipped: no passage in the page title (10)
 
 - https://www.lifebibleministry.com/through-the-bible/romans/1-1 (title: Romans (Part 1) :1-17: Paul, a servant of Christ Jesus)
+- https://www.lifebibleministry.com/through-the-bible/2-corinthians/2026/1-2 (title: 2 Corinthians 1 (Part 2) :12 24: You stand firm in your faith)
 - https://www.lifebibleministry.com/through-the-bible/1-corinthians/small-group/1cor-2025-intro (title: How To Use This Small Group Study: HOW TO USE THIS STUDY)
 - https://www.lifebibleministry.com/through-the-bible/matthew/in-depth (title: Life Bible Ministry: Study Through All 66 Books of the Bible)
 - https://www.lifebibleministry.com/through-the-bible/1-corinthians/small-group (title: Life Bible Ministry: Study Through All 66 Books of the Bible)

@@ -96,11 +96,10 @@ func siteTitle(raw string) string {
 var (
 	bookRE  = regexp.MustCompile(`(?i)^(` + passage.BookNamePattern() + `)\.?(?:\s+|$|:|•)`)
 	partRE  = regexp.MustCompile(`(?i)^\s*\(Part\s*\d+\)`)
-	chapRE  = regexp.MustCompile(`(?i)^(?:chapter\s+)?(\d{1,3})\b`)
-	colonRE = regexp.MustCompile(`^\s*:\s*(\d{1,3}[a-z]?)\b`)
-	bareVRE = regexp.MustCompile(`^\s+(\d{1,3}[a-z]?)\b`)
+	chapRE  = regexp.MustCompile(`(?i)^(?:chapter\s+)?(\d{1,3})[a-z]?\b`)
+	colonRE = regexp.MustCompile(`^\s*:\s*(\d{1,3})[a-z]?\b`)
+	bareVRE = regexp.MustCompile(`^\s+(\d{1,3})[a-z]?\b`)
 	rangeRE = regexp.MustCompile(`(?i)^\s*(?:[-–—]|\bthru\b|\bthrough\b|\bto\b|\band\b)\s*`)
-	restRE  = regexp.MustCompile(`^\s*(?:•|:|[-–—])?\s*`)
 )
 
 // point is a place a passage starts or ends at: a chapter, and a verse or "".
@@ -131,7 +130,91 @@ func endpoint(s string) (p point, rest string, ok bool) {
 		p.v = m[1]
 		s = s[len(m[0]):]
 	}
+	if p.v != "" {
+		if m := partRE.FindString(s); m != "" { // "3:13-17 (Part 2)"
+			s = s[len(m):]
+		}
+	}
 	return p, s, true
+}
+
+var (
+	numberRE = regexp.MustCompile(`^\s*\d`)
+	tailRE   = regexp.MustCompile(`^\s*,\s*(\d{1,3})[a-z]?(?:\s*[-–—]\s*(\d{1,3})[a-z]?)?\b`)
+	joinRE   = regexp.MustCompile(`(?i)^\s*(?:,\s*)?(?:[-–—&]|\bthru\b|\bthrough\b|\bto\b|\band\b)\s*`)
+)
+
+// span reads one passage of book from the start of s: a chapter or verse, an
+// optional "-" and an end, an optional list of more verses ("15, 18-31"
+// reads as 15 to 31). With more, a second passage of the same book joined by
+// a dash, "thru", "to", "and" or "&" ("Hebrews 9 (Part 2) :16-28 - Hebrews 10
+// (Part 1) :1-18") ends the span where it ends.
+func span(book, s string, more bool) (from, to point, haveTo bool, rest string, ok bool) {
+	from, s, ok = endpoint(s)
+	if !ok {
+		return
+	}
+	if m := rangeRE.FindString(s); m != "" {
+		r := s[len(m):]
+		bookAgain := false
+		if bm := bookRE.FindStringSubmatch(r); bm != nil {
+			if b2, found := passage.BookOSIS(bm[1]); found && b2 == book {
+				r = r[len(bm[0]):]
+				bookAgain = true
+			}
+		}
+		if p2, r2, good := endpoint(r); good {
+			to, s, haveTo = p2, r2, true
+			if from.v != "" && to.v == "" && !bookAgain && !to.word {
+				// "3:1-5": the number after the dash is a verse of the same chapter.
+				to = point{c: from.c, v: to.c}
+			}
+		}
+	}
+	last := &from
+	if haveTo {
+		last = &to
+	}
+	if last.v != "" {
+		for {
+			m := tailRE.FindStringSubmatch(s)
+			if m == nil {
+				break
+			}
+			v := m[1]
+			if m[2] != "" {
+				v = m[2]
+			}
+			to, haveTo = point{c: last.c, v: v}, true
+			last = &to
+			s = s[len(m[0]):]
+		}
+	}
+	for more {
+		j := joinRE.FindString(s)
+		if j == "" {
+			break
+		}
+		r := s[len(j):]
+		bm := bookRE.FindStringSubmatch(r)
+		if bm == nil {
+			break
+		}
+		if b2, found := passage.BookOSIS(bm[1]); !found || b2 != book {
+			break
+		}
+		f2, t2, h2, r2, good := span(book, r[len(bm[0]):], false)
+		if !good {
+			break
+		}
+		if h2 {
+			to = t2
+		} else {
+			to = f2
+		}
+		haveTo, s = true, r2
+	}
+	return from, to, haveTo, s, true
 }
 
 // ParseTitle reads the passage a page's title opens with as an OSIS
@@ -161,26 +244,11 @@ func ParseTitle(title string) (ref, shown string, series, ok bool) {
 	case strings.HasSuffix(m[0], "•"):
 		s = "•" + s
 	}
-	var from, to point
-	var haveTo bool
-	if p, r, good := endpoint(s); good {
-		from, s = p, r
-		if m := rangeRE.FindString(s); m != "" {
-			r := s[len(m):]
-			bookAgain := false
-			if bm := bookRE.FindStringSubmatch(r); bm != nil {
-				if b2, found := passage.BookOSIS(bm[1]); found && b2 == book {
-					r = r[len(bm[0]):]
-					bookAgain = true
-				}
-			}
-			if p2, r2, good := endpoint(r); good {
-				to, s, haveTo = p2, r2, true
-				if from.v != "" && to.v == "" && !bookAgain && !to.word {
-					// "3:1-5": the number after the dash is a verse of the same chapter.
-					to = point{c: from.c, v: to.c}
-				}
-			}
+	from, to, haveTo, rest, good := span(book, s, true)
+	if good {
+		if numberRE.MatchString(rest) {
+			// A number left over ("12 24", a dash lost): not read, never cut short.
+			return "", "", false, false
 		}
 	} else if strings.HasPrefix(strings.TrimSpace(s), ":") || strings.HasPrefix(strings.TrimSpace(s), "•") || strings.TrimSpace(s) == "" {
 		// A book's name alone: the whole book. "Genesis: Through the Bible" is a

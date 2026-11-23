@@ -87,6 +87,14 @@ func TestParseTitle(t *testing.T) {
 		{"1 Corinthians 2: The natural and the spiritual man", "1Cor.2", "1 Corinthians 2: The natural and the spiritual man", false},
 		{"Psalm 23: The Lord is my shepherd", "Ps.23", "Psalm 23: The Lord is my shepherd", false},
 		{"John 3:16: God so loved", "John.3.16", "John 3:16: God so loved", false},
+		{"Luke 2 (Part 2) :41-52 & Luke 3 (Part 1) :1-20: The Ministry of John", "Luke.2.41-Luke.3.20", "Luke 2 (Part 2) :41-52 & Luke 3 (Part 1) :1-20: The Ministry of John", false},
+		{"John 14 (Part 3) :15, 18-31 • The Dynamic of Love", "John.14.15-John.14.31", "John 14 (Part 3) :15, 18-31 • The Dynamic of Love", false},
+		{"Colossians 3 (Part 2) :18-25, and Colossians 4 (Part 1) :1: Authentic", "Col.3.18-Col.4.1", "Colossians 3 (Part 2) :18-25, and Colossians 4 (Part 1) :1: Authentic", false},
+		{"Hebrews 9 (Part 2) :16-28 - Hebrews 10 (Part 1) :1-18: The Perfect Sacrifice", "Heb.9.16-Heb.10.18", "Hebrews 9 (Part 2) :16-28 - Hebrews 10 (Part 1) :1-18: The Perfect Sacrifice", false},
+		{"Matthew 3:13-17 (Part 2) and Matthew 4:1-11 (Part 1): Baptism and Temptation", "Matt.3.13-Matt.4.11", "Matthew 3:13-17 (Part 2) and Matthew 4:1-11 (Part 1): Baptism and Temptation", false},
+		{"Matthew 25 (Part 2) :31-46 thru Matthew 26 (Part 1):1-16 • The Sheep", "Matt.25.31-Matt.26.16", "Matthew 25 (Part 2) :31-46 thru Matthew 26 (Part 1):1-16 • The Sheep", false},
+		{"Acts 6 (Part 2) :8-15 & Acts 7: Stephen, the first Christian Martyr", "Acts.6.8-Acts.7", "Acts 6 (Part 2) :8-15 & Acts 7: Stephen, the first Christian Martyr", false},
+		{"Luke 8:1-10a: The sower", "Luke.8.1-Luke.8.10", "Luke 8:1-10a: The sower", false},
 		{"Genesis 1:1-2:3: Creation", "Gen.1.1-Gen.2.3", "Genesis 1:1-2:3: Creation", false},
 		{"Genesis 28–Genesis 30 (Part 1): Jacob gets a taste", "Gen.28-Gen.30", "Genesis 28–Genesis 30 (Part 1): Jacob gets a taste", false},
 		{"Exodus 34 (Part 2)–Exodus 36: Covenant renewed", "Exod.34-Exod.36", "Exodus 34 (Part 2)–Exodus 36: Covenant renewed", false},
@@ -106,7 +114,7 @@ func TestParseTitle(t *testing.T) {
 			t.Errorf("ParseTitle(%q) = %q, %q, series %v, %v; want %q, %q, series %v", c.title, ref, shown, series, ok, c.ref, c.shown, c.series)
 		}
 	}
-	for _, bad := range []string{"Genesis: Through the Bible", "A Word on Prayer", "", "Romans (Part 1) :1-17: Paul, a servant", "Notabook 3: x", "Isaiah 99 : x"} {
+	for _, bad := range []string{"Genesis: Through the Bible", "A Word on Prayer", "", "Romans (Part 1) :1-17: Paul, a servant", "Notabook 3: x", "2 Corinthians 1 (Part 2) :12 24: A dash was lost", "Isaiah 99 : x"} {
 		if ref, _, _, ok := ParseTitle(bad); ok {
 			t.Errorf("ParseTitle(%q) = %q, want no passage", bad, ref)
 		}
