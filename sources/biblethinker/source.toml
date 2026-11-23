@@ -1,0 +1,54 @@
+# Bible Thinker (https://biblethinker.org), Mike Winger's site: his book-by-book
+# series through the Bible, one row an episode (a post of a series), written by
+#
+#   go run ./tools/biblethinker --cache .biblethinker-cache --out sources/biblethinker --report sources/biblethinker/REPORT.md
+#
+# from the series' archive pages (https://biblethinker.org/1-peter/, /hebrews/,
+# /mark/, /romans/ and their later pages) and, for the dates, the WordPress
+# REST API's id and date of each series' posts. This file is by hand; rows.jsonl
+# and REPORT.md are rewritten by every run, so edit the tool, not them.
+#
+# The Governor's scope word (Postern general 2026-11-23, dictated): "Do Bible
+# thinker should just be sermons in his book but book series though the Bible".
+# So only the book series: the site's other categories (Q&A sessions,
+# livestreams, topical talks, debates, interviews) are not read.
+#
+# What the tool counted (REPORT.md names every skipped episode):
+#   4 book series, 149 episodes on their pages, 132 rows, 17 skipped (no
+#   passage in the title or the post's address).
+#
+# The site has NO terms of use: /terms, /terms-of-use, /terms-and-conditions,
+# /legal, /privacy-policy and /copyright all answer 404 (read 2026-11-23). Its
+# only legal page, /disclaimer, is a privacy policy. The words below are what
+# the site does say, quoted word for word from the pages read on 2026-11-23.
+
+id = "biblethinker"
+name = "Bible Thinker: Mike Winger's book-by-book series"
+kind = "sermons"
+
+licence = """
+The site has no terms of use. Its only legal page, https://biblethinker.org/disclaimer/, is a privacy policy; it opens: "BibleThinker.org provides powerful tools for the studying of God’s Word through our free online video reference library, with study tools that are grounded in the historical, conservative Christian faith." It says nothing about copying, scraping, automated access, linking or indexing. The footer prints: "Copyright © 2026 BibleThinker. All Rights Reserved."
+https://biblethinker.org/robots.txt, read 2026-11-23:
+# START YOAST BLOCK
+# ---------------------------
+User-agent: *
+Disallow:
+
+Sitemap: https://biblethinker.org/sitemap_index.xml
+# ---------------------------
+# END YOAST BLOCK"""
+
+licence_note = """
+Decision: the site has no terms of use and its robots.txt forbids nothing, so the terms are NOT ADDRESSED (silence is not a permission); the Governor gave his word on 2026-11-23 17:37:46Z (Postern txid direct:cbd35263b1ee4f0d463e475a928c110f09e551f0493cbc44081935fd559c5dcf): "A: Go ahead: robots.txt allows it, no terms say no; we keep only links, titles, passages and YouTube ids". The index keeps only a post's title, its passage, its address, the id of the YouTube video the post itself embeds, and the date and length the listing prints; never the media, the audio (Castos), a transcript, the lesson notes or a description. The tool fetches one request at a time, two seconds apart, with a User-Agent that names the project, and obeys robots.txt. If Bible Thinker asks for the rows to be removed, the Governor removes them. Off by default, as every source whose terms are not addressed.
+The videos are YouTube's: a row's alt_url is the watch address of the video the post embeds, so the player reads it as it reads a Brookfield First row; YouTube's terms bind the videos the links open, not these rows. No YouTube API is called, so the 30-day limit on API data (sources/brookfield-first) does not apply."""
+
+credit = "Mike Winger, Bible Thinker (biblethinker.org)"
+homepage = "https://biblethinker.org/"
+terms_url = "https://biblethinker.org/disclaimer/"
+added = 2026-11-23
+on_by_default = false
+
+# The site answers 404 to an address it does not have; a pause keeps a
+# `sermons check --urls` run polite.
+[host_rules."biblethinker.org"]
+delay_ms = 2000
