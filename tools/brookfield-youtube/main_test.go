@@ -260,7 +260,7 @@ func TestBuildSortsTheVideos(t *testing.T) {
 	if res.WithPreacher != 2 || res.WithPassage != 4 || res.SeriesRows != 1 {
 		t.Errorf("preacher %d passage %d series %d", res.WithPreacher, res.WithPassage, res.SeriesRows)
 	}
-	if res.First != "2020-07-12" || res.Last != "2026-11-09" {
+	if res.First != "2020-07-12" || res.Last != "2026-11-08" {
 		t.Errorf("date range %s to %s", res.First, res.Last)
 	}
 }
@@ -269,9 +269,9 @@ func TestBuildNumbersTheMorningRePhil(t *testing.T) {
 	res := Build(fixtureItems(t))
 	want := []RephilRow{
 		{Number: 12, Title: "MORNING REPHIL #12", Date: "2024-05-02", URL: "https://www.youtube.com/watch?v=repHilMid012"},
-		{Number: 477, Title: "Morning RePhil #477", Date: "2026-11-07", URL: "https://www.youtube.com/watch?v=repHil477A1"},
-		// No number in the title: its place in publish order (third).
-		{Number: 3, Title: "Morning RePhil", Date: "2026-11-09", URL: "https://www.youtube.com/watch?v=repHilNoNo1"},
+		{Number: 477, Title: "Morning RePhil #477", Date: "2026-11-06", URL: "https://www.youtube.com/watch?v=repHil477A1"},
+		// No number in the title: the next after the highest before it.
+		{Number: 478, Title: "Morning RePhil", Date: "2026-11-08", URL: "https://www.youtube.com/watch?v=repHilNoNo1"},
 	}
 	if len(res.Rephil) != len(want) {
 		t.Fatalf("%d RePhil", len(res.Rephil))
@@ -408,7 +408,7 @@ func TestRunWritesTheSameBytesTwice(t *testing.T) {
 	if len(lines) != 3 {
 		t.Fatalf("%d RePhil lines", len(lines))
 	}
-	if lines[1] != `{"number":477,"title":"Morning RePhil #477","date":"2026-11-07","url":"https://www.youtube.com/watch?v=repHil477A1"}` {
+	if lines[1] != `{"number":477,"title":"Morning RePhil #477","date":"2026-11-06","url":"https://www.youtube.com/watch?v=repHil477A1"}` {
 		t.Errorf("RePhil line %s", lines[1])
 	}
 
@@ -428,7 +428,7 @@ func TestRunWritesTheSameBytesTwice(t *testing.T) {
 	rep := string(first[report])
 	for _, w := range []string{
 		"Videos seen: 10", "Sermons: 6", "with a preacher: 2", "with a passage: 4", "Morning RePhil episodes: 3",
-		"2020-07-12", "2026-11-09", "Quota used: 3 units", "privVid0001", "badRef000001", "repHilNoNo1",
+		"2020-07-12", "2026-11-08", "Quota used: 3 units", "privVid0001", "badRef000001", "repHilNoNo1",
 	} {
 		if !strings.Contains(rep, w) {
 			t.Errorf("REPORT.md lacks %q\n%s", w, rep)
