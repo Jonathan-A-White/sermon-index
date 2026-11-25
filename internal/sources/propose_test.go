@@ -115,6 +115,45 @@ func TestRecipeAndTemplateNameTheSteps(t *testing.T) {
 	}
 }
 
+// The recipe's two tool tables keep up with the tools: every directory under
+// tools/ has a line in the table of what the tools read, and each of these
+// sources has a line, naming its tool, in the table of the shapes here.
+func TestRecipeTablesNameTheTools(t *testing.T) {
+	b, err := os.ReadFile("../../docs/adding-a-source.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// line returns the row that begins with cell in the table whose header
+	// begins with header, or "".
+	line := func(header, cell string) string {
+		_, table, found := strings.Cut(string(b), "\n"+header)
+		if !found {
+			t.Fatalf("docs/adding-a-source.md has no table %q", header)
+		}
+		table, _, _ = strings.Cut(table, "\n\n")
+		for _, l := range strings.Split(table, "\n") {
+			if strings.HasPrefix(l, "| "+cell+" |") {
+				return l
+			}
+		}
+		return ""
+	}
+	tools, err := os.ReadDir("../../tools")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, d := range tools {
+		if d.IsDir() && line("| Tool | Reads |", "`tools/"+d.Name()+"`") == "" {
+			t.Errorf("the table of what the tools read has no line for tools/%s", d.Name())
+		}
+	}
+	for _, source := range []string{"clarkson-works", "lifebible-ttb"} {
+		if l := line("| Source | Catalogue |", "`"+source+"`"); !strings.Contains(l, "`tools/"+source+"`") {
+			t.Errorf("the table of the shapes here has no line for %s naming its tool", source)
+		}
+	}
+}
+
 // A notes mail with no passage is read from its notes PDF (pdfPassage); the
 // recipe and the hourly script's header say so and not that it is left as it is.
 func TestRecipeSaysARecordWithNoPassageIsReadFromItsNotesPDF(t *testing.T) {
