@@ -40,7 +40,7 @@ import (
 )
 
 const (
-	userAgent = "public-domain-text-reader/1.0"
+	userAgent = "sermon-index-clarkson-works (+https://github.com/Jonathan-A-White/sermon-index)"
 	preacher  = "David Clarkson"
 )
 

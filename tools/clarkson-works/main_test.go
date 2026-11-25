@@ -320,8 +320,10 @@ func TestFetchVolumes(t *testing.T) {
 		t.Errorf("two requests in %v: not spaced", d)
 	}
 	for _, a := range agents {
-		if a == "" || strings.HasPrefix(a, "Go-http-client") {
-			t.Errorf("User-Agent %q does not name a client", a)
+		// The recipe (docs/adding-a-source.md): a tool's User-Agent names
+		// the project.
+		if !strings.Contains(a, "sermon-index") {
+			t.Errorf("User-Agent %q does not name the project", a)
 		}
 	}
 	got = nil
