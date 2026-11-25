@@ -29,6 +29,7 @@ type Fetcher struct {
 	HTTP  *http.Client
 	Cache string        // directory for the pages fetched
 	Delay time.Duration // the pause between two requests to the site
+	Retry time.Duration // the pause before asking again after a server error, times the attempt; 10 s when 0
 	Log   io.Writer     // one line a request; nil for none
 
 	robots *Robots
@@ -70,31 +71,48 @@ func (f *Fetcher) get(ctx context.Context, path string) ([]byte, error) {
 			}
 		}
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, f.base()+path, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("User-Agent", userAgent)
 	client := f.HTTP
 	if client == nil {
 		client = &http.Client{Timeout: 2 * time.Minute}
 	}
-	f.n++
-	f.last = time.Now()
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
+	retry := f.Retry
+	if retry == 0 {
+		retry = 10 * time.Second
 	}
-	defer resp.Body.Close()
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 32<<20))
-	if f.Log != nil {
-		fmt.Fprintf(f.Log, "GET %s %d\n", path, resp.StatusCode)
-	}
-	if err != nil {
-		return nil, err
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("GET %s: %s", path, resp.Status)
+	var body []byte
+	for attempt := 1; ; attempt++ {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, f.base()+path, nil)
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("User-Agent", userAgent)
+		f.n++
+		f.last = time.Now()
+		resp, err := client.Do(req)
+		if err != nil {
+			return nil, err
+		}
+		body, err = io.ReadAll(io.LimitReader(resp.Body, 32<<20))
+		resp.Body.Close()
+		if f.Log != nil {
+			fmt.Fprintf(f.Log, "GET %s %d\n", path, resp.StatusCode)
+		}
+		if err != nil {
+			return nil, err
+		}
+		if resp.StatusCode >= 500 && attempt < 4 {
+			// a server error is the site's, not an answer: wait and ask again, politely
+			select {
+			case <-time.After(time.Duration(attempt) * retry):
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			}
+			continue
+		}
+		if resp.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("GET %s: %s", path, resp.Status)
+		}
+		break
 	}
 	if err := os.MkdirAll(f.Cache, 0o755); err != nil {
 		return nil, err
@@ -207,6 +225,21 @@ func (f *Fetcher) FetchSeries(ctx context.Context, s Series) (*SeriesData, error
 		}
 	}
 	return out, nil
+}
+
+// FetchBody reads one post's page (from the cache or the site) and returns the
+// text of its own words (BodyText). Only the passage in it is used; nothing of
+// the text is kept in a row.
+func (f *Fetcher) FetchBody(ctx context.Context, e Episode) (string, error) {
+	u, err := url.Parse(e.URL)
+	if err != nil {
+		return "", err
+	}
+	page, err := f.get(ctx, u.Path)
+	if err != nil {
+		return "", err
+	}
+	return BodyText(page), nil
 }
 
 // Robots is the rules of robots.txt's "User-agent: *" group.

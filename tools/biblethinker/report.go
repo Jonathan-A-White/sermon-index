@@ -19,11 +19,13 @@ Read on 2026-11-23, one request at a time with the User-Agent "sermon-index-chec
 
 **The Governor's word (2026-11-23 17:37:46Z, Postern txid direct:cbd35263b1ee4f0d463e475a928c110f09e551f0493cbc44081935fd559c5dcf):** "A: Go ahead: robots.txt allows it, no terms say no; we keep only links, titles, passages and YouTube ids".
 
-**What is kept:** a post's title, its passage, its address, the id of the YouTube video the post itself embeds, the length and the date the listing prints. Never the media, the audio (Castos), a transcript, the lesson notes or a description.`
+**What is kept:** a post's title, its passage, its address, the id of the YouTube video the post itself embeds, the length and the date the listing prints. Never the media, the audio (Castos), a transcript, the lesson notes or a description. A post's own text is read for a passage when its title and address print none, and nothing of it is kept.`
 
-// notRead are the site's other categories, none of them a book series, as the
-// REST API listed them on 2026-11-23.
-const notRead = "Answering Progressive Christians, Catholicism Refuted, Christians React to 20 Atheist Arguments Against God, Contending for the Faith Webinar, Debates, Evidence for the Bible, Exposing False Prophets & Cover-Up Culture, Homosexuality, How to Find Jesus in the Old Testament, Interviews, Learning about Cults, Marriage Questions Conference '22, Marriage, Divorce and Remarriage, Past Livestreams & Misc. Topical Teachings, Past Q&A Sessions, Pop-Atheism and Its Problems, PSA Defended: Scripture, History, Philosophy, & Rhetoric, The Mark Series (an empty category; the Mark series is in Mark), The Passion Project, Thinking Biblically Reviews, Understanding the Old Testament Law, Wisdom in the Word (topical talks), Women In Ministry, World Mission Society Church of God - WMSCOG, Worship Songs"
+// notRead are the site's other categories, as the REST API listed them on
+// 2026-11-23, with the ones the Governor named on 2026-11-24 as left out first.
+// The rest were never asked for: a post of them that is also in a category
+// read is a row of that one.
+const notRead = "Past Q&A Sessions (past-qa-sessions), Debates (debates), Interviews (interviews), Thinking Biblically Reviews (thinking-biblically-reviews), Worship Songs (worship-songs), Christians React to 20 Atheist Arguments Against God (christians-react-to-20-atheist-arguments-against-god); and not asked for: Answering Progressive Christians, Catholicism Refuted, Contending for the Faith Webinar, Evidence for the Bible, Exposing False Prophets & Cover-Up Culture, Homosexuality, Learning about Cults, Marriage Questions Conference '22, Marriage, Divorce and Remarriage, Pop-Atheism and Its Problems, PSA Defended: Scripture, History, Philosophy, & Rhetoric, The Mark Series (an empty category; the Mark series is in Mark), The Passion Project, Women In Ministry, World Mission Society Church of God - WMSCOG"
 
 // SeriesRun is a series with what the site gave and what was made of it.
 type SeriesRun struct {
@@ -33,36 +35,37 @@ type SeriesRun struct {
 
 // WriteReport writes REPORT.md.
 func WriteReport(w io.Writer, runs []SeriesRun, robots string) {
-	var seen, rows, skipped int
+	var seen, rows, skipped, dups int
 	for _, r := range runs {
 		seen += r.Res.Seen
 		rows += len(r.Res.Rows)
 		skipped += len(r.Res.Skips)
+		dups += r.Res.Dups
 	}
 	p := func(f string, a ...any) { fmt.Fprintf(w, f+"\n", a...) }
 
-	p("# biblethinker: Bible Thinker's book series, Mike Winger")
+	p("# biblethinker: Bible Thinker, Mike Winger")
 	p("")
 	p("<!-- toc: none -->")
 	p("")
 	p("Written by `go run ./tools/biblethinker --cache .biblethinker-cache --out sources/biblethinker --report sources/biblethinker/REPORT.md`; this file is rewritten by every run.")
 	p("")
-	p("One row an episode of a book-by-book series through the Bible on https://biblethinker.org: the post's address (`url`), the YouTube video the post itself embeds (`alt_url`, a watch address, which Lampas's `videoOf()` plays), the passage, the preacher Mike Winger, the date and the length. The posts of every other category (Q&A sessions, livestreams, topical talks, debates, interviews) are not read.")
+	p("One row a post of the categories below on https://biblethinker.org that names a passage: the post's address (`url`), the YouTube video the post itself embeds (`alt_url`, a watch address, which Lampas's `videoOf()` plays), the passage, the preacher Mike Winger, the date and the length; the row's `notes` name its category (\"Series: <category>\"). A post in two categories is one row, the first category's. The posts of the other categories (Q&A sessions, debates, interviews, reactions and reviews, worship songs) are not read.")
 	p("")
 	p("## Counts")
 	p("")
-	p("- Book series found: %d.", len(runs))
-	p("- Episodes found on the series pages: **%d**.", seen)
+	p("- Categories read: %d.", len(runs))
+	p("- Posts found on the category pages: **%d** (%d of them already a row of an earlier category).", seen, dups)
 	p("- Rows written: **%d**.", rows)
-	p("- Episodes skipped: **%d** (each is named below).", skipped)
+	p("- Posts skipped: **%d** (each is named below).", skipped)
 	p("")
-	p("| Series | Page | Archive pages | Category count | Episodes on the pages | Rows | Skipped |")
-	p("| --- | --- | ---: | ---: | ---: | ---: | ---: |")
+	p("| Category | Page | Archive pages | Category count | Posts found | Also in an earlier category | Rows | Skipped |")
+	p("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |")
 	for _, r := range runs {
-		p("| %s | %s | %d | %d | %d | %d | %d |", r.Res.Series.Name, r.Res.Series.URL(), len(r.Data.Pages), r.Data.Count, r.Res.Seen, len(r.Res.Rows), len(r.Res.Skips))
+		p("| %s | %s | %d | %d | %d | %d | %d | %d |", r.Res.Series.Name, r.Res.Series.URL(), len(r.Data.Pages), r.Data.Count, r.Res.Seen, r.Res.Dups, len(r.Res.Rows), len(r.Res.Skips))
 	}
 	p("")
-	p("Every episode on a series page is a row or is named below. The skipped, by reason:")
+	p("Every post on a category page is a row, is the row of an earlier category, or is named below. The skipped, by reason:")
 	p("")
 	counts := map[string]int{}
 	for _, r := range runs {
@@ -74,7 +77,7 @@ func WriteReport(w io.Writer, runs []SeriesRun, robots string) {
 		p("- %s: %d", k, counts[k])
 	}
 	p("")
-	p("## The skipped episodes")
+	p("## The skipped posts")
 	for _, r := range runs {
 		if len(r.Res.Skips) == 0 {
 			continue
@@ -89,7 +92,7 @@ func WriteReport(w io.Writer, runs []SeriesRun, robots string) {
 	p("")
 	p("## Passages")
 	p("")
-	p("A passage is read from the title (`1 Peter 1:3-7`, `(1:1-8)`, `(Mk 5:1-20)`, `(15:40-16:8)`, `Romans 6`) and, where the title prints none, from the digits that end the post's address (`...-1-peter-13-7` is 1 Peter 1:3-7; the digits are cut into chapter and verse in the one way the book has, and a post whose digits can be cut two ways is skipped). Where both give a passage and they differ, the title is used and the post is named here.")
+	p("A passage is read from the title (`1 Peter 1:3-7`, `(1:1-8)`, `(Mk 5:1-20)`, `(15:40-16:8)`, `Romans 6`; in a topical category any book, `Isaiah 53:1-12`, `Psalm 23`) and, where the title prints none, from the digits that end the post's address (`...-1-peter-13-7` is 1 Peter 1:3-7; the digits are cut into chapter and verse in the one way the book has, and a post whose digits can be cut two ways goes on to the next step). Where both give a passage and they differ, the title is used and the post is named here. Where neither gives one, the post's own words are read (its page, the Lesson Overview, not the share buttons nor the links to other posts): the first scripture reference there with a book and a chapter and verse (`Isaiah 53:1-12`, `1 John 4:8`, `Rom 8:1`; for a book series, the first one in that book) is the passage, and the row's `notes` say so. The embedded video's own YouTube description is not read: no YouTube address is fetched.")
 	p("")
 	any := false
 	for _, r := range runs {
@@ -110,7 +113,7 @@ func WriteReport(w io.Writer, runs []SeriesRun, robots string) {
 	p("")
 	p("## Not read")
 	p("")
-	p("The site's other categories, none of them a book series: %s.", notRead)
+	p("The site's other categories: %s.", notRead)
 	p("")
 	p(termsRead)
 	p("")

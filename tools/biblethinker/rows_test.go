@@ -31,7 +31,7 @@ var fixtureDates = map[int]string{
 }
 
 func TestBuildSeriesWritesTheRow(t *testing.T) {
-	res := BuildSeries(Series{Slug: "1-peter", Book: "1Pet", Name: "1 Peter"}, fixtureEpisodes(t), fixtureDates)
+	res := BuildSeries(Series{Slug: "1-peter", Book: "1Pet", Name: "1 Peter"}, fixtureEpisodes(t), fixtureDates, nil)
 
 	var got *Row
 	for i := range res.Rows {
@@ -53,7 +53,7 @@ func TestBuildSeriesWritesTheRow(t *testing.T) {
 }
 
 func TestBuildSeriesSkipsAndCounts(t *testing.T) {
-	res := BuildSeries(Series{Slug: "1-peter", Book: "1Pet", Name: "1 Peter"}, fixtureEpisodes(t), fixtureDates)
+	res := BuildSeries(Series{Slug: "1-peter", Book: "1Pet", Name: "1 Peter"}, fixtureEpisodes(t), fixtureDates, nil)
 	if res.Seen != 7 {
 		t.Errorf("seen = %d, want 7", res.Seen)
 	}
@@ -89,7 +89,7 @@ func TestBuildSeriesSkipsAndCounts(t *testing.T) {
 }
 
 func TestBuildSeriesRowsAreInDateOrder(t *testing.T) {
-	res := BuildSeries(Series{Slug: "1-peter", Book: "1Pet", Name: "1 Peter"}, fixtureEpisodes(t), fixtureDates)
+	res := BuildSeries(Series{Slug: "1-peter", Book: "1Pet", Name: "1 Peter"}, fixtureEpisodes(t), fixtureDates, nil)
 	for i := 1; i < len(res.Rows); i++ {
 		if *res.Rows[i-1].Date > *res.Rows[i].Date {
 			t.Errorf("row %d (%s) is before row %d (%s)", i, *res.Rows[i].Date, i-1, *res.Rows[i-1].Date)
@@ -103,7 +103,7 @@ func TestBuildSeriesUsesSlugWhenTheTitleHasNoPassage(t *testing.T) {
 		URL: "https://biblethinker.org/to-god-be-the-glory-romans-1133-36/", Slug: "to-god-be-the-glory-romans-1133-36",
 		YouTubeID: "mzyAOaFpnuQ", Categories: []string{"romans"},
 	}}
-	res := BuildSeries(Series{Slug: "romans", Book: "Rom", Name: "Romans"}, eps, nil)
+	res := BuildSeries(Series{Slug: "romans", Book: "Rom", Name: "Romans"}, eps, nil, nil)
 	if len(res.Rows) != 1 || *res.Rows[0].Ref != "Rom.11.33-Rom.11.36" {
 		t.Fatalf("rows = %+v skips = %+v", res.Rows, res.Skips)
 	}
@@ -121,7 +121,7 @@ func TestBuildSeriesNamesATitleAndSlugThatDisagree(t *testing.T) {
 		URL: "https://biblethinker.org/spiritual-warfare-1-peter-31-2/", Slug: "spiritual-warfare-1-peter-31-2",
 		YouTubeID: "N-ypbo5DS0U", Categories: []string{"1-peter"},
 	}}
-	res := BuildSeries(Series{Slug: "1-peter", Book: "1Pet", Name: "1 Peter"}, eps, nil)
+	res := BuildSeries(Series{Slug: "1-peter", Book: "1Pet", Name: "1 Peter"}, eps, nil, nil)
 	if len(res.Rows) != 1 || *res.Rows[0].Ref != "1Pet.2.11-1Pet.2.12" {
 		t.Fatalf("the title wins: rows = %+v", res.Rows)
 	}
@@ -139,7 +139,7 @@ func TestParseDuration(t *testing.T) {
 }
 
 func TestWriteRowsIsOneJSONObjectALine(t *testing.T) {
-	res := BuildSeries(Series{Slug: "1-peter", Book: "1Pet", Name: "1 Peter"}, fixtureEpisodes(t), fixtureDates)
+	res := BuildSeries(Series{Slug: "1-peter", Book: "1Pet", Name: "1 Peter"}, fixtureEpisodes(t), fixtureDates, nil)
 	var b bytes.Buffer
 	if err := WriteRows(&b, res.Rows); err != nil {
 		t.Fatal(err)

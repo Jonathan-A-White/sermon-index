@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/Jonathan-A-White/sermon-index/internal/passage"
 )
@@ -231,4 +232,136 @@ func cvSplits(b *passage.Book, digits string) [][2]int {
 		}
 	}
 	return out
+}
+
+var (
+	bodyStarts = []string{`<div class="swp-hidden-panel-wrap"`, `<div class="hjs-section prev-next"`, `</article>`}
+
+	// scriptureRE reads a book's name (any spelling passage.BookOSIS reads),
+	// a chapter and, after a colon, a verse or a span of verses.
+	scriptureRE = regexp.MustCompile(`(?i)(?:^|[^\pL\d])(` + passage.BookNamePattern() + `)\.?\s*(\d{1,3})(?::(\d{1,3})[a-z]?(?:\s?[-–]\s?(\d{1,3})(?::(\d{1,3}))?)?)?`)
+
+	// notAChapter are words that follow a number in prose: "Mark 5 minutes".
+	notAChapter = regexp.MustCompile(`^\s+(?:minutes?|mins?|seconds?|hours?|days?|weeks?|months?|years?|times?|people|percent)\b`)
+)
+
+// BodyText is the text of a post's own words: what the page prints in the
+// entry-content before the share buttons and the "Additional Videos In This
+// Series" links, which are other posts' addresses and titles. Tags are
+// removed, entities read and white space made single; "" when the page has no
+// entry-content.
+func BodyText(page []byte) string {
+	s := string(page)
+	i := strings.Index(s, `<div class="entry-content">`)
+	if i < 0 {
+		return ""
+	}
+	s = s[i+len(`<div class="entry-content">`):]
+	end := len(s)
+	for _, m := range bodyStarts {
+		if j := strings.Index(s, m); j >= 0 && j < end {
+			end = j
+		}
+	}
+	s = tagRE.ReplaceAllString(s[:end], " ")
+	return strings.Join(strings.Fields(html.UnescapeString(s)), " ")
+}
+
+// RefsInText returns the passages a text names, in order and each once, as
+// OSIS references: a book written with a capital (full or abbreviated, as
+// passage.BookOSIS reads it), a chapter and a verse or span of verses
+// ("Isaiah 53:1-12", "1 John 4:8", "Genesis 1:26-2:3"). A chapter and verse the
+// book does not have are not a passage. With bare, a full book name and a
+// chapter alone ("Psalm 23") is a passage too, unless a word of time follows
+// ("Mark 5 minutes").
+func RefsInText(text string, bare bool) []string {
+	var out []string
+	seen := map[string]bool{}
+	for _, m := range scriptureRE.FindAllStringSubmatchIndex(text, -1) {
+		g := func(n int) string {
+			if m[2*n] < 0 {
+				return ""
+			}
+			return text[m[2*n]:m[2*n+1]]
+		}
+		name := g(1)
+		if r := []rune(name)[0]; !unicode.IsUpper(r) && !unicode.IsDigit(r) {
+			continue // "mark 3:4" is a verb, not a book
+		}
+		osis, ok := passage.BookOSIS(name)
+		if !ok {
+			continue
+		}
+		if g(3) == "" {
+			if !bare {
+				continue
+			}
+			if _, full := passage.FullBookOSIS(name); !full || notAChapter.MatchString(text[m[1]:]) {
+				continue
+			}
+		}
+		ref, err := passage.RangeOSIS(osis, g(2), g(3), g(4), g(5))
+		if err != nil {
+			continue
+		}
+		if r, err := passage.Parse(ref); err != nil || r.Lo > r.Hi {
+			continue
+		}
+		if !seen[ref] {
+			seen[ref] = true
+			out = append(out, ref)
+		}
+	}
+	return out
+}
+
+// RefsFromSlugAnyBook is RefsFromSlug for a post of no one book: when the
+// address ends in a book's name and digits ("...-isaiah-531-12"), the
+// passages those digits can mean in that book; nil when it does not.
+func RefsFromSlugAnyBook(slug string) []string {
+	toks := strings.Split(slug, "-")
+	for len(toks) > 0 && toks[len(toks)-1] == "again" {
+		toks = toks[:len(toks)-1]
+	}
+	var best *passage.Book
+	bestN := 0
+	for _, b := range passage.Books() {
+		b := b
+		names := []string{b.Name}
+		if b.OSIS == "Ps" {
+			names = append(names, "Psalm") // "psalm-23"
+		}
+		for _, name := range names {
+			nt := strings.Split(strings.ToLower(name), " ")
+			for k := 0; k+len(nt) < len(toks); k++ {
+				if !equalToks(toks[k:k+len(nt)], nt) || len(toks)-(k+len(nt)) > 3 {
+					continue
+				}
+				rest := toks[k+len(nt):]
+				if len(rest) > 1 && rest[0] == "pt" || len(rest) > 1 && rest[0] == "part" {
+					rest = rest[1:]
+				}
+				digits := len(rest) > 0
+				for _, r := range rest {
+					digits = digits && isDigits.MatchString(r)
+				}
+				if digits && len(nt) > bestN {
+					best, bestN = &b, len(nt)
+				}
+			}
+		}
+	}
+	if best == nil {
+		return nil
+	}
+	return RefsFromSlug(best.OSIS, strings.Join(toks, "-"))
+}
+
+func equalToks(a, b []string) bool {
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return len(a) == len(b)
 }

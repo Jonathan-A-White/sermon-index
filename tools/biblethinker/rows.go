@@ -15,23 +15,42 @@ const (
 	siteRoot = "https://biblethinker.org"
 )
 
-// Series is one of Mike Winger's book-by-book series on the site: the slug of
-// its archive page, the OSIS name of the book it goes through and the name
-// the site prints for it.
+// Series is one of the site's categories the tool reads: the slug of its
+// archive page, the name the site prints for it and, for a book-by-book
+// series, the OSIS name of the book it goes through. A topical category has no
+// book ("") and a post's passage may be in any book.
 type Series struct {
 	Slug string
 	Book string
 	Name string
 }
 
-// BookSeries are the book series through the Bible the site has. The other
-// categories of the site (Q&A sessions, livestreams, topics, debates,
-// interviews) are not book series and are not read.
-var BookSeries = []Series{
+// Topical reports whether the category is not a series through one book.
+func (s Series) Topical() bool { return s.Book == "" }
+
+// Categories are the categories the tool reads, in the order it reads them (a
+// post in two is the row of the first): the four book series, then the
+// Governor's 2026-11-24 widening to every post that names a passage.
+var Categories = []Series{
 	{Slug: "1-peter", Book: "1Pet", Name: "1 Peter"},
 	{Slug: "hebrews", Book: "Heb", Name: "Hebrews"},
 	{Slug: "mark", Book: "Mark", Name: "Mark"},
 	{Slug: "romans", Book: "Rom", Name: "Romans"},
+	{Slug: "how-to-find-jesus-in-the-old-testament", Name: "How to Find Jesus in the Old Testament"},
+	{Slug: "wisdom-in-the-word", Name: "Wisdom in the Word"},
+	{Slug: "understanding-the-old-testament-law", Name: "Understanding the Old Testament Law"},
+	{Slug: "past-livestreams-and-misc-topical-teachings", Name: "Past Livestreams & Misc. Topical Teachings"},
+}
+
+// NotReadCategories are the categories whose posts are left out (Q&A, debates,
+// interviews, reactions and reviews, worship songs), by slug.
+var NotReadCategories = []string{
+	"past-qa-sessions",
+	"debates",
+	"interviews",
+	"thinking-biblically-reviews",
+	"worship-songs",
+	"christians-react-to-20-atheist-arguments-against-god",
 }
 
 // URL is the address of the series' archive page.
@@ -65,16 +84,34 @@ type Skip struct {
 type SeriesResult struct {
 	Series   Series
 	Seen     int      // articles on the series' archive pages
+	Dups     int      // of them, posts an earlier category already has (its row is that category's)
 	Rows     []Row    // in date order
 	Skips    []Skip   // Seen - len(Rows) of them
 	Disagree []string // a post whose title and slug name different passages (the title is used)
 	NoDate   int      // rows whose post the REST API gave no date for
 }
 
+// SplitSeen cuts the posts of a category into those no earlier category has
+// (fresh) and those one has (dups), by address, and marks the fresh as seen.
+func SplitSeen(eps []Episode, seen map[string]bool) (fresh, dups []Episode) {
+	for _, e := range eps {
+		if seen[e.URL] {
+			dups = append(dups, e)
+			continue
+		}
+		seen[e.URL] = true
+		fresh = append(fresh, e)
+	}
+	return fresh, dups
+}
+
 // BuildSeries makes a row of every episode of the series that has a passage
 // and a YouTube id of its own, and names each one that has not. dates maps a
-// post id to its date, "2015-09-13".
-func BuildSeries(s Series, eps []Episode, dates map[int]string) SeriesResult {
+// post id to its date, "2015-09-13". The passage is read from the title, else
+// from the digits ending the post's address and, for a post that names none,
+// from the post's own text, which bodyOf returns (bodyOf may be nil); bodyOf
+// is asked only for a post the title and the address leave without a passage.
+func BuildSeries(s Series, eps []Episode, dates map[int]string, bodyOf func(Episode) string) SeriesResult {
 	res := SeriesResult{Series: s, Seen: len(eps)}
 	type dated struct {
 		row  Row
@@ -90,18 +127,25 @@ func BuildSeries(s Series, eps []Episode, dates map[int]string) SeriesResult {
 			continue
 		}
 		var reasons []string
-		ref, cited, err := RefFromTitle(s.Book, e.Title)
-		fromSlug := false
-		slugRefs := RefsFromSlug(s.Book, e.Slug)
+		ref, cited, slugRefs, err := passageOfTitle(s, e)
+		fromSlug, fromBody := false, false
 		switch {
 		case err != nil:
 			reasons = append(reasons, "the passage in the title is not in "+s.Name+": "+err.Error())
 		case ref == "" && len(slugRefs) == 1:
 			ref, fromSlug = slugRefs[0], true
-		case ref == "" && len(slugRefs) > 1:
-			reasons = append(reasons, "no passage in the title, and the digits ending the post's address could be any of "+strings.Join(slugRefs, ", "))
 		case ref == "":
-			reasons = append(reasons, "no passage in the title or the post's address")
+			if bodyOf != nil && e.YouTubeID != "" {
+				ref = refFromBody(s, bodyOf(e))
+			}
+			switch {
+			case ref != "":
+				fromBody = true
+			case len(slugRefs) > 1:
+				reasons = append(reasons, "no passage in the title or the post's text (body), and the digits ending the post's address could be any of "+strings.Join(slugRefs, ", "))
+			default:
+				reasons = append(reasons, "no passage in the title, the post's address or the post's text (body)")
+			}
 		case len(slugRefs) > 0 && !contains(slugRefs, ref):
 			res.Disagree = append(res.Disagree, fmt.Sprintf("%s: the title says %s, the address says %s; the title is used", e.Slug, ref, strings.Join(slugRefs, " or ")))
 		}
@@ -115,6 +159,9 @@ func BuildSeries(s Series, eps []Episode, dates map[int]string) SeriesResult {
 		note := fmt.Sprintf("Series: %s (%s). The YouTube id is the one embedded in the post.", s.Name, s.URL())
 		if fromSlug {
 			note += " The title prints no passage; it is read from the digits ending the post's address."
+		}
+		if fromBody {
+			note += " The title and the post's address print no passage; it is the first one the post's own text names."
 		}
 		r := Row{
 			ID:       e.Slug,
@@ -156,6 +203,31 @@ func BuildSeries(s Series, eps []Episode, dates map[int]string) SeriesResult {
 		res.Rows = append(res.Rows, d.row)
 	}
 	return res
+}
+
+// passageOfTitle reads the passage the title prints and the passages the
+// digits ending the address can mean: in the series' book for a book series,
+// in any book for a topical category.
+func passageOfTitle(s Series, e Episode) (ref string, cited, slugRefs []string, err error) {
+	if !s.Topical() {
+		ref, cited, err = RefFromTitle(s.Book, e.Title)
+		return ref, cited, RefsFromSlug(s.Book, e.Slug), err
+	}
+	if refs := RefsInText(e.Title, true); len(refs) > 0 {
+		ref = refs[0]
+	}
+	return ref, nil, RefsFromSlugAnyBook(e.Slug), nil
+}
+
+// refFromBody is the first passage the post's text names (in the series' book
+// for a book series), or "".
+func refFromBody(s Series, body string) string {
+	for _, r := range RefsInText(body, true) {
+		if s.Topical() || strings.HasPrefix(r, s.Book+".") {
+			return r
+		}
+	}
+	return ""
 }
 
 func hasCategory(e Episode, slug string) bool { return contains(e.Categories, slug) }

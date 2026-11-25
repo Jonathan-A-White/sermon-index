@@ -158,3 +158,29 @@ func TestFetcherRefusesAnErrorStatus(t *testing.T) {
 		t.Fatal("a 404 archive page gave no error")
 	}
 }
+
+func TestFetcherTriesAgainAfterAServerError(t *testing.T) {
+	n := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n++
+		if n < 3 {
+			http.Error(w, "bad gateway", http.StatusBadGateway)
+			return
+		}
+		io.WriteString(w, "<html><div class=\"entry-content\"><p>Romans 8:1</p></div></html>")
+	}))
+	defer srv.Close()
+	f := &Fetcher{Base: srv.URL, HTTP: srv.Client(), Cache: t.TempDir(), Retry: time.Millisecond}
+	got, err := f.FetchBody(context.Background(), Episode{URL: "https://biblethinker.org/a-post/"})
+	if err != nil || got != "Romans 8:1" {
+		t.Fatalf("got %q, %v after %d requests", got, err, n)
+	}
+	// a 404 is an answer, not a fault to try again
+	n = 0
+	nf := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { n++; http.NotFound(w, r) }))
+	defer nf.Close()
+	f = &Fetcher{Base: nf.URL, HTTP: nf.Client(), Cache: t.TempDir(), Retry: time.Millisecond}
+	if _, err := f.FetchBody(context.Background(), Episode{URL: "https://biblethinker.org/gone/"}); err == nil || n != 1 {
+		t.Errorf("404: err %v after %d requests", err, n)
+	}
+}
