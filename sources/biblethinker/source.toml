@@ -20,13 +20,15 @@
 # direct:88c6674c... "genuine sermons"): "Mike Winger have other sermons that
 # are on Bible thinker but are not a part of his Through the Bible series but
 # they're genuine Sons if so can we link them into". So every Bible Thinker
-# post whose page names a passage is a row (PROVISIONAL: the Governor is to
-# confirm); the categories read are how-to-find-jesus-in-the-old-testament,
+# post whose page names a passage is a row (the Mayor's reading of those words,
+# told to the Governor in that thread, direct:d1ce451b...; he may narrow it);
+# the categories read are how-to-find-jesus-in-the-old-testament,
 # wisdom-in-the-word, understanding-the-old-testament-law and
 # past-livestreams-and-misc-topical-teachings, beside the four book series. Not
 # read: past-qa-sessions, debates, interviews, thinking-biblically-reviews,
 # worship-songs and christians-react-to-20-atheist-arguments-against-god (Q&A,
-# debates, interviews, reactions and reviews, worship songs).
+# debates, interviews, reactions and reviews, worship songs). A post the site
+# also files under one of those is left out (REPORT.md names it).
 #
 # Postern general 2026-11-23, dictated: "Do Bible
 # thinker should just be sermons in his book but book series though the Bible".
@@ -35,8 +37,9 @@
 #
 # What the tool counted (REPORT.md names every skipped post):
 #   8 categories, 4 book series and 4 topical, 421 posts on their pages (9 of
-#   them in two categories, so one row), 184 rows, 228 skipped (no passage in
-#   the title, the post's address or the post's text).
+#   them in two categories, so one row), 177 rows, 235 skipped (221 with no
+#   passage in the title, the post's address or the post's text; 14 also filed
+#   under a category not read).
 #
 # The site has NO terms of use: /terms, /terms-of-use, /terms-and-conditions,
 # /legal, /privacy-policy and /copyright all answer 404 (read 2026-11-23). Its
@@ -60,7 +63,7 @@ Sitemap: https://biblethinker.org/sitemap_index.xml
 # END YOAST BLOCK"""
 
 licence_note = """
-Decision: the site has no terms of use and its robots.txt forbids nothing, so the terms are NOT ADDRESSED (silence is not a permission); the Governor gave his word on 2026-11-23 17:37:46Z (Postern txid direct:cbd35263b1ee4f0d463e475a928c110f09e551f0493cbc44081935fd559c5dcf): "A: Go ahead: robots.txt allows it, no terms say no; we keep only links, titles, passages and YouTube ids". The index keeps only a post's title, its passage, its address, the id of the YouTube video the post itself embeds, and the date and length the listing prints; never the media, the audio (Castos), a transcript, the lesson notes or a description. The tool fetches one request at a time, two seconds apart, with a User-Agent that names the project, and obeys robots.txt. If Bible Thinker asks for the rows to be removed, the Governor removes them. Off by default, as every source whose terms are not addressed.
+Decision: the site has no terms of use and its robots.txt forbids nothing, so the terms are NOT ADDRESSED (silence is not a permission); the Governor gave his word on 2026-11-23 17:37:46Z (Postern txid direct:cbd35263b1ee4f0d463e475a928c110f09e551f0493cbc44081935fd559c5dcf): "A: Go ahead: robots.txt allows it, no terms say no; we keep only links, titles, passages and YouTube ids". The index keeps only a post's title, its passage, its address, the id of the YouTube video the post itself embeds, and the date and length the listing prints (a post whose title and address print no passage has its page's own text read for one, and none of the text is kept); never the media, the audio (Castos), a transcript, the lesson notes or a description. The tool fetches one request at a time, two seconds apart, with a User-Agent that names the project, and obeys robots.txt. If Bible Thinker asks for the rows to be removed, the Governor removes them. Off by default, as every source whose terms are not addressed.
 The videos are YouTube's: a row's alt_url is the watch address of the video the post embeds, so the player reads it as it reads a Brookfield First row; YouTube's terms bind the videos the links open, not these rows. No YouTube API is called, so the 30-day limit on API data (sources/brookfield-first) does not apply."""
 
 credit = "Mike Winger, Bible Thinker (biblethinker.org)"

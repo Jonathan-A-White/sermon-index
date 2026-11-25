@@ -4,14 +4,14 @@
 
 Written by `go run ./tools/biblethinker --cache .biblethinker-cache --out sources/biblethinker --report sources/biblethinker/REPORT.md`; this file is rewritten by every run.
 
-One row a post of the categories below on https://biblethinker.org that names a passage: the post's address (`url`), the YouTube video the post itself embeds (`alt_url`, a watch address, which Lampas's `videoOf()` plays), the passage, the preacher Mike Winger, the date and the length; the row's `notes` name its category ("Series: <category>"). A post in two categories is one row, the first category's. The posts of the other categories (Q&A sessions, debates, interviews, reactions and reviews, worship songs) are not read.
+One row a post of the categories below on https://biblethinker.org that names a passage: the post's address (`url`), the YouTube video the post itself embeds (`alt_url`, a watch address, which Lampas's `videoOf()` plays), the passage, the preacher Mike Winger, the date and the length; the row's `notes` name its category ("Series: <category>"). A post in two categories is one row, the first category's. The categories of Q&A sessions, debates, interviews, reactions and reviews and worship songs are not read, and a post the site also files under one of them is left out.
 
 ## Counts
 
 - Categories read: 8.
 - Posts found on the category pages: **421** (9 of them already a row of an earlier category).
-- Rows written: **184**.
-- Posts skipped: **228** (each is named below).
+- Rows written: **177**.
+- Posts skipped: **235** (each is named below).
 
 | Category | Page | Archive pages | Category count | Posts found | Also in an earlier category | Rows | Skipped |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -19,14 +19,15 @@ One row a post of the categories below on https://biblethinker.org that names a 
 | Hebrews | https://biblethinker.org/hebrews/ | 1 | 5 | 5 | 0 | 4 | 1 |
 | Mark | https://biblethinker.org/mark/ | 6 | 70 | 70 | 0 | 66 | 4 |
 | Romans | https://biblethinker.org/romans/ | 5 | 51 | 51 | 0 | 47 | 4 |
-| How to Find Jesus in the Old Testament | https://biblethinker.org/how-to-find-jesus-in-the-old-testament/ | 3 | 27 | 27 | 0 | 9 | 18 |
+| How to Find Jesus in the Old Testament | https://biblethinker.org/how-to-find-jesus-in-the-old-testament/ | 3 | 27 | 27 | 0 | 8 | 19 |
 | Wisdom in the Word | https://biblethinker.org/wisdom-in-the-word/ | 3 | 25 | 25 | 0 | 5 | 20 |
 | Understanding the Old Testament Law | https://biblethinker.org/understanding-the-old-testament-law/ | 1 | 2 | 2 | 0 | 0 | 2 |
-| Past Livestreams & Misc. Topical Teachings | https://biblethinker.org/past-livestreams-and-misc-topical-teachings/ | 19 | 218 | 218 | 9 | 32 | 177 |
+| Past Livestreams & Misc. Topical Teachings | https://biblethinker.org/past-livestreams-and-misc-topical-teachings/ | 19 | 218 | 218 | 9 | 26 | 183 |
 
 Every post on a category page is a row, is the row of an earlier category, or is named below. The skipped, by reason:
 
-- no passage: 228
+- no passage: 221
+- category not read: 14
 - no YouTube id: 0
 - not in the series: 0
 - passage not in the book: 0
@@ -64,6 +65,7 @@ Every post on a category page is a row, is the row of an earlier category, or is
 - Who Is the Angel of the Lord?: How to Find Jesus in the Old Testament pt 4 (https://biblethinker.org/who-is-the-angel-of-the-lord-how-to-find-jesus-in-the-old-testament-pt-4/): no passage in the title, the post's address or the post's text (body)
 - Examples of Christophanies: How to find Jesus in the Old Testament pt 5 (https://biblethinker.org/examples-of-christophanies-how-to-find-jesus-in-the-old-testament-pt-5/): no passage in the title, the post's address or the post's text (body)
 - How Many Types of Christ Are There?: How to find Jesus in the Old Testament pt 7 (https://biblethinker.org/how-many-types-of-christ-are-there-how-to-find-jesus-in-the-old-testament-pt-7/): no passage in the title, the post's address or the post's text (body)
+- Joseph as a Type of Christ: How to Find Jesus in the Old Testament pt 8 (https://biblethinker.org/joseph-as-a-type-of-christ-how-to-find-jesus-in-the-old-testament-pt-8/): no passage in the title, the post's address or the post's text (body)
 - Why Bible Prophecy Confuses You: How to find Jesus in the Old Testament pt 9 (https://biblethinker.org/why-bible-prophecy-confuses-you-how-to-find-jesus-in-the-old-testament-pt-9/): no passage in the title, the post's address or the post's text (body)
 - Ways That Moses Is a Type of Christ: How to Find Jesus in the Old Testament pt 10 (https://biblethinker.org/ways-that-moses-is-a-type-of-christ-how-to-find-jesus-in-the-ot-pt-10/): no passage in the title, the post's address or the post's text (body)
 - David is a Type of Christ: How to find Jesus in the Old Testament pt 13 (https://biblethinker.org/david-is-a-type-of-christ-how-to-find-jesus-in-the-ot-pt-13/): no passage in the title, the post's address or the post's text (body)
@@ -75,7 +77,7 @@ Every post on a category page is a row, is the row of an earlier category, or is
 - The Spring Feasts of Israel: How to Find Jesus in the Old Testament pt 21 (https://biblethinker.org/the-spring-feasts-of-israel-how-to-find-jesus-in-the-ot-pt-21/): no passage in the title, the post's address or the post's text (body)
 - Trumpets, Day of Atonement, Booths: How to Find Jesus in the Old Testament pt 22 (https://biblethinker.org/trumpets-day-of-atonement-booths-how-to-find-jesus-in-the-ot-22/): no passage in the title, the post's address or the post's text (body)
 - The Mind Blowing Significance of Passover as Prophecy (https://biblethinker.org/the-mind-blowing-significance-of-passover-as-prophecy/): no passage in the title, the post's address or the post's text (body)
-- Can I Really Justify Seeing Pictures of Jesus In The Old Testament? (https://biblethinker.org/can-i-really-justify-seeing-pictures-of-jesus-in-the-old-testament/): no passage in the title, the post's address or the post's text (body)
+- Can I Really Justify Seeing Pictures of Jesus In The Old Testament? (https://biblethinker.org/can-i-really-justify-seeing-pictures-of-jesus-in-the-old-testament/): left out: also filed under the category interviews, which is not read
 
 ### Wisdom in the Word
 
@@ -111,7 +113,7 @@ Every post on a category page is a row, is the row of an earlier category, or is
 - Are All Religions THE SAME? (https://biblethinker.org/are-all-religions-the-same/): no passage in the title, the post's address or the post's text (body)
 - The Conscience and What The Bible Teaches About It (https://biblethinker.org/the-conscience-and-what-the-bible-teaches-about-it/): no passage in the title, the post's address or the post's text (body)
 - The Bible for Beginners (https://biblethinker.org/the-bible-for-beginners/): no passage in the title, the post's address or the post's text (body)
-- Regretting abortion. Two true stories (https://biblethinker.org/regretting-abortion-two-true-stories/): no passage in the title, the post's address or the post's text (body)
+- Regretting abortion. Two true stories (https://biblethinker.org/regretting-abortion-two-true-stories/): left out: also filed under the category interviews, which is not read
 - Is Christmas PAGAN? In defense of Christmas (https://biblethinker.org/is-christmas-pagan-in-defense-of-christmas/): no passage in the title, the post's address or the post's text (body)
 - Hope Makes Me Smile. Jesus Gives Me Hope. (https://biblethinker.org/19-hopes-every-christian-has/): no passage in the title, the post's address or the post's text (body)
 - EVIDENCE for the RESURRECTION of Christ (https://biblethinker.org/a-case-for-the-resurrection-of-christ/): no passage in the title, the post's address or the post's text (body)
@@ -153,6 +155,7 @@ Every post on a category page is a row, is the row of an earlier category, or is
 - A Biblical Objection to Presuppositional Apologetics (https://biblethinker.org/a-biblical-objection-to-presuppositional-apologetics/): no passage in the title, the post's address or the post's text (body)
 - Why I Think Calvinism Is Unbiblical (https://biblethinker.org/why-i-think-calvinism-is-unbiblical/): no passage in the title, the post's address or the post's text (body)
 - My Concerns About The Passion Translation and Brian Simmons (https://biblethinker.org/my-concerns-about-the-passion-translation-and-brian-simmons/): no passage in the title, the post's address or the post's text (body)
+- You Won’t Believe What Joseph Smith Added to The Bible! (https://biblethinker.org/you-wont-believe-what-joseph-smith-added-to-the-bible/): no passage in the title, the post's address or the post's text (body)
 - Exposing the Agenda and Origins of “The Passion Translation” (https://biblethinker.org/exposing-the-agenda-and-origins-of-the-passion-translation/): no passage in the title, the post's address or the post's text (body)
 - Are Some Sins Worse Than Others? Please don’t get this wrong! (https://biblethinker.org/are-some-sins-worse-than-others-please-dont-get-this-wrong/): no passage in the title, the post's address or the post's text (body)
 - A Pastor Shares His Thoughts on Halloween (https://biblethinker.org/a-pastor-shares-his-thoughts-on-halloween/): no passage in the title, the post's address or the post's text (body)
@@ -168,22 +171,22 @@ Every post on a category page is a row, is the row of an earlier category, or is
 - I’ve Been Looking Into The Hebrew Roots Movement and Here’s What I’ve Found So Far (https://biblethinker.org/ive-been-looking-into-the-hebrew-roots-movement-and-heres-what-ive-found-so-far/): no passage in the title, the post's address or the post's text (body)
 - Will I Be Banned from YT and I Need Your Help (https://biblethinker.org/will-i-be-banned-from-yt-and-i-need-your-help/): no passage in the title, the post's address or the post's text (body)
 - The Gospels Are History Not Myth (https://biblethinker.org/the-gospels-are-history-not-myth/): no passage in the title, the post's address or the post's text (body)
-- Live w/ Mike Winger and Capturing Christianity (https://biblethinker.org/live-w-mike-winger-and-capturing-christianity/): no passage in the title, the post's address or the post's text (body)
+- Live w/ Mike Winger and Capturing Christianity (https://biblethinker.org/live-w-mike-winger-and-capturing-christianity/): left out: also filed under the category interviews, which is not read
 - A Bunch Of Reasons The Empty Tomb Is Historical (https://biblethinker.org/a-bunch-of-reasons-the-empty-tomb-is-historical/): no passage in the title, the post's address or the post's text (body)
 - Skeptics Wrongly Claim Apostle Paul Didn’t Know Jesus (https://biblethinker.org/heres-what-paul-knew-about-jesus/): no passage in the title, the post's address or the post's text (body)
 - Philemon Explained (https://biblethinker.org/philemon-explained/): no passage in the title, the post's address or the post's text (body)
 - How their martyrdom helps prove Jesus rose! (https://biblethinker.org/were-they-really-persecuted-for-saying-jesus-rose/): no passage in the title, the post's address or the post's text (body)
 - Why We Can’t Agree on What Faith Is and What We Can Learn From It. (https://biblethinker.org/why-we-cant-agree-on-what-faith-is-and-what-we-can-learn-from-it/): no passage in the title, the post's address or the post's text (body)
-- The State of Youth Today and How to Disciple Them (Dr. Sean McDowell) (https://biblethinker.org/the-state-of-youth-today-and-how-to-disciple-them-dr-sean-mcdowell/): no passage in the title, the post's address or the post's text (body)
+- The State of Youth Today and How to Disciple Them (Dr. Sean McDowell) (https://biblethinker.org/the-state-of-youth-today-and-how-to-disciple-them-dr-sean-mcdowell/): left out: also filed under the category interviews, which is not read
 - Do Extraordinary Claims Require Extraordinary Evidence? Nah. (https://biblethinker.org/do-extraordinary-claims-require-extraordinary-evidence-nah/): no passage in the title, the post's address or the post's text (body)
 - Stressed Out? Biblical Help That’s NOT a Cliche (https://biblethinker.org/stressed-out-biblical-help-thats-not-a-cliche/): no passage in the title, the post's address or the post's text (body)
 - Does Acts Teach Us to Follow the Law of Moses? Hebrew Roots part 3 (https://biblethinker.org/does-acts-teach-us-to-follow-the-law-of-moses-hebrew-roots-part-3/): no passage in the title, the post's address or the post's text (body)
 - A Pivotal Issue: Hebrew Roots part 4 (https://biblethinker.org/a-pivotal-issue-hebrew-roots-part-4/): no passage in the title, the post's address or the post's text (body)
 - Steven Anderson vs The Biblical Gospel (https://biblethinker.org/steven-anderson-vs-the-biblical-gospel/): no passage in the title, the post's address or the post's text (body)
-- Real Historian Responds to “Jesus Was a Myth” Claims (https://biblethinker.org/real-historian-responds-to-jesus-was-a-myth-claims/): no passage in the title, the post's address or the post's text (body)
+- Real Historian Responds to “Jesus Was a Myth” Claims (https://biblethinker.org/real-historian-responds-to-jesus-was-a-myth-claims/): left out: also filed under the category interviews, which is not read
 - Responding to Calvinist Arguments for Limited Atonement (https://biblethinker.org/responding-to-calvinist-arguments-for-limited-atonement/): no passage in the title, the post's address or the post's text (body)
 - A Biblical Analysis of Infant Baptism (https://biblethinker.org/infant-baptism-not-in-bible/): no passage in the title, the post's address or the post's text (body)
-- God’s Wrath is Good (https://biblethinker.org/gods-wrath-is-good/): no passage in the title, the post's address or the post's text (body)
+- God’s Wrath is Good (https://biblethinker.org/gods-wrath-is-good/): left out: also filed under the category past-qa-sessions, which is not read
 - Did Jesus Die on a Cross or a Stake? Here’s the Evidence. (https://biblethinker.org/did-jesus-die-on-a-cross-or-a-stake-heres-the-evidence/): no passage in the title, the post's address or the post's text (body)
 - A Christian Evaluation of Suicide (https://biblethinker.org/a-christian-evaluation-of-suicide/): no passage in the title, the post's address or the post's text (body)
 - My Tips for Bible Teachers (https://biblethinker.org/tips-for-bible-teachers/): no passage in the title, the post's address or the post's text (body)
@@ -192,21 +195,23 @@ Every post on a category page is a row, is the row of an earlier category, or is
 - Sola Scriptura: why I believe it and how it works (https://biblethinker.org/sola-scriptura-why-i-believe-it-and-how-it-works/): no passage in the title, the post's address or the post's text (body)
 - Biblical Tools For Dealing With Sadness and Depression (https://biblethinker.org/biblical-tools-for-dealing-with-sadness-and-depression/): no passage in the title, the post's address or the post's text (body)
 - How You Can Know and Show Christianity Is True (Understanding Apologetic Methodology) (https://biblethinker.org/how-you-can-know-and-show-christianity-is-true-understanding-apologetic-methodology/): no passage in the title, the post's address or the post's text (body)
+- Apologetics Empire! 12 YouTube Channels LIVE at Once! (https://biblethinker.org/apologetics-empire-12-youtube-channels-live-at-once/): no passage in the title, the post's address or the post's text (body)
 - Why This Pro-Choice Artist BLOCKED Me (https://biblethinker.org/why-this-pro-choice-artist-blocked-me/): no passage in the title, the post's address or the post's text (body)
 - Why 8 People Couldn’t Be Pro-Choice Any Longer: Here’s What They Said (https://biblethinker.org/why-8-people-couldnt-be-pro-choice-any-longer-heres-what-they-said/): no passage in the title, the post's address or the post's text (body)
 - Irrefutable Proof the Bible Doesn’t Teach Flat Earth (https://biblethinker.org/irrefutable-proof-the-bible-doesnt-teach-flat-earth/): no passage in the title, the post's address or the post's text (body)
 - We Desperately Need Some Biblical Wisdom During Coronavirus (https://biblethinker.org/we-desperately-need-some-biblical-wisdom-during-coronavirus/): no passage in the title, the post's address or the post's text (body)
-- How Do The Dead Sea Scroll Forgeries Impact Christianity? (https://biblethinker.org/how-do-the-dead-sea-scroll-forgeries-impact-christianity/): no passage in the title, the post's address or the post's text (body)
-- Dumb Things People Really Believe About Mary Magdalene and Jesus (https://biblethinker.org/dumb-things-people-really-believe-about-mary-magdalene-and-jesus/): no passage in the title, the post's address or the post's text (body)
+- How Do The Dead Sea Scroll Forgeries Impact Christianity? (https://biblethinker.org/how-do-the-dead-sea-scroll-forgeries-impact-christianity/): left out: also filed under the category interviews, which is not read
+- Dumb Things People Really Believe About Mary Magdalene and Jesus (https://biblethinker.org/dumb-things-people-really-believe-about-mary-magdalene-and-jesus/): left out: also filed under the category interviews, which is not read
 - How to Get Saved (https://biblethinker.org/how-to-get-saved/): no passage in the title, the post's address or the post's text (body)
-- Dr. Sean McDowell Critiques “The Myth of Persecution” by Candida Moss (https://biblethinker.org/dr-sean-mcdowell-critiques-the-myth-of-persecution-by-candida-moss/): no passage in the title, the post's address or the post's text (body)
+- I’ve kept this project a secret… until today. (https://biblethinker.org/ive-kept-this-project-a-secret-until-today/): left out: also filed under the category past-qa-sessions, which is not read
+- Dr. Sean McDowell Critiques “The Myth of Persecution” by Candida Moss (https://biblethinker.org/dr-sean-mcdowell-critiques-the-myth-of-persecution-by-candida-moss/): left out: also filed under the category interviews, which is not read
 - Literally the WORST Bible Translation I’ve Ever Seen (https://biblethinker.org/literally-the-worst-bible-translation-ive-ever-seen/): no passage in the title, the post's address or the post's text (body)
 - Kenneth Copeland Cures Your Baldness and Ruins Your Faith (https://biblethinker.org/kenneth-copeland-cures-your-baldness-and-ruins-your-faith/): no passage in the title, the post's address or the post's text (body)
 - Different Christian Views of Revelation Explained (https://biblethinker.org/different-christian-views-of-revelation-explained/): no passage in the title, the post's address or the post's text (body)
-- What is the baptism of the Holy Spirit? (https://biblethinker.org/what-is-the-baptism-of-the-holy-spirit/): no passage in the title, the post's address or the post's text (body)
+- What is the baptism of the Holy Spirit? (https://biblethinker.org/what-is-the-baptism-of-the-holy-spirit/): left out: also filed under the category interviews, which is not read
 - The Theology of the Holy Spirit Explained and Defended (https://biblethinker.org/the-theology-of-the-holy-spirit-explained-and-defended/): no passage in the title, the post's address or the post's text (body)
-- The Best Bible Version May Depend on Your Education Level (https://biblethinker.org/the-best-bible-version-may-depend-on-your-education-level/): no passage in the title, the post's address or the post's text (body)
-- How I Respond to King James Only Christians (https://biblethinker.org/how-i-respond-to-king-james-only-christians/): no passage in the title, the post's address or the post's text (body)
+- The Best Bible Version May Depend on Your Education Level (https://biblethinker.org/the-best-bible-version-may-depend-on-your-education-level/): left out: also filed under the category interviews, which is not read
+- How I Respond to King James Only Christians (https://biblethinker.org/how-i-respond-to-king-james-only-christians/): left out: also filed under the category interviews, which is not read
 - Is it too late for me? (https://biblethinker.org/is-it-too-late-for-me/): no passage in the title, the post's address or the post's text (body)
 - I Had to Vote on a Medical Ethics Committee on Whether to Pull the Plug (https://biblethinker.org/i-had-to-vote-on-a-medical-ethics-committee-on-whether-to-pull-the-plug/): no passage in the title, the post's address or the post's text (body)
 - This note on my car showed me just how HORRIFYING pro-choice logic is. (https://biblethinker.org/this-note-on-my-car-showed-me-just-how-horrifying-pro-choice-logic-is/): no passage in the title, the post's address or the post's text (body)
@@ -224,6 +229,9 @@ Every post on a category page is a row, is the row of an earlier category, or is
 - Not Even JOEL OSTEEN Can Copyright Strike This Video: Osteen Misuses the Bible 14 Out of 15 times. (https://biblethinker.org/not-even-joel-osteen-can-copyright-strike-this-video-osteen-misuses-the-bible-14-out-of-15-times/): no passage in the title, the post's address or the post's text (body)
 - Low self-worth and abandonment issues. Any advice? (https://biblethinker.org/low-self-worth-and-abandonment-issues-any-advice/): no passage in the title, the post's address or the post's text (body)
 - We don’t think gluttony is a sin anymore (https://biblethinker.org/we-dont-think-gluttony-is-a-sin-anymore/): no passage in the title, the post's address or the post's text (body)
+- The connection between Christmas and Saturnalia (https://biblethinker.org/the-connection-between-christmas-and-saturnalia/): no passage in the title, the post's address or the post's text (body)
+- Is it OK to celebrate a holiday that’s not in the Bible? (https://biblethinker.org/is-it-ok-to-celebrate-a-holiday-thats-not-in-the-bible/): no passage in the title, the post's address or the post's text (body)
+- Some concerning facts about Santa (https://biblethinker.org/some-concerning-facts-about-santa/): no passage in the title, the post's address or the post's text (body)
 - I hope you don’t believe this myth… (https://biblethinker.org/i-hope-you-dont-believe-this-myth/): no passage in the title, the post's address or the post's text (body)
 - Examples of modern idolatry and do I worry people will idolize me? (https://biblethinker.org/examples-of-modern-idolatry-and-do-i-worry-people-will-idolize-me/): no passage in the title, the post's address or the post's text (body)
 - No marriage in heaven (https://biblethinker.org/no-marriage-in-heaven/): no passage in the title, the post's address or the post's text (body)
@@ -283,11 +291,11 @@ Every post on a category page is a row, is the row of an earlier category, or is
 - It’s actually getting WORSE! We need to do something. (https://biblethinker.org/urgent-nigeria-update/): no passage in the title, the post's address or the post's text (body)
 - WARNING: Muslims Will End a Bunch of Christians on Christmas (Nigerian sources) (https://biblethinker.org/warning-muslims-will-end-a-bunch-of-christians-on-christmas-nigerian-sources/): no passage in the title, the post's address or the post's text (body)
 - I’m Not Weak for Saying Televising the Execution is Unbiblical: Here’s my case (https://biblethinker.org/im-not-weak-for-saying-televising-the-execution-is-unbiblical-heres-my-case/): no passage in the title, the post's address or the post's text (body)
-- Sean McDowell and I discuss the BIG Mormon debate (https://biblethinker.org/sean-mcdowell-and-i-discuss-the-big-mormon-debate/): no passage in the title, the post's address or the post's text (body)
+- Sean McDowell and I discuss the BIG Mormon debate (https://biblethinker.org/sean-mcdowell-and-i-discuss-the-big-mormon-debate/): left out: also filed under the category debates, which is not read
 
 ## Passages
 
-A passage is read from the title (`1 Peter 1:3-7`, `(1:1-8)`, `(Mk 5:1-20)`, `(15:40-16:8)`, `Romans 6`; in a topical category any book, `Isaiah 53:1-12`, `Psalm 23`) and, where the title prints none, from the digits that end the post's address (`...-1-peter-13-7` is 1 Peter 1:3-7; the digits are cut into chapter and verse in the one way the book has, and a post whose digits can be cut two ways goes on to the next step). Where both give a passage and they differ, the title is used and the post is named here. Where neither gives one, the post's own words are read (its page, the Lesson Overview, not the share buttons nor the links to other posts): the first scripture reference there with a book and a chapter and verse (`Isaiah 53:1-12`, `1 John 4:8`, `Rom 8:1`; for a book series, the first one in that book) is the passage, and the row's `notes` say so. The embedded video's own YouTube description is not read: no YouTube address is fetched.
+A passage is read from the title (`1 Peter 1:3-7`, `(1:1-8)`, `(Mk 5:1-20)`, `(15:40-16:8)`, `Romans 6`; in a topical category any book, `Isaiah 53:1-12`, `Psalm 23`) and, where the title prints none, from the digits that end the post's address (`...-1-peter-13-7` is 1 Peter 1:3-7; the digits are cut into chapter and verse in the one way the book has, and a post whose digits can be cut two ways goes on to the next step). Where both give a passage and they differ, the title is used and the post is named here. Where neither gives one, the post's own words are read (its page, the Lesson Overview, not the share buttons, nor a "click here" sentence, nor the words of a link to another post or to YouTube): the first scripture reference there with a book and a chapter and verse (`Isaiah 53:1-12`, `1 John 4:8`, `Rom 8:1`) or a full book name and a chapter or chapters (`Genesis 14`, `Leviticus 1-7`); for a book series, the first one in that book is the passage, and the row's `notes` say so. The embedded video's own YouTube description is not read: no YouTube address is fetched.
 
 - No post's title and address name different passages.
 
