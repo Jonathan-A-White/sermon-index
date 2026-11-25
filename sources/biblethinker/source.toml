@@ -1,21 +1,42 @@
-# Bible Thinker (https://biblethinker.org), Mike Winger's site: his book-by-book
-# series through the Bible, one row an episode (a post of a series), written by
+# Bible Thinker (https://biblethinker.org), Mike Winger's site: his book series
+# through the Bible and his other teachings that name a passage, one row a post,
+# written by
 #
 #   go run ./tools/biblethinker --cache .biblethinker-cache --out sources/biblethinker --report sources/biblethinker/REPORT.md
 #
-# from the series' archive pages (https://biblethinker.org/1-peter/, /hebrews/,
-# /mark/, /romans/ and their later pages) and, for the dates, the WordPress
-# REST API's id and date of each series' posts. This file is by hand; rows.jsonl
-# and REPORT.md are rewritten by every run, so edit the tool, not them.
+# from the archive pages of the categories the tool reads (https://biblethinker.org/1-peter/,
+# /hebrews/, /mark/, /romans/, /how-to-find-jesus-in-the-old-testament/,
+# /wisdom-in-the-word/, /understanding-the-old-testament-law/,
+# /past-livestreams-and-misc-topical-teachings/ and their later pages) and, for
+# the dates, the WordPress REST API's id and date of each category's posts. A
+# post whose title and address print no passage is read for one in its own
+# text (its page, the Lesson Overview). This file is by hand; rows.jsonl and
+# REPORT.md are rewritten by every run, so edit the tool, not them.
 #
-# The Governor's scope word (Postern general 2026-11-23, dictated): "Do Bible
+# The Governor's scope words, the newest first and the one that rules:
+#
+# Postern general 2026-11-24 ~23:40Z (txid
+# direct:0f79878bd2671f15431dd39dc1ba151415e0240fd3f56d0d6adb277f6133347d, and
+# direct:88c6674c... "genuine sermons"): "Mike Winger have other sermons that
+# are on Bible thinker but are not a part of his Through the Bible series but
+# they're genuine Sons if so can we link them into". So every Bible Thinker
+# post whose page names a passage is a row (PROVISIONAL: the Governor is to
+# confirm); the categories read are how-to-find-jesus-in-the-old-testament,
+# wisdom-in-the-word, understanding-the-old-testament-law and
+# past-livestreams-and-misc-topical-teachings, beside the four book series. Not
+# read: past-qa-sessions, debates, interviews, thinking-biblically-reviews,
+# worship-songs and christians-react-to-20-atheist-arguments-against-god (Q&A,
+# debates, interviews, reactions and reviews, worship songs).
+#
+# Postern general 2026-11-23, dictated: "Do Bible
 # thinker should just be sermons in his book but book series though the Bible".
-# So only the book series: the site's other categories (Q&A sessions,
-# livestreams, topical talks, debates, interviews) are not read.
+# That limited the source to the four book series; the 2026-11-24 words above
+# widen it.
 #
-# What the tool counted (REPORT.md names every skipped episode):
-#   4 book series, 149 episodes on their pages, 132 rows, 17 skipped (no
-#   passage in the title or the post's address).
+# What the tool counted (REPORT.md names every skipped post):
+#   8 categories, 4 book series and 4 topical, 421 posts on their pages (9 of
+#   them in two categories, so one row), 184 rows, 228 skipped (no passage in
+#   the title, the post's address or the post's text).
 #
 # The site has NO terms of use: /terms, /terms-of-use, /terms-and-conditions,
 # /legal, /privacy-policy and /copyright all answer 404 (read 2026-11-23). Its
@@ -23,7 +44,7 @@
 # the site does say, quoted word for word from the pages read on 2026-11-23.
 
 id = "biblethinker"
-name = "Bible Thinker: Mike Winger's book-by-book series"
+name = "Bible Thinker: Mike Winger's teachings"
 kind = "sermons"
 
 licence = """
@@ -43,7 +64,7 @@ Decision: the site has no terms of use and its robots.txt forbids nothing, so th
 The videos are YouTube's: a row's alt_url is the watch address of the video the post embeds, so the player reads it as it reads a Brookfield First row; YouTube's terms bind the videos the links open, not these rows. No YouTube API is called, so the 30-day limit on API data (sources/brookfield-first) does not apply."""
 
 credit = "Mike Winger, Bible Thinker (biblethinker.org)"
-# Not the site root (internal/sources/homepage_test.go): the largest of the four series.
+# Not the site root (internal/sources/homepage_test.go): the largest of the book series.
 homepage = "https://biblethinker.org/mark/"
 terms_url = "https://biblethinker.org/disclaimer/"
 added = 2026-11-23
