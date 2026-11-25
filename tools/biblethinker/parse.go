@@ -238,8 +238,19 @@ var (
 	bodyStarts = []string{`<div class="swp-hidden-panel-wrap"`, `<div class="hjs-section prev-next"`, `</article>`}
 
 	// scriptureRE reads a book's name (any spelling passage.BookOSIS reads),
-	// a chapter and, after a colon, a verse or a span of verses.
-	scriptureRE = regexp.MustCompile(`(?i)(?:^|[^\pL\d])(` + passage.BookNamePattern() + `)\.?\s*(\d{1,3})(?::(\d{1,3})[a-z]?(?:\s?[-–]\s?(\d{1,3})(?::(\d{1,3}))?)?)?`)
+	// a chapter and then, after a colon, a verse or a span of verses, or, after
+	// a dash, a last chapter ("Leviticus 1-7").
+	scriptureRE = regexp.MustCompile(`(?i)(?:^|[^\pL\d])(` + passage.BookNamePattern() + `)\.?\s*(\d{1,3})(?:(?::(\d{1,3})[a-z]?(?:\s?[-–]\s?(\d{1,3})(?::(\d{1,3}))?)?)|\s?[-–]\s?(\d{1,3})\b)?`)
+
+	// promoRE is a paragraph or a list item (withoutPointers).
+	promoRE       = regexp.MustCompile(`(?s)<p[\s>].*?</p>|<li[\s>].*?</li>`)
+	lineBreakRE   = regexp.MustCompile(`<br\s*/?>`)
+	sentenceEndRE = regexp.MustCompile(`[.!?]["”)]*\s+|\n`)
+	clickHereRE   = regexp.MustCompile(`(?i)click(?:\s|&nbsp;)+here`)
+	// otherPostLinkRE is a link to another post of the site or to YouTube: its
+	// words are another video's title or a channel's name ("Acts 17
+	// Apologetics"). A link to a Bible text stays.
+	otherPostLinkRE = regexp.MustCompile(`(?s)<a\s[^>]*href="https?://(?:www\.)?(?:biblethinker\.org|youtube\.com|youtu\.be)[/"?][^>]*>.*?</a>`)
 
 	// notAChapter are words that follow a number in prose: "Mark 5 minutes".
 	notAChapter = regexp.MustCompile(`^\s+(?:minutes?|mins?|seconds?|hours?|days?|weeks?|months?|years?|times?|people|percent)\b`)
@@ -247,8 +258,10 @@ var (
 
 // BodyText is the text of a post's own words: what the page prints in the
 // entry-content before the share buttons and the "Additional Videos In This
-// Series" links, which are other posts' addresses and titles. Tags are
-// removed, entities read and white space made single; "" when the page has no
+// Series" links, which are other posts' addresses and titles, and without the
+// sentences that say "click here" and the words of links to other posts or to
+// YouTube, which are about other videos. Tags are removed,
+// entities read and white space made single; "" when the page has no
 // entry-content.
 func BodyText(page []byte) string {
 	s := string(page)
@@ -263,8 +276,54 @@ func BodyText(page []byte) string {
 			end = j
 		}
 	}
-	s = tagRE.ReplaceAllString(s[:end], " ")
+	s = otherPostLinkRE.ReplaceAllStringFunc(s[:end], func(a string) string {
+		if clickHereRE.MatchString(tagRE.ReplaceAllString(a, " ")) {
+			return " click here "
+		}
+		return " "
+	})
+	s = promoRE.ReplaceAllStringFunc(s, withoutPointers)
+	s = tagRE.ReplaceAllString(s, " ")
 	return strings.Join(strings.Fields(html.UnescapeString(s)), " ")
+}
+
+// withoutPointers takes out of a paragraph or list item the sentences that say
+// "click here", which point at another video ("Click here for the study on
+// Genesis 22."), and the question a sentence beginning so answers ("Does
+// Jeremiah 10 ban Christmas trees? CLICK HERE to find out."). A block that
+// says it nowhere is returned as it is.
+func withoutPointers(block string) string {
+	text := tagRE.ReplaceAllString(lineBreakRE.ReplaceAllString(block, "\n"), " ")
+	text = html.UnescapeString(text)
+	text = strings.ReplaceAll(text, "\u00a0", " ")
+	if !clickHereRE.MatchString(text) {
+		return block
+	}
+	var sentences []string
+	for at := 0; at < len(text); {
+		m := sentenceEndRE.FindStringIndex(text[at:])
+		if m == nil {
+			sentences = append(sentences, text[at:])
+			break
+		}
+		sentences = append(sentences, text[at:at+m[1]])
+		at += m[1]
+	}
+	var kept []string
+	for _, s := range sentences {
+		t := strings.TrimSpace(s)
+		if t == "" {
+			continue
+		}
+		if m := clickHereRE.FindStringIndex(t); m != nil {
+			if m[0] == 0 && len(kept) > 0 && strings.HasSuffix(kept[len(kept)-1], "?") {
+				kept = kept[:len(kept)-1]
+			}
+			continue
+		}
+		kept = append(kept, t)
+	}
+	return " " + html.EscapeString(strings.Join(kept, " ")) + " "
 }
 
 // RefsInText returns the passages a text names, in order and each once, as
@@ -272,8 +331,8 @@ func BodyText(page []byte) string {
 // passage.BookOSIS reads it), a chapter and a verse or span of verses
 // ("Isaiah 53:1-12", "1 John 4:8", "Genesis 1:26-2:3"). A chapter and verse the
 // book does not have are not a passage. With bare, a full book name and a
-// chapter alone ("Psalm 23") is a passage too, unless a word of time follows
-// ("Mark 5 minutes").
+// chapter alone ("Psalm 23") or a span of chapters ("Leviticus 1-7") is a
+// passage too, unless a word of time follows ("Mark 5 minutes").
 func RefsInText(text string, bare bool) []string {
 	var out []string
 	seen := map[string]bool{}
@@ -300,7 +359,11 @@ func RefsInText(text string, bare bool) []string {
 				continue
 			}
 		}
-		ref, err := passage.RangeOSIS(osis, g(2), g(3), g(4), g(5))
+		last := g(4)
+		if g(3) == "" {
+			last = g(6)
+		}
+		ref, err := passage.RangeOSIS(osis, g(2), g(3), last, g(5))
 		if err != nil {
 			continue
 		}

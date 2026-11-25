@@ -39,6 +39,9 @@ func TestRefsInText(t *testing.T) {
 		{"mark 3:4 and gen 1:1", false, nil},                 // a book is written with a capital
 		{"Romans 99:1 and Jude 1:99", true, nil},             // a chapter or verse the book does not have
 		{"Mark 5 minutes later", true, nil},                  // not a chapter followed by a word of time
+		{"the sacrifices of Leviticus 1-7 and Exodus 12 – 13", true, []string{"Lev.1-Lev.7", "Exod.12-Exod.13"}}, // never cut short
+		{"Leviticus 1-99 is no passage", true, nil},
+		{"Leviticus 1-7 is", false, nil},
 		{"Rom 8:1 and Matt 5:3-12", false, []string{"Rom.8.1", "Matt.5.3-Matt.5.12"}},
 	} {
 		if got := RefsInText(c.in, c.bare); !reflect.DeepEqual(got, c.want) {
@@ -227,5 +230,35 @@ func TestReportCountsEachCategory(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Errorf("report lacks %q:\n%s", want, out)
 		}
+	}
+}
+
+func TestBodyTextLeavesOutOtherVideosAndChannels(t *testing.T) {
+	got := BodyText([]byte(`<article><div class="entry-content"><p>Testing our traditions.</p>
+<ul><li>Does Jeremiah 10 ban Christmas trees? <a href="https://www.youtube.com/watch?v=GFhHmj77_rg">CLICK HERE</a> to find out</li>
+<li><a href="https://www.youtube.com/user/Acts17Apologetics">Acts 17 Apologetics</a></li>
+<li><a href="https://youtu.be/ugxJBb0lPXQ">Romans 1:1</a></li></ul>
+<p><a href="https://biblethinker.org/other/">The Good Shepherd: Psalm 23:1</a></p>
+<p>Click here for my talk on Genesis 3:15.</p>
+<p>The sower, from this study in Mark 4:1-20. <a href="https://www.youtube.com/playlist?list=x">Click here</a> for the whole playlist.</p>
+<p><a href="https://youtu.be/x">Click here</a>&nbsp;for the study on Genesis 22.</p>
+<p>See <a href="https://www.biblegateway.com/passage/?search=John+1">John 1:14</a> today.</p>
+</div></article>`))
+	if got != "Testing our traditions. The sower, from this study in Mark 4:1-20. See John 1:14 today." {
+		t.Errorf("body text = %q", got)
+	}
+}
+
+func TestAPostAlsoFiledUnderACategoryNotReadIsLeftOut(t *testing.T) {
+	eps := []Episode{{
+		PostID: 11, Title: "Live Q and A: Psalm 23", URL: "https://biblethinker.org/live/", Slug: "live",
+		YouTubeID: "s0eX1P2f8Nc", Categories: []string{"wisdom-in-the-word", "past-qa-sessions"},
+	}}
+	res := BuildSeries(wisdom, eps, nil, nil)
+	if len(res.Rows) != 0 || len(res.Skips) != 1 {
+		t.Fatalf("rows = %+v skips = %+v", res.Rows, res.Skips)
+	}
+	if r := res.Skips[0].Reason; reasonKind(r) != "category not read" || !strings.Contains(r, "past-qa-sessions") {
+		t.Errorf("reason %q", r)
 	}
 }

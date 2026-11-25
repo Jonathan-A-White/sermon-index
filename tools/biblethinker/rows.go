@@ -86,7 +86,7 @@ type SeriesResult struct {
 	Seen     int      // articles on the series' archive pages
 	Dups     int      // of them, posts an earlier category already has (its row is that category's)
 	Rows     []Row    // in date order
-	Skips    []Skip   // Seen - len(Rows) of them
+	Skips    []Skip   // Seen - Dups - len(Rows) of them
 	Disagree []string // a post whose title and slug name different passages (the title is used)
 	NoDate   int      // rows whose post the REST API gave no date for
 }
@@ -124,6 +124,10 @@ func BuildSeries(s Series, eps []Episode, dates map[int]string, bodyOf func(Epis
 		}
 		if !hasCategory(e, s.Slug) {
 			skip(fmt.Sprintf("not in the %s series (its categories: %s)", s.Slug, strings.Join(e.Categories, ", ")))
+			continue
+		}
+		if no := notReadCategory(e); no != "" {
+			skip(fmt.Sprintf("left out: also filed under the category %s, which is not read", no))
 			continue
 		}
 		var reasons []string
@@ -225,6 +229,16 @@ func refFromBody(s Series, body string) string {
 	for _, r := range RefsInText(body, true) {
 		if s.Topical() || strings.HasPrefix(r, s.Book+".") {
 			return r
+		}
+	}
+	return ""
+}
+
+// notReadCategory is the first of the post's categories that is not read, or "".
+func notReadCategory(e Episode) string {
+	for _, c := range NotReadCategories {
+		if contains(e.Categories, c) {
+			return c
 		}
 	}
 	return ""

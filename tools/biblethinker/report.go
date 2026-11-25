@@ -50,7 +50,7 @@ func WriteReport(w io.Writer, runs []SeriesRun, robots string) {
 	p("")
 	p("Written by `go run ./tools/biblethinker --cache .biblethinker-cache --out sources/biblethinker --report sources/biblethinker/REPORT.md`; this file is rewritten by every run.")
 	p("")
-	p("One row a post of the categories below on https://biblethinker.org that names a passage: the post's address (`url`), the YouTube video the post itself embeds (`alt_url`, a watch address, which Lampas's `videoOf()` plays), the passage, the preacher Mike Winger, the date and the length; the row's `notes` name its category (\"Series: <category>\"). A post in two categories is one row, the first category's. The posts of the other categories (Q&A sessions, debates, interviews, reactions and reviews, worship songs) are not read.")
+	p("One row a post of the categories below on https://biblethinker.org that names a passage: the post's address (`url`), the YouTube video the post itself embeds (`alt_url`, a watch address, which Lampas's `videoOf()` plays), the passage, the preacher Mike Winger, the date and the length; the row's `notes` name its category (\"Series: <category>\"). A post in two categories is one row, the first category's. The categories of Q&A sessions, debates, interviews, reactions and reviews and worship songs are not read, and a post the site also files under one of them is left out.")
 	p("")
 	p("## Counts")
 	p("")
@@ -73,7 +73,7 @@ func WriteReport(w io.Writer, runs []SeriesRun, robots string) {
 			counts[reasonKind(s.Reason)]++
 		}
 	}
-	for _, k := range []string{"no passage", "no YouTube id", "not in the series", "passage not in the book"} {
+	for _, k := range []string{"no passage", "category not read", "no YouTube id", "not in the series", "passage not in the book"} {
 		p("- %s: %d", k, counts[k])
 	}
 	p("")
@@ -92,7 +92,7 @@ func WriteReport(w io.Writer, runs []SeriesRun, robots string) {
 	p("")
 	p("## Passages")
 	p("")
-	p("A passage is read from the title (`1 Peter 1:3-7`, `(1:1-8)`, `(Mk 5:1-20)`, `(15:40-16:8)`, `Romans 6`; in a topical category any book, `Isaiah 53:1-12`, `Psalm 23`) and, where the title prints none, from the digits that end the post's address (`...-1-peter-13-7` is 1 Peter 1:3-7; the digits are cut into chapter and verse in the one way the book has, and a post whose digits can be cut two ways goes on to the next step). Where both give a passage and they differ, the title is used and the post is named here. Where neither gives one, the post's own words are read (its page, the Lesson Overview, not the share buttons nor the links to other posts): the first scripture reference there with a book and a chapter and verse (`Isaiah 53:1-12`, `1 John 4:8`, `Rom 8:1`; for a book series, the first one in that book) is the passage, and the row's `notes` say so. The embedded video's own YouTube description is not read: no YouTube address is fetched.")
+	p("A passage is read from the title (`1 Peter 1:3-7`, `(1:1-8)`, `(Mk 5:1-20)`, `(15:40-16:8)`, `Romans 6`; in a topical category any book, `Isaiah 53:1-12`, `Psalm 23`) and, where the title prints none, from the digits that end the post's address (`...-1-peter-13-7` is 1 Peter 1:3-7; the digits are cut into chapter and verse in the one way the book has, and a post whose digits can be cut two ways goes on to the next step). Where both give a passage and they differ, the title is used and the post is named here. Where neither gives one, the post's own words are read (its page, the Lesson Overview, not the share buttons, nor a \"click here\" sentence, nor the words of a link to another post or to YouTube): the first scripture reference there with a book and a chapter and verse (`Isaiah 53:1-12`, `1 John 4:8`, `Rom 8:1`) or a full book name and a chapter or chapters (`Genesis 14`, `Leviticus 1-7`); for a book series, the first one in that book is the passage, and the row's `notes` say so. The embedded video's own YouTube description is not read: no YouTube address is fetched.")
 	p("")
 	any := false
 	for _, r := range runs {
@@ -128,6 +128,8 @@ func WriteReport(w io.Writer, runs []SeriesRun, robots string) {
 
 func reasonKind(reason string) string {
 	switch {
+	case strings.HasPrefix(reason, "left out: "):
+		return "category not read"
 	case strings.HasPrefix(reason, "not in the "):
 		return "not in the series"
 	case strings.Contains(reason, "passage in the title is not in"):
