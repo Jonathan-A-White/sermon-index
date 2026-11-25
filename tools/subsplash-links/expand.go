@@ -9,7 +9,10 @@ import (
 	"time"
 )
 
-// userAgent names no person and no machine.
+// userAgent names no person and no machine. It is a generic client name and
+// not the project's, which docs/adding-a-source.md asks of other tools: the
+// story that made this tool asked for one (mw-qtu3zvz.49.1), and the recipe
+// records the exception.
 const userAgent = "link-reader/1.0 (reads where a shared short link points; one HEAD each)"
 
 // minInterval is the least the tool waits between two requests.
