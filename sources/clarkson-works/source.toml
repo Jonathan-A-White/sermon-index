@@ -1,0 +1,85 @@
+# David Clarkson's sermons, 34 rows from the Nichol edition (The Practical
+# Works of David Clarkson, 3 volumes, Edinburgh, James Nichol, 1864-65), as
+# the Internet Archive scans it. Written (rows.jsonl and REPORT.md) by
+#
+#   go run ./tools/clarkson-works
+#
+# from the OCR (_djvu.xml) of the three items
+#
+#   practicalworksof01clar   volume 1, University of Toronto (Robarts)
+#   practicalworksof02clar   volume 2, University of Toronto (Robarts)
+#   practicalworksof03clar   volume 3, Princeton Theological Seminary Library
+#
+# fetched once on 2026-11-25 into the git-ignored .archive-cache/, one request
+# at a time, 2 seconds apart. A row is a sermon of a volume's contents page:
+# its title and printed page, typed from the contents page's image; the Archive
+# leaf where it begins (https://archive.org/details/<item>/page/n<N>, N counted
+# from 0); and the contents page's text, kept only where the sermon's own
+# heading or most of its running heads read the same in the OCR. The index
+# keeps facts only: no sentence of a sermon is written in this repository.
+#
+# What the tool counted (2026-11-25):
+#   34 sermons read (13, 13 and 8 a volume); 34 rows, 34 with a preaching text
+#   that resolves; none left out. REPORT.md lists the leaf of every row, the
+#   one sermon whose running heads misprint its text (volume 2, "The Lord
+#   Rules over all"), the parts of the volumes that are not sermons (a
+#   treatise against the Papists among them), and that no sermon's text is
+#   2 Peter 1:4, or anywhere in 2 Peter, with the pages that cite the verse.
+#   tools/clarkson-works/REPORT.md is what the scan showed for each row.
+#
+# Not used: the Banner of Truth's reprint and the Logos edition
+# (LLS$CLARKSON02), which are licensed; digitalpuritan.net and Monergism,
+# whose files were not read.
+
+id = "clarkson-works"
+name = "David Clarkson's sermons (Practical Works, 1864-65; Internet Archive)"
+kind = "sermons"
+
+# The Internet Archive's terms of use ("Terms of Use 31 Dec 2014"),
+# https://archive.org/about/terms.php (now https://archive.org/about/terms),
+# quoted verbatim as read on 2026-11-25. The live page is drawn by JavaScript
+# and a script gets no text from it, so the words are those of the Wayback
+# Machine's copy of 2022
+# (https://web.archive.org/web/2022id_/https://archive.org/about/terms.php).
+# The last paragraph is the "Licensing" section of
+# https://archive.org/developers/index.html, read the same day. Neither says
+# anything of automated download. https://archive.org/robots.txt disallows only
+# /control/ and /report/. None of the three items' metadata
+# (https://archive.org/metadata/<item>) has a rights, licenseurl,
+# possible-copyright-status or access-restricted-item field.
+licence = """
+Access to the Archive’s Collections is provided at no cost to you and is \
+granted for scholarship and research purposes only.
+
+Some of the content available through the Archive may be governed by local, \
+national, and/or international laws and regulations, and your use of such \
+content is solely at your own risk. You agree to abide by all applicable laws \
+and regulations, including intellectual property laws, in connection with your \
+use of the Archive. In particular, you certify that your use of any part of \
+the Archive's Collections will be limited to noninfringing or fair use under \
+copyright law. If a Creative Commons or other license has been declared for \
+particular material on the Archive, to the extent you trust the declaration \
+and declarer (which is rarely the Internet Archive), you may use the content \
+according to the terms and conditions of the applicable license.
+
+The Internet Archive does not assert any new copyright or other proprietary \
+rights over any of the material in its database."""
+
+licence_note = """
+The words are public domain: David Clarkson died in 1686 and the edition used \
+was printed in 1864-65, before 1929. The Archive states no licence on any of \
+the three items; its terms (above) ask that use be noninfringing, and neither \
+allow nor forbid automated download in so many words. The index keeps only a \
+title, a reference, a page number and the address of a reader page, never a \
+sentence of a sermon or of the Archive's OCR, and /v1/text does not serve the \
+words of these sermons. The Banner of Truth's reprint and the Logos edition \
+are licensed and are not used."""
+
+credit = "David Clarkson; Internet Archive (scans of the 1864-65 Nichol edition, from the University of Toronto and Princeton Theological Seminary libraries)"
+homepage = "https://archive.org/details/practicalworksof01clar"
+terms_url = "https://archive.org/about/terms.php"
+added = 2026-11-25
+on_by_default = true
+
+[host_rules."archive.org"]
+delay_ms = 1000
