@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 // rawZip is a SWORD RawLD package of the entries, as CrossWire's rawzip.
@@ -89,6 +90,35 @@ func TestFetchModuleSkipsWhatIsCached(t *testing.T) {
 	}
 	if len(*got) != 2 {
 		t.Errorf("a cached module was fetched again: %v", *got)
+	}
+}
+
+func TestFetchModuleSpacesItsRequests(t *testing.T) {
+	m := modules["TCR"]
+	zipBytes := rawZip(t, m, fixture(t, "tcr-three.txt"))
+	var mu sync.Mutex
+	var at []time.Time
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		at = append(at, time.Now())
+		mu.Unlock()
+		if r.URL.Path == "/packages/rawzip/"+m.ZipName {
+			w.Write(zipBytes)
+			return
+		}
+		w.Write([]byte(confText))
+	}))
+	defer srv.Close()
+	if err := fetchModule(context.Background(), srv.Client(), srv.URL, m, t.TempDir(), &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(at) != 2 {
+		t.Fatalf("%d requests, want 2", len(at))
+	}
+	if gap := at[1].Sub(at[0]); gap < time.Second {
+		t.Errorf("the second request came %v after the first, want at least a second", gap)
 	}
 }
 

@@ -8,10 +8,11 @@
 //
 // It fetches the module's package (packages/rawzip/<Module>.zip) and its
 // mods.d/<module>.conf from https://www.crosswire.org/ftpmirror/pub/sword
-// into the cache directory (a file already there is not fetched again),
-// reads the RawLD dictionary (a topic a key, ThML in the entry) and writes
-// the two files. source.toml is written by hand: it holds the licence and
-// what was found about it. Two runs over the same cache write the same bytes.
+// into the cache directory (a file already there is not fetched again; the
+// two requests are a second apart), reads the RawLD dictionary (a topic a
+// key, ThML in the entry) and writes the two files. source.toml is written
+// by hand: it holds the licence and what was found about it. Two runs over
+// the same cache write the same bytes.
 package main
 
 import (
@@ -124,8 +125,12 @@ func runModule(ctx context.Context, client *http.Client, base, name, cache, out,
 	return nil
 }
 
+// fetchDelay is the pause between two requests to CrossWire.
+const fetchDelay = time.Second
+
 // fetchModule fetches the module's package and its conf into the cache,
-// each unless it is there already.
+// each unless it is there already, one request at a time with fetchDelay
+// between them.
 func fetchModule(ctx context.Context, client *http.Client, base string, m Module, cache string, log io.Writer) error {
 	if err := os.MkdirAll(cache, 0o755); err != nil {
 		return err
@@ -134,11 +139,20 @@ func fetchModule(ctx context.Context, client *http.Client, base string, m Module
 		{base + "/packages/rawzip/" + m.ZipName, m.ZipName},
 		{base + "/raw/mods.d/" + m.ConfName, m.ConfName},
 	}
+	fetched := 0
 	for i, f := range files {
 		path := filepath.Join(cache, f.name)
 		if st, err := os.Stat(path); err == nil && st.Size() > 0 {
 			continue
 		}
+		if fetched > 0 {
+			select {
+			case <-time.After(fetchDelay):
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}
+		fetched++
 		fmt.Fprintf(log, "fetching %s\n", f.url)
 		if err := fetchOne(ctx, client, f.url, path, i == 0); err != nil {
 			return err
