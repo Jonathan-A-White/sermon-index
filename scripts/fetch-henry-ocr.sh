@@ -7,12 +7,16 @@ set -eu
 here=$(cd "$(dirname "$0")/.." && pwd)
 dir=${SERMON_INDEX_ARCHIVE_CACHE:-$here/.archive-cache}
 mkdir -p "$dir"
+fetched=
 for item in miscellaneouswor00henr completeworksofr0001revm; do
 	f="$dir/${item}_djvu.xml"
 	if [ -s "$f" ]; then
 		echo "have $f"
 		continue
 	fi
+	# One request at a time and a second apart, as docs/adding-a-source.md asks.
+	[ -z "$fetched" ] || sleep 1
+	fetched=1
 	echo "fetching $item"
 	# The User-Agent names the project, as docs/adding-a-source.md asks.
 	curl -fsSL --retry 3 -A 'sermon-index-fetch-henry-ocr' -o "$f.part" "https://archive.org/download/$item/${item}_djvu.xml"
