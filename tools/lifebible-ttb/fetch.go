@@ -38,15 +38,16 @@ func cachePath(cache, u string) string {
 
 // FetchPages reads each page address of urls (the list page and the book
 // pages are not read), one request at a time with delay between requests.
-// A page already in the cache directory is read from it and not fetched
-// again. A path robots.txt disallows is never asked for. A page that cannot
-// be had is returned with its Err, and the run goes on.
-func FetchPages(ctx context.Context, client *http.Client, urls []string, cache string, delay time.Duration, log io.Writer) (map[string]PageResult, error) {
+// asked says the site has just been asked for something else (the sitemap),
+// so the first page fetched waits delay too. A page already in the cache
+// directory is read from it and not fetched again. A path robots.txt
+// disallows is never asked for. A page that cannot be had is returned with
+// its Err, and the run goes on.
+func FetchPages(ctx context.Context, client *http.Client, urls []string, cache string, delay time.Duration, asked bool, log io.Writer) (map[string]PageResult, error) {
 	if err := os.MkdirAll(cache, 0o755); err != nil {
 		return nil, err
 	}
 	out := map[string]PageResult{}
-	fetched := 0
 	for _, u := range urls {
 		pu, err := url.Parse(u)
 		if err != nil {
@@ -65,14 +66,14 @@ func FetchPages(ctx context.Context, client *http.Client, urls []string, cache s
 			out[u] = PageResult{Page: ParsePage(string(b))}
 			continue
 		}
-		if fetched > 0 {
+		if asked {
 			select {
 			case <-time.After(delay):
 			case <-ctx.Done():
 				return nil, ctx.Err()
 			}
 		}
-		fetched++
+		asked = true
 		fmt.Fprintf(log, "fetching %s\n", u)
 		body, err := fetchOne(ctx, client, u)
 		if err != nil {
@@ -115,21 +116,22 @@ func fetchOne(ctx context.Context, client *http.Client, u string) ([]byte, error
 	return body, nil
 }
 
-// fetchSitemap keeps the sitemap in the cache like a page.
-func fetchSitemap(ctx context.Context, client *http.Client, u, cache string) ([]byte, error) {
+// fetchSitemap keeps the sitemap in the cache like a page. asked says the
+// site was asked for it, false when it came from the cache.
+func fetchSitemap(ctx context.Context, client *http.Client, u, cache string) (body []byte, asked bool, err error) {
 	path := filepath.Join(cache, "sitemap.xml")
 	if b, err := os.ReadFile(path); err == nil && len(b) > 0 {
-		return b, nil
+		return b, false, nil
 	}
-	body, err := fetchOne(ctx, client, u)
+	body, err = fetchOne(ctx, client, u)
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", u, err)
+		return nil, true, fmt.Errorf("%s: %w", u, err)
 	}
 	if !strings.Contains(string(body[:min(len(body), 400)]), "<urlset") && !strings.Contains(string(body[:min(len(body), 400)]), "<?xml") {
-		return nil, fmt.Errorf("%s: not a sitemap", u)
+		return nil, true, fmt.Errorf("%s: not a sitemap", u)
 	}
 	if err := os.WriteFile(path, body, 0o644); err != nil {
-		return nil, err
+		return nil, true, err
 	}
-	return body, nil
+	return body, true, nil
 }

@@ -47,7 +47,7 @@ func run(ctx context.Context, sitemapURL, cache, out string, delay time.Duration
 	if err := os.MkdirAll(cache, 0o755); err != nil {
 		return err
 	}
-	body, err := fetchSitemap(ctx, client, sitemapURL, cache)
+	body, asked, err := fetchSitemap(ctx, client, sitemapURL, cache)
 	if err != nil {
 		return err
 	}
@@ -55,7 +55,7 @@ func run(ctx context.Context, sitemapURL, cache, out string, delay time.Duration
 	if err != nil {
 		return err
 	}
-	pages, err := FetchPages(ctx, client, urls, cache, delay, stdout)
+	pages, err := FetchPages(ctx, client, urls, cache, delay, asked, stdout)
 	if err != nil {
 		return err
 	}

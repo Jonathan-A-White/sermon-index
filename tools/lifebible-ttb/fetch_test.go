@@ -3,14 +3,73 @@ package main
 import (
 	"bytes"
 	"context"
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 )
+
+// The sitemap's request is a request to the site too: the first page is asked
+// for no sooner than delay after it.
+func TestRunSpacesTheSitemapAndTheFirstPage(t *testing.T) {
+	page, err := os.ReadFile("testdata/isaiah-1.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	const delay = 200 * time.Millisecond
+	var mu sync.Mutex
+	var paths []string
+	var at []time.Time
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		paths = append(paths, r.URL.Path)
+		at = append(at, time.Now())
+		mu.Unlock()
+		if r.URL.Path == "/sitemap.xml" {
+			// The sitemap lists the site's own addresses, and ParseSitemap
+			// keeps only those: the transport below sends them here.
+			fmt.Fprintf(w, `<?xml version="1.0"?><urlset><url><loc>%s/isaiah/1</loc></url></urlset>`, ttbPrefix)
+			return
+		}
+		w.Write(page)
+	}))
+	defer srv.Close()
+	to, err := url.Parse(srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	was := http.DefaultTransport
+	http.DefaultTransport = roundTrip(func(r *http.Request) (*http.Response, error) {
+		r = r.Clone(r.Context())
+		r.URL.Scheme, r.URL.Host, r.Host = to.Scheme, to.Host, ""
+		return was.RoundTrip(r)
+	})
+	defer func() { http.DefaultTransport = was }()
+
+	if err := run(context.Background(), site+"/sitemap.xml", t.TempDir(), t.TempDir(), delay, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if want := []string{"/sitemap.xml", "/through-the-bible/isaiah/1"}; !slices.Equal(paths, want) {
+		t.Fatalf("asked for %v, want %v", paths, want)
+	}
+	if gap := at[1].Sub(at[0]); gap < delay {
+		t.Errorf("the first page was asked for %v after the sitemap, want at least %v", gap, delay)
+	}
+}
+
+type roundTrip func(*http.Request) (*http.Response, error)
+
+func (f roundTrip) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
 
 func TestFetchPages(t *testing.T) {
 	page, err := os.ReadFile("testdata/isaiah-1.html")
@@ -50,7 +109,7 @@ func TestFetchPages(t *testing.T) {
 		t.Fatal(err)
 	}
 	var log bytes.Buffer
-	got, err := FetchPages(context.Background(), srv.Client(), urls, cache, 0, &log)
+	got, err := FetchPages(context.Background(), srv.Client(), urls, cache, 0, false, &log)
 	if err != nil {
 		t.Fatal(err)
 	}
