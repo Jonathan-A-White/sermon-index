@@ -10,7 +10,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/Jonathan-A-White/sermon-index/internal/sources"
 )
@@ -58,7 +60,7 @@ func fakeAPI(t *testing.T, reqs *[]*http.Request) *httptest.Server {
 func TestClientWalksTheUploadsPlaylist(t *testing.T) {
 	var reqs []*http.Request
 	srv := fakeAPI(t, &reqs)
-	c := &Client{Base: srv.URL, Key: testKey, HTTP: srv.Client()}
+	c := &Client{Base: srv.URL, Key: testKey, HTTP: srv.Client(), Gap: time.Nanosecond}
 
 	pl, err := c.UploadsPlaylist(context.Background(), "@BrookfieldFirst")
 	if err != nil {
@@ -95,6 +97,48 @@ func TestClientWalksTheUploadsPlaylist(t *testing.T) {
 	}
 	if c.Units != 3 {
 		t.Errorf("quota %d units, want 3 (1 each)", c.Units)
+	}
+}
+
+// The recipe asks for requests a second apart: channels.list and every page of
+// playlistItems.list, as the tool sends them with a Client it has set no pause
+// on.
+func TestUploadsSpacesItsRequests(t *testing.T) {
+	var mu sync.Mutex
+	var at []time.Time
+	var paths []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		at = append(at, time.Now())
+		paths = append(paths, r.URL.Path)
+		mu.Unlock()
+		switch {
+		case r.URL.Path == "/youtube/v3/channels":
+			w.Write(fixture(t, "channel.json"))
+		case r.URL.Query().Get("pageToken") == "PAGE2TOKEN":
+			w.Write(fixture(t, "uploads-page2.json"))
+		default:
+			w.Write(fixture(t, "uploads-page1.json"))
+		}
+	}))
+	defer srv.Close()
+	c := &Client{Base: srv.URL, Key: testKey, HTTP: srv.Client()}
+	pl, err := c.UploadsPlaylist(context.Background(), "@BrookfieldFirst")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.Uploads(context.Background(), pl); err != nil {
+		t.Fatal(err)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(at) != 3 {
+		t.Fatalf("%d requests, want 3 (channels.list, then two pages)", len(at))
+	}
+	for i := 1; i < len(at); i++ {
+		if gap := at[i].Sub(at[i-1]); gap < time.Second {
+			t.Errorf("request %d (%s) came %v after the one before, want at least a second", i+1, paths[i], gap)
+		}
 	}
 }
 
@@ -158,7 +202,7 @@ func fixtureItems(t *testing.T) []Item {
 	t.Helper()
 	var reqs []*http.Request
 	srv := fakeAPI(t, &reqs)
-	c := &Client{Base: srv.URL, Key: testKey, HTTP: srv.Client()}
+	c := &Client{Base: srv.URL, Key: testKey, HTTP: srv.Client(), Gap: time.Nanosecond}
 	items, err := c.Uploads(context.Background(), "UUYJE6WQ5ZJ9vkbWKjrxZGSg")
 	if err != nil {
 		t.Fatal(err)
@@ -351,7 +395,7 @@ func runFixtureWith(t *testing.T, out, rephil, report, list string) (string, err
 	t.Helper()
 	var reqs []*http.Request
 	srv := fakeAPI(t, &reqs)
-	c := &Client{Base: srv.URL, Key: testKey, HTTP: srv.Client()}
+	c := &Client{Base: srv.URL, Key: testKey, HTTP: srv.Client(), Gap: time.Nanosecond}
 	var stdout bytes.Buffer
 	err := run(context.Background(), c, "@BrookfieldFirst", out, rephil, report, list, &stdout)
 	return stdout.String(), err

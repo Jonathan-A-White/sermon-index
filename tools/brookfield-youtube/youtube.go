@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
 
 // The YouTube Data API v3. Only two methods are called, both public-metadata
@@ -26,15 +27,19 @@ const (
 	keyHeader   = "X-Goog-Api-Key"
 	userAgent   = "sermon-index-brookfield-youtube (+https://github.com/Jonathan-A-White/sermon-index)"
 	maxErrBytes = 2000
+	requestGap  = time.Second // the pause between two requests to the API
 )
 
-// Client reads the API. The key goes in a request header, never in the
-// address, and any text of an error that holds it is made "[key]".
+// Client reads the API, one request at a time with a pause between them. The
+// key goes in a request header, never in the address, and any text of an error
+// that holds it is made "[key]".
 type Client struct {
 	Base  string // the API's origin; apiBase when empty
 	Key   string
 	HTTP  *http.Client
-	Units int // quota units spent so far
+	Gap   time.Duration // the pause between two requests; requestGap when 0
+	Units int           // quota units spent so far
+	last  time.Time     // when the last request ended
 }
 
 // Item is one entry of a playlist: a video as the uploads playlist lists it.
@@ -66,7 +71,25 @@ func (c *Client) fail(format string, a ...any) error {
 	return errors.New(c.redact(fmt.Sprintf(format, a...)))
 }
 
-// get calls one method and decodes the JSON answer into v.
+// pause waits until Gap has passed since the last request ended; the first
+// request does not wait.
+func (c *Client) pause(ctx context.Context) error {
+	if c.last.IsZero() {
+		return nil
+	}
+	gap := c.Gap
+	if gap == 0 {
+		gap = requestGap
+	}
+	select {
+	case <-time.After(gap - time.Since(c.last)):
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+// get calls one method, after the pause, and decodes the JSON answer into v.
 func (c *Client) get(ctx context.Context, method string, q url.Values, v any) error {
 	u := c.base() + "/youtube/v3/" + method + "?" + q.Encode()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
@@ -80,7 +103,11 @@ func (c *Client) get(ctx context.Context, method string, q url.Values, v any) er
 	if hc == nil {
 		hc = http.DefaultClient
 	}
+	if err := c.pause(ctx); err != nil {
+		return c.fail("%s: %v", method, err)
+	}
 	c.Units += callCost // a request costs at least a unit, even a refused one
+	defer func() { c.last = time.Now() }()
 	resp, err := hc.Do(req)
 	if err != nil {
 		return c.fail("%s: %v", method, err)

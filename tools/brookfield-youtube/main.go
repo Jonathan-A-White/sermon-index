@@ -5,11 +5,12 @@
 //	YOUTUBE_API_KEY="$(mw secrets get youtube_api_key)" go run ./tools/brookfield-youtube
 //
 // It resolves the handle with channels.list, walks the channel's uploads
-// playlist with playlistItems.list (50 a page) and keeps, for each video, only
-// facts: its title as YouTube prints it, its date, the preacher and the
-// passage where the title or the description names one, and the watch link.
-// Nothing is downloaded: no video, no audio, no caption, no page. The
-// description is read for a preacher and a passage and is never written out.
+// playlist with playlistItems.list (50 a page), one request at a time and a
+// second apart, and keeps, for each video, only facts: its title as YouTube
+// prints it, its date, the preacher and the passage where the title or the
+// description names one, and the watch link. Nothing is downloaded: no video,
+// no audio, no caption, no page. The description is read for a preacher and a
+// passage and is never written out.
 //
 // The key is read from the environment variable YOUTUBE_API_KEY alone. It is
 // sent in a request header, never written to a file, a log or the report, and
