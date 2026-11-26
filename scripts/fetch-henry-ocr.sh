@@ -14,6 +14,7 @@ for item in miscellaneouswor00henr completeworksofr0001revm; do
 		continue
 	fi
 	echo "fetching $item"
-	curl -fsSL --retry 3 -o "$f.part" "https://archive.org/download/$item/${item}_djvu.xml"
+	# The User-Agent names the project, as docs/adding-a-source.md asks.
+	curl -fsSL --retry 3 -A 'sermon-index-fetch-henry-ocr' -o "$f.part" "https://archive.org/download/$item/${item}_djvu.xml"
 	mv "$f.part" "$f"
 done
