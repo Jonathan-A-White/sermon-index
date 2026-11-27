@@ -1,0 +1,30 @@
+{
+  "kind": "youtube#playlistItemListResponse",
+  "etag": "i",
+  "pageInfo": {
+    "totalResults": 1,
+    "resultsPerPage": 50
+  },
+  "items": [
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "x",
+      "id": "UIcorAAAAAAA1",
+      "snippet": {
+        "publishedAt": "2026-01-01T00:00:00Z",
+        "channelId": "UCSpQNTtLDeQ5Z571g9j0LRg",
+        "title": "What Love Is | 1 Corinthians 13 Deep Dive | Pastor Allen Nolan",
+        "description": "Pastor Allen Nolan (fixture description).",
+        "playlistId": "x",
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "corAAAAAAA1"
+        }
+      },
+      "contentDetails": {
+        "videoId": "corAAAAAAA1",
+        "videoPublishedAt": "2025-07-18T14:00:00Z"
+      }
+    }
+  ]
+}

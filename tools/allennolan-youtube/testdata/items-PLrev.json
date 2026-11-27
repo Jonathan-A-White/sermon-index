@@ -1,0 +1,150 @@
+{
+  "kind": "youtube#playlistItemListResponse",
+  "etag": "i",
+  "pageInfo": {
+    "totalResults": 7,
+    "resultsPerPage": 50
+  },
+  "items": [
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "x",
+      "id": "UIrevAAAAAA01",
+      "snippet": {
+        "publishedAt": "2026-01-01T00:00:00Z",
+        "channelId": "UCSpQNTtLDeQ5Z571g9j0LRg",
+        "title": "Revelation Explained 27: Prerequisite for Jesus' Return (6:12-17) Pastor Allen Nolan Sermon",
+        "description": "Pastor Allen Nolan (fixture description).",
+        "playlistId": "x",
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "revAAAAAA01"
+        }
+      },
+      "contentDetails": {
+        "videoId": "revAAAAAA01",
+        "videoPublishedAt": "2020-01-15T14:00:00Z"
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "x",
+      "id": "UIrevAAAAAA02",
+      "snippet": {
+        "publishedAt": "2026-01-01T00:00:00Z",
+        "channelId": "UCSpQNTtLDeQ5Z571g9j0LRg",
+        "title": "What's The Pale Horse? Book of Revelation Explained 25 (Revelation 6:7-8) Pastor Allen Nolan Sermon",
+        "description": "Pastor Allen Nolan (fixture description).",
+        "playlistId": "x",
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "revAAAAAA02"
+        }
+      },
+      "contentDetails": {
+        "videoId": "revAAAAAA02",
+        "videoPublishedAt": "2020-01-08T14:00:00Z"
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "x",
+      "id": "UIrevAAAAAA03",
+      "snippet": {
+        "publishedAt": "2026-01-01T00:00:00Z",
+        "channelId": "UCSpQNTtLDeQ5Z571g9j0LRg",
+        "title": "Book of Revelation Explained 28: Four Winds of the Earth | Pastor Allen Nolan Sermon",
+        "description": "Pastor Allen Nolan (fixture description).",
+        "playlistId": "x",
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "revAAAAAA03"
+        }
+      },
+      "contentDetails": {
+        "videoId": "revAAAAAA03",
+        "videoPublishedAt": "2020-01-17T14:00:00Z"
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "x",
+      "id": "UIrevAAAAAA04",
+      "snippet": {
+        "publishedAt": "2026-01-01T00:00:00Z",
+        "channelId": "UCSpQNTtLDeQ5Z571g9j0LRg",
+        "title": "Book of Revelation Explained 47: Summary of Revelation 1-14 | Pastor Allen Nolan Sermon",
+        "description": "Pastor Allen Nolan (fixture description).",
+        "playlistId": "x",
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "revAAAAAA04"
+        }
+      },
+      "contentDetails": {
+        "videoId": "revAAAAAA04",
+        "videoPublishedAt": "2020-03-18T14:00:00Z"
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "x",
+      "id": "UIrevAAAAAA05",
+      "snippet": {
+        "publishedAt": "2026-01-01T00:00:00Z",
+        "channelId": "UCSpQNTtLDeQ5Z571g9j0LRg",
+        "title": "Who Are the Two Witnesses In Revelation? Revelation Bible Study | Pastor Allen Nolan Sermon",
+        "description": "The two witnesses of Revelation 11:3-12 are explained. Also see Daniel 9 and John 12.",
+        "playlistId": "x",
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "revAAAAAA05"
+        }
+      },
+      "contentDetails": {
+        "videoId": "revAAAAAA05",
+        "videoPublishedAt": "2020-02-15T14:00:00Z"
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "x",
+      "id": "UIrevAAAAAA06",
+      "snippet": {
+        "publishedAt": "2026-01-01T00:00:00Z",
+        "channelId": "UCSpQNTtLDeQ5Z571g9j0LRg",
+        "title": "Revelation Explained Part 20: Dreams in Revelation (Daniel 8:1-2, 16-26) Pastor Allen Nolan Sermon",
+        "description": "Pastor Allen Nolan (fixture description).",
+        "playlistId": "x",
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "revAAAAAA06"
+        }
+      },
+      "contentDetails": {
+        "videoId": "revAAAAAA06",
+        "videoPublishedAt": "2019-12-21T14:00:00Z"
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "x",
+      "id": "UIrevAAAAAA07",
+      "snippet": {
+        "publishedAt": "2026-01-01T00:00:00Z",
+        "channelId": "UCSpQNTtLDeQ5Z571g9j0LRg",
+        "title": "Revelation Explained 41: Archangels and Dragon | Pastor Allen Nolan Sermon",
+        "description": "Revelation 12:7-17 and Daniel 10:13 are read.",
+        "playlistId": "x",
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "revAAAAAA07"
+        }
+      },
+      "contentDetails": {
+        "videoId": "revAAAAAA07",
+        "videoPublishedAt": "2020-09-16T14:00:00Z"
+      }
+    }
+  ]
+}

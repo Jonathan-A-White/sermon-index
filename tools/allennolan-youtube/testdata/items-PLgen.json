@@ -1,0 +1,90 @@
+{
+  "kind": "youtube#playlistItemListResponse",
+  "etag": "i",
+  "pageInfo": {
+    "totalResults": 4,
+    "resultsPerPage": 50
+  },
+  "items": [
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "x",
+      "id": "UIgenAAAAAA01",
+      "snippet": {
+        "publishedAt": "2026-01-01T00:00:00Z",
+        "channelId": "UCSpQNTtLDeQ5Z571g9j0LRg",
+        "title": "Does the Bible Contradict Science? | Book of Genesis Bible Study 3 | Pastor Allen Nolan Sermon",
+        "description": "Pastor Allen Nolan (fixture description).",
+        "playlistId": "x",
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "genAAAAAA01"
+        }
+      },
+      "contentDetails": {
+        "videoId": "genAAAAAA01",
+        "videoPublishedAt": "2020-06-03T14:00:00Z"
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "x",
+      "id": "UIgenAAAAAA02",
+      "snippet": {
+        "publishedAt": "2026-01-01T00:00:00Z",
+        "channelId": "UCSpQNTtLDeQ5Z571g9j0LRg",
+        "title": "Why the Nephilim Are More Than Just Giants | Genesis 6 Deep Dive",
+        "description": "Join Pastor Allen Nolan and learn who the Sons of God are in Genesis 6?",
+        "playlistId": "x",
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "genAAAAAA02"
+        }
+      },
+      "contentDetails": {
+        "videoId": "genAAAAAA02",
+        "videoPublishedAt": "2020-07-01T14:00:00Z"
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "x",
+      "id": "UIgenAAAAAA03",
+      "snippet": {
+        "publishedAt": "2026-01-01T00:00:00Z",
+        "channelId": "UCSpQNTtLDeQ5Z571g9j0LRg",
+        "title": "Abraham's Divine Calling (Genesis 12:1-3) | Book of Genesis Bible Study Part 32",
+        "description": "Pastor Allen Nolan (fixture description).",
+        "playlistId": "x",
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "genAAAAAA03"
+        }
+      },
+      "contentDetails": {
+        "videoId": "genAAAAAA03",
+        "videoPublishedAt": "2020-07-29T14:00:00Z"
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "x",
+      "id": "UIgenAAAAAA04",
+      "snippet": {
+        "publishedAt": "2026-01-01T00:00:00Z",
+        "channelId": "UCSpQNTtLDeQ5Z571g9j0LRg",
+        "title": "Private video",
+        "description": "This video is private.",
+        "playlistId": "x",
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "genAAAAAA04"
+        }
+      },
+      "contentDetails": {
+        "videoId": "genAAAAAA04",
+        "videoPublishedAt": "2020-08-01T14:00:00Z"
+      }
+    }
+  ]
+}

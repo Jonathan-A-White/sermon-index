@@ -1,0 +1,50 @@
+{
+  "kind": "youtube#playlistItemListResponse",
+  "etag": "i",
+  "pageInfo": {
+    "totalResults": 2,
+    "resultsPerPage": 50
+  },
+  "items": [
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "x",
+      "id": "UIrevAAAAAA03",
+      "snippet": {
+        "publishedAt": "2026-01-01T00:00:00Z",
+        "channelId": "UCSpQNTtLDeQ5Z571g9j0LRg",
+        "title": "Book of Revelation Explained 28: Four Winds of the Earth | Pastor Allen Nolan Sermon",
+        "description": "Pastor Allen Nolan (fixture description).",
+        "playlistId": "x",
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "revAAAAAA03"
+        }
+      },
+      "contentDetails": {
+        "videoId": "revAAAAAA03",
+        "videoPublishedAt": "2020-01-17T14:00:00Z"
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "x",
+      "id": "UIrev5AAAAAA1",
+      "snippet": {
+        "publishedAt": "2026-01-01T00:00:00Z",
+        "channelId": "UCSpQNTtLDeQ5Z571g9j0LRg",
+        "title": "Slain Lamb with Seven Horns and Seven Eyes in Revelation",
+        "description": "Pastor Allen Nolan (fixture description).",
+        "playlistId": "x",
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "rev5AAAAAA1"
+        }
+      },
+      "contentDetails": {
+        "videoId": "rev5AAAAAA1",
+        "videoPublishedAt": "2019-12-14T14:00:00Z"
+      }
+    }
+  ]
+}

@@ -1,0 +1,70 @@
+{
+  "kind": "youtube#playlistItemListResponse",
+  "etag": "i",
+  "pageInfo": {
+    "totalResults": 3,
+    "resultsPerPage": 50
+  },
+  "items": [
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "x",
+      "id": "UIchapAAAAAA1",
+      "snippet": {
+        "publishedAt": "2026-01-01T00:00:00Z",
+        "channelId": "UCSpQNTtLDeQ5Z571g9j0LRg",
+        "title": "Revelation Chapter 1: Jesus and the Coming Apocalypse | Pastor Allen Nolan",
+        "description": "Pastor Allen Nolan (fixture description).",
+        "playlistId": "x",
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "chapAAAAAA1"
+        }
+      },
+      "contentDetails": {
+        "videoId": "chapAAAAAA1",
+        "videoPublishedAt": "2024-10-23T14:00:00Z"
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "x",
+      "id": "UIchapAAAAAA2",
+      "snippet": {
+        "publishedAt": "2026-01-01T00:00:00Z",
+        "channelId": "UCSpQNTtLDeQ5Z571g9j0LRg",
+        "title": "The Truth About Revelation 17 & 18: Babylon and the Beast | Pastor Allen Nolan Sermon",
+        "description": "Pastor Allen Nolan (fixture description).",
+        "playlistId": "x",
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "chapAAAAAA2"
+        }
+      },
+      "contentDetails": {
+        "videoId": "chapAAAAAA2",
+        "videoPublishedAt": "2025-05-07T14:00:00Z"
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "x",
+      "id": "UIchapAAAAAA3",
+      "snippet": {
+        "publishedAt": "2026-01-01T00:00:00Z",
+        "channelId": "UCSpQNTtLDeQ5Z571g9j0LRg",
+        "title": "The Seven Bowls of Wrath: Are We Ready for What's Coming? (Rev. 16 and 17)",
+        "description": "Pastor Allen Nolan (fixture description).",
+        "playlistId": "x",
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "chapAAAAAA3"
+        }
+      },
+      "contentDetails": {
+        "videoId": "chapAAAAAA3",
+        "videoPublishedAt": "2025-04-30T02:30:00Z"
+      }
+    }
+  ]
+}

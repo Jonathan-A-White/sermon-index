@@ -1,0 +1,19 @@
+{
+  "kind": "youtube#channelListResponse",
+  "etag": "c",
+  "pageInfo": {
+    "totalResults": 1,
+    "resultsPerPage": 5
+  },
+  "items": [
+    {
+      "kind": "youtube#channel",
+      "etag": "x",
+      "id": "UCSpQNTtLDeQ5Z571g9j0LRg",
+      "snippet": {
+        "title": "Pastor Allen Nolan",
+        "customUrl": "@allennolan"
+      }
+    }
+  ]
+}

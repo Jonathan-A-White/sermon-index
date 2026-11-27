@@ -1,0 +1,76 @@
+{
+  "kind": "youtube#playlistListResponse",
+  "etag": "p1",
+  "nextPageToken": "PLPAGE2",
+  "pageInfo": {
+    "totalResults": 9,
+    "resultsPerPage": 5
+  },
+  "items": [
+    {
+      "kind": "youtube#playlist",
+      "etag": "x",
+      "id": "PLgen",
+      "snippet": {
+        "publishedAt": "2024-01-16T00:00:00Z",
+        "channelId": "UCSpQNTtLDeQ5Z571g9j0LRg",
+        "title": "Book of Genesis Bible Study"
+      },
+      "contentDetails": {
+        "itemCount": 4
+      }
+    },
+    {
+      "kind": "youtube#playlist",
+      "etag": "x",
+      "id": "PLrev",
+      "snippet": {
+        "publishedAt": "2024-01-16T00:00:00Z",
+        "channelId": "UCSpQNTtLDeQ5Z571g9j0LRg",
+        "title": "The Book of Revelation Bible Study Verse by Verse"
+      },
+      "contentDetails": {
+        "itemCount": 7
+      }
+    },
+    {
+      "kind": "youtube#playlist",
+      "etag": "x",
+      "id": "PLpray",
+      "snippet": {
+        "publishedAt": "2024-01-16T00:00:00Z",
+        "channelId": "UCSpQNTtLDeQ5Z571g9j0LRg",
+        "title": "Why God Isn’t Answering Your Prayers"
+      },
+      "contentDetails": {
+        "itemCount": 7
+      }
+    },
+    {
+      "kind": "youtube#playlist",
+      "etag": "x",
+      "id": "PLmyst",
+      "snippet": {
+        "publishedAt": "2024-01-16T00:00:00Z",
+        "channelId": "UCSpQNTtLDeQ5Z571g9j0LRg",
+        "title": "Genesis Mysteries Explained: Nephilim, Enoch, the Firmament & the Flood"
+      },
+      "contentDetails": {
+        "itemCount": 12
+      }
+    },
+    {
+      "kind": "youtube#playlist",
+      "etag": "x",
+      "id": "PLshorts",
+      "snippet": {
+        "publishedAt": "2024-01-16T00:00:00Z",
+        "channelId": "UCSpQNTtLDeQ5Z571g9j0LRg",
+        "title": "Youtube Shorts"
+      },
+      "contentDetails": {
+        "itemCount": 275
+      }
+    }
+  ]
+}

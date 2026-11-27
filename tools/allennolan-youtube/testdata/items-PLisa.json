@@ -1,0 +1,50 @@
+{
+  "kind": "youtube#playlistItemListResponse",
+  "etag": "i",
+  "pageInfo": {
+    "totalResults": 2,
+    "resultsPerPage": 50
+  },
+  "items": [
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "x",
+      "id": "UIisaAAAAAAA1",
+      "snippet": {
+        "publishedAt": "2026-01-01T00:00:00Z",
+        "channelId": "UCSpQNTtLDeQ5Z571g9j0LRg",
+        "title": "Decoding Isaiah 53: In-Depth Verse by Verse Analysis 1 | Pastor Allen Nolan Full Sermon",
+        "description": "This study of Isaiah 53 also cites Isaiah 16:11, John 12 and Daniel 9.",
+        "playlistId": "x",
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "isaAAAAAAA1"
+        }
+      },
+      "contentDetails": {
+        "videoId": "isaAAAAAAA1",
+        "videoPublishedAt": "2022-04-25T14:00:00Z"
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "x",
+      "id": "UIisaAAAAAAA2",
+      "snippet": {
+        "publishedAt": "2026-01-01T00:00:00Z",
+        "channelId": "UCSpQNTtLDeQ5Z571g9j0LRg",
+        "title": "Jesus' Suffering and Great Glory: Isaiah 53 Verse by Verse 2 | Pastor Allen Nolan Full Sermon",
+        "description": "Pastor Allen Nolan (fixture description).",
+        "playlistId": "x",
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "isaAAAAAAA2"
+        }
+      },
+      "contentDetails": {
+        "videoId": "isaAAAAAAA2",
+        "videoPublishedAt": "2022-05-02T14:00:00Z"
+      }
+    }
+  ]
+}

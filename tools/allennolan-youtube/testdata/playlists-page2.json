@@ -1,0 +1,62 @@
+{
+  "kind": "youtube#playlistListResponse",
+  "etag": "p2",
+  "pageInfo": {
+    "totalResults": 9,
+    "resultsPerPage": 5
+  },
+  "items": [
+    {
+      "kind": "youtube#playlist",
+      "etag": "x",
+      "id": "PLrev5",
+      "snippet": {
+        "publishedAt": "2024-01-16T00:00:00Z",
+        "channelId": "UCSpQNTtLDeQ5Z571g9j0LRg",
+        "title": "Revelation Chapter 5 | Allen Nolan"
+      },
+      "contentDetails": {
+        "itemCount": 2
+      }
+    },
+    {
+      "kind": "youtube#playlist",
+      "etag": "x",
+      "id": "PLchap",
+      "snippet": {
+        "publishedAt": "2024-01-16T00:00:00Z",
+        "channelId": "UCSpQNTtLDeQ5Z571g9j0LRg",
+        "title": "Revelation Bible Study by Chapters"
+      },
+      "contentDetails": {
+        "itemCount": 3
+      }
+    },
+    {
+      "kind": "youtube#playlist",
+      "etag": "x",
+      "id": "PLisa",
+      "snippet": {
+        "publishedAt": "2024-01-16T00:00:00Z",
+        "channelId": "UCSpQNTtLDeQ5Z571g9j0LRg",
+        "title": "Isaiah 53 Verse by Verse Bible Study | Allen Nolan"
+      },
+      "contentDetails": {
+        "itemCount": 2
+      }
+    },
+    {
+      "kind": "youtube#playlist",
+      "etag": "x",
+      "id": "PLcor",
+      "snippet": {
+        "publishedAt": "2024-01-16T00:00:00Z",
+        "channelId": "UCSpQNTtLDeQ5Z571g9j0LRg",
+        "title": "1 Corinthians 13 | Pastor Allen Nolan"
+      },
+      "contentDetails": {
+        "itemCount": 1
+      }
+    }
+  ]
+}
