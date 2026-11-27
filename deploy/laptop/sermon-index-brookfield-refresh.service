@@ -2,14 +2,15 @@
 # daemon. Started by sermon-index-brookfield-refresh.timer. For `systemctl --user`.
 #
 # It reads the YouTube key from the vault (mw secrets get youtube_api_key) into
-# the environment of one go run, regenerates sources/brookfield-first and
-# data/morning-rephil.jsonl, commits and pushes them only if they changed, then
-# loads sources/ into the live database (sermons load --all) and only then
-# writes the stamp.
+# the environment of each go run, regenerates sources/brookfield-first,
+# data/morning-rephil.jsonl and sources/allennolan (Pastor Allen Nolan's book
+# playlists, tools/allennolan-youtube), commits and pushes them only if they
+# changed, then loads sources/ into the live database (sermons load --all) and
+# only then, when both tools succeeded, writes the stamp.
 # The key is in no file and no unit. A failed run is mailed to the Mayor by
 # OnFailure=.
 [Unit]
-Description=Sermon index: regenerate Brookfield First's YouTube list and commit it if it changed
+Description=Sermon index: regenerate Brookfield First's and allennolan's YouTube lists and commit them if they changed
 After=network-online.target
 Wants=network-online.target
 OnFailure=mw-unit-failed@%n.service

@@ -26,8 +26,21 @@ const fakeKey = "fake-key-for-test-7731"
 // that the key reached its environment, never the key.
 const fakeGoRefresh = `#!/bin/sh
 echo "go $*" >> "$FAKE_LOG"
-[ "$1" = run ] && [ "$2" = ./tools/brookfield-youtube ] || exit 2
-[ -n "$YOUTUBE_API_KEY" ] && echo "key-in-environment" >> "$FAKE_LOG"
+[ "$1" = run ] || exit 2
+[ -n "$YOUTUBE_API_KEY" ] && echo "key-in-environment $2" >> "$FAKE_LOG"
+case "$2" in
+./tools/allennolan-youtube)
+	case "$FAKE_ALLEN" in
+	fail) echo "allennolan-youtube: playlists.list: 403 quota exceeded" >&2; exit 1 ;;
+	partial) echo garbage > sources/allennolan/rows.jsonl; echo "allennolan-youtube: disk full" >&2; exit 1 ;;
+	esac
+	printf '%s\n' "${FAKE_ALLEN_ROWS:-old allen row}" > sources/allennolan/rows.jsonl
+	echo "wrote allennolan"
+	exit 0
+	;;
+./tools/brookfield-youtube) ;;
+*) exit 2 ;;
+esac
 case "$FAKE_FETCH" in
 fail) echo "brookfield-youtube: playlistItems.list: 403 quota exceeded" >&2; exit 1 ;;
 partial) echo garbage > sources/brookfield-first/rows.jsonl; echo "brookfield-youtube: disk full" >&2; exit 1 ;;
@@ -115,6 +128,8 @@ func newRefreshRig(t *testing.T) *refreshRig {
 	for rel, body := range map[string]string{
 		"sources/brookfield-first/rows.jsonl":  "old row\n",
 		"sources/brookfield-first/source.toml": "id = 'x'\n",
+		"sources/allennolan/rows.jsonl":        "old allen row\n",
+		"sources/allennolan/source.toml":       "id = 'allennolan'\n",
 		"data/morning-rephil.jsonl":            "{\"number\":1}\n",
 		"README.md":                            "readme\n",
 	} {
@@ -218,7 +233,7 @@ func TestRefreshCommitsAndPushesWhenTheOutputChanged(t *testing.T) {
 	}
 	// The key reached the one go run, and is printed nowhere.
 	logb, _ := os.ReadFile(r.log)
-	if !strings.Contains(string(logb), "key-in-environment") {
+	if !strings.Contains(string(logb), "key-in-environment ./tools/brookfield-youtube") {
 		t.Errorf("the key did not reach go run's environment:\n%s", logb)
 	}
 	if strings.Contains(out, fakeKey) || strings.Contains(string(logb), fakeKey) {
@@ -555,5 +570,135 @@ func TestInstallEnablesTheRefreshTimersAndUninstallRemovesThem(t *testing.T) {
 		if !strings.Contains(r.calls(), "systemctl --user disable --now "+timer) {
 			t.Errorf("uninstall did not disable %s:\n%s", timer, r.calls())
 		}
+	}
+}
+
+func TestRefreshRunsAllennolanWithTheKeyAndCommitsOnlyWhatChanged(t *testing.T) {
+	r := newRefreshRig(t)
+	// Brookfield unchanged, allennolan changed: one commit, holding allennolan only.
+	out, code := r.run("scripts/refresh-brookfield.sh", "FAKE_ROWS=old row", "FAKE_ALLEN_ROWS=new allen row")
+	if code != 0 {
+		t.Fatalf("exit %d:\n%s", code, out)
+	}
+	if !strings.Contains(r.calls(), "go run ./tools/allennolan-youtube") {
+		t.Errorf("allennolan-youtube was not run:\n%s", r.calls())
+	}
+	if !strings.Contains(r.calls(), "key-in-environment ./tools/allennolan-youtube") {
+		t.Errorf("the key did not reach allennolan-youtube:\n%s", r.calls())
+	}
+	if strings.Contains(out, fakeKey) || strings.Contains(r.calls(), fakeKey) {
+		t.Error("the key was printed or logged")
+	}
+	if got := r.file("sources/allennolan/rows.jsonl"); got != "new allen row\n" {
+		t.Errorf("allennolan rows.jsonl = %q", got)
+	}
+	if got := r.commits(); got != "2" {
+		t.Errorf("commits = %s, want 2", got)
+	}
+	files := git(t, r.clone, "show", "--name-only", "--format=", "HEAD")
+	if files != "sources/allennolan/rows.jsonl" {
+		t.Errorf("the commit holds %q, want only sources/allennolan/rows.jsonl", files)
+	}
+	if head, remote := git(t, r.clone, "rev-parse", "HEAD"), git(t, r.origin, "rev-parse", "main"); head != remote {
+		t.Errorf("the commit was not pushed")
+	}
+	if _, err := os.Stat(r.stamp()); err != nil {
+		t.Errorf("no stamp after a good run: %v", err)
+	}
+}
+
+func TestRefreshWithAllennolanUnchangedMakesNoCommit(t *testing.T) {
+	r := newRefreshRig(t)
+	out, code := r.run("scripts/refresh-brookfield.sh", "FAKE_ROWS=old row", "FAKE_ALLEN_ROWS=old allen row")
+	if code != 0 {
+		t.Fatalf("exit %d:\n%s", code, out)
+	}
+	if got := r.commits(); got != "1" {
+		t.Errorf("commits = %s, want 1", got)
+	}
+	if !strings.Contains(r.calls(), "go run ./tools/allennolan-youtube") {
+		t.Errorf("allennolan-youtube was not run:\n%s", r.calls())
+	}
+}
+
+func TestRefreshWhenAllennolanFailsRestoresBothAndLeavesTheStamp(t *testing.T) {
+	for _, mode := range []string{"fail", "partial"} {
+		t.Run(mode, func(t *testing.T) {
+			r := newRefreshRig(t)
+			old := time.Now().Add(-10 * 24 * time.Hour)
+			r.writeStamp(old)
+			out, code := r.run("scripts/refresh-brookfield.sh", "FAKE_ROWS=old row", "FAKE_ALLEN="+mode)
+			if code == 0 {
+				t.Fatalf("exit 0 though allennolan-youtube failed:\n%s", out)
+			}
+			if !strings.Contains(out, "allennolan-youtube") {
+				t.Errorf("the failure does not say what failed:\n%s", out)
+			}
+			if got := r.file("sources/allennolan/rows.jsonl"); got != "old allen row\n" {
+				t.Errorf("allennolan rows.jsonl changed to %q", got)
+			}
+			if st := git(t, r.clone, "status", "--porcelain"); st != "" {
+				t.Errorf("the tree is not clean after the failure:\n%s", st)
+			}
+			if got := r.commits(); got != "1" {
+				t.Errorf("commits = %s, want 1", got)
+			}
+			b, _ := os.ReadFile(r.stamp())
+			if strings.TrimSpace(string(b)) != strconv.FormatInt(old.Unix(), 10) {
+				t.Errorf("a failed run moved the stamp to %q", b)
+			}
+		})
+	}
+}
+
+func TestRefreshWhenAllennolanFailsStillKeepsBrookfieldsNewList(t *testing.T) {
+	r := newRefreshRig(t)
+	old := time.Now().Add(-10 * 24 * time.Hour)
+	r.writeStamp(old)
+	out, code := r.run("scripts/refresh-brookfield.sh", "FAKE_ROWS=new row", "FAKE_ALLEN=fail")
+	if code == 0 {
+		t.Fatalf("exit 0 though allennolan-youtube failed:\n%s", out)
+	}
+	if got := r.file("sources/brookfield-first/rows.jsonl"); got != "new row\n" {
+		t.Errorf("brookfield's new list was dropped: %q", got)
+	}
+	if got := r.commits(); got != "2" {
+		t.Errorf("commits = %s, want 2", got)
+	}
+	if files := git(t, r.clone, "show", "--name-only", "--format=", "HEAD"); strings.Contains(files, "allennolan") {
+		t.Errorf("the commit holds allennolan files:\n%s", files)
+	}
+	b, _ := os.ReadFile(r.stamp())
+	if strings.TrimSpace(string(b)) != strconv.FormatInt(old.Unix(), 10) {
+		t.Errorf("a failed run moved the stamp to %q", b)
+	}
+}
+
+func TestRefreshRefusesAnEditedAllennolanFile(t *testing.T) {
+	r := newRefreshRig(t)
+	if err := os.WriteFile(filepath.Join(r.clone, "sources/allennolan/rows.jsonl"), []byte("someone's edit\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out, code := r.run("scripts/refresh-brookfield.sh", "FAKE_ROWS=new row")
+	if code == 0 {
+		t.Fatalf("exit 0 over an edited allennolan file:\n%s", out)
+	}
+	if got := r.file("sources/allennolan/rows.jsonl"); got != "someone's edit\n" {
+		t.Errorf("the edit was overwritten: %q", got)
+	}
+}
+
+func TestStaleMessageAndRefreshUnitNameAllennolan(t *testing.T) {
+	r := newRefreshRig(t)
+	r.writeStamp(time.Now().Add(-28 * 24 * time.Hour))
+	if out, code := r.run("scripts/check-brookfield-stale.sh"); code == 0 || !strings.Contains(out, "allennolan") {
+		t.Errorf("the stale message does not name allennolan: exit %d, %q", code, out)
+	}
+	b, err := os.ReadFile(filepath.Join(repoRoot(t), "deploy/laptop/sermon-index-brookfield-refresh.service"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(b), "allennolan") {
+		t.Error("the refresh service does not say it also refreshes allennolan")
 	}
 }

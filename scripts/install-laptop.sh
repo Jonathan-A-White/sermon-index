@@ -21,7 +21,7 @@
 #
 # It also installs the Brookfield First refresh (deploy/laptop/
 # sermon-index-brookfield-*): a service and a timer that regenerate the YouTube
-# list (and the Morning RePhil episodes) every day, and a daily check that it did.
+# list (and the Morning RePhil episodes, and allennolan's YouTube list) every day, and a daily check that it did.
 # The install enables both timers but fetches nothing; the units run the
 # scripts of the checkout at ~/sermon-index. The same goes for the hourly
 # Subsplash linking (sermon-index-subsplash-hourly.*, scripts/subsplash-hourly.sh).

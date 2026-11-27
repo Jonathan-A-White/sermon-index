@@ -1,5 +1,5 @@
 #!/bin/sh
-# Exit non-zero when Brookfield First's YouTube list was last refreshed more
+# Exit non-zero when Brookfield First's and allennolan's YouTube lists were last refreshed more
 # than 27 days ago, or never (no stamp, or one that is not a number).
 #
 #   scripts/check-brookfield-stale.sh
@@ -25,6 +25,6 @@ esac
 now=$(date +%s)
 age=$((now - at))
 if [ "$age" -gt $((STALE_DAYS * 86400)) ]; then
-	stale "the last good refresh of the Brookfield First list was $((age / 86400)) days ago ($(date -u -d "@$at" +%F)); YouTube allows 30. Run scripts/refresh-brookfield.sh and read the journal: journalctl --user -u sermon-index-brookfield-refresh"
+	stale "the last good refresh of the Brookfield First and allennolan YouTube lists was $((age / 86400)) days ago ($(date -u -d "@$at" +%F)); YouTube allows 30. Run scripts/refresh-brookfield.sh and read the journal: journalctl --user -u sermon-index-brookfield-refresh"
 fi
 echo "check-brookfield-stale: the last good refresh was $((age / 86400)) days ago; fine"
