@@ -8,9 +8,9 @@
 # the tool, not the file. Nothing is downloaded: no video, no audio, no caption.
 #
 # What the tool counted (REPORT.md lists what it could not sort):
-#   527 videos seen, 356 sermons, 238 with a preacher, 343 with a passage
-#   (2 of them series, matched by no passage), 225 Morning RePhil episodes
-#   (in data/morning-rephil.jsonl, not here), dates 2020-03-15 to 2026-11-22.
+#   528 videos seen, 356 sermons, 238 with a preacher, 343 with a passage
+#   (2 of them series, matched by no passage), 226 Morning RePhil episodes
+#   (in data/morning-rephil.jsonl, not here), dates 2020-03-15 to 2026-11-26.
 #   344 of them carry the title, preacher and passage of the church's own list
 #   (passages.tsv, merged by date; see REPORT.md).
 #
